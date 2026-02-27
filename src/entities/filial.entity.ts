@@ -1,8 +1,8 @@
 import { Entity, Column } from 'typeorm';
-import { BaseEntity } from '../../common/entities/base.entity';
+import { BaseEntityAuditable } from '../../common/entities/base.entity';
 
 @Entity('filiales')
-export class Filial extends BaseEntity {
+export class Filial extends BaseEntityAuditable {
 
   @Column({ unique: true, length: 10 })
   codigo: string;
