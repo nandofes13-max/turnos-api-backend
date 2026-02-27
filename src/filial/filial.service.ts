@@ -28,4 +28,13 @@ export class FilialService {
     const filial = this.filialRepository.create(data);
     return this.filialRepository.save(filial);
   }
+
+  async debugStructure(): Promise<any> {
+    return this.filialRepository.query(`
+      SELECT column_name, data_type, is_nullable
+      FROM information_schema.columns
+      WHERE table_name = 'filial'
+         OR table_name = 'filiales';
+    `);
+  }
 }
