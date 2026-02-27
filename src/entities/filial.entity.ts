@@ -1,16 +1,12 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column } from 'typeorm';
+import { BaseEntity } from '../../common/entities/base.entity';
 
 @Entity('filiales')
-export class Filial {
-  @PrimaryGeneratedColumn()
-  id: number;
+export class Filial extends BaseEntity {
 
-  @Column()
+  @Column({ unique: true, length: 10 })
+  codigo: string;
+
+  @Column({ length: 150 })
   nombre: string;
-
-  @Column()
-  direccion: string;
-
-  @Column({ nullable: true })
-  telefono?: string;
 }
