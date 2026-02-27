@@ -20,4 +20,9 @@ export class FilialController {
   create(@Body() body: Partial<Filial>): Promise<Filial> {
     return this.filialService.create(body);
   }
+
+  @Get('debug/structure')
+  debugStructure() {
+    return this.filialService.debugStructure();
+  }
 }
