@@ -9,9 +9,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
       ssl: {
         rejectUnauthorized: false,
       },
-      extra: {
-        family: 4, // 👈 ESTO SOLUCIONA ENETUNREACH
-      },
       autoLoadEntities: true,
       synchronize: false,
     }),
