@@ -14,7 +14,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
         family: 4, // fuerza IPv4, evita errores ENETUNREACH en Render
       },
       autoLoadEntities: true, // carga automáticamente las entidades de tu proyecto
-      synchronize: false,     // 🔹 en producción no conviene sincronizar schema automáticamente
+      synchronize: true,     // 🔹 en producción no conviene sincronizar schema automáticamente
     }),
   ],
 })
