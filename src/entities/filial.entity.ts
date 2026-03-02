@@ -1,12 +1,13 @@
-import { Entity, Column } from 'typeorm';
-import { BaseEntityAuditable } from '../../common/entities/base.entity';
+import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 
-@Entity('filiales')
-export class Filial extends BaseEntityAuditable {
+@Entity()
+export class Filial {
+  @PrimaryGeneratedColumn()
+  id: number;
 
-  @Column({ unique: true, length: 10 })
+  @Column()
   codigo: string;
 
-  @Column({ length: 150 })
+  @Column()
   nombre: string;
 }
