@@ -1,6 +1,7 @@
 // src/app.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { FilialModule } from './filial/filial.module';
 
 @Module({
   imports: [
@@ -13,9 +14,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
       extra: {
         family: 4, // fuerza IPv4, evita errores ENETUNREACH en Render
       },
-      autoLoadEntities: true, // carga automáticamente las entidades de tu proyecto
-      synchronize: true,     // 🔹 en producción no conviene sincronizar schema automáticamente
+      entities: [__dirname + '/**/*.entity{.ts,.js}'], // 🔹 ruta correcta para dev y prod
+      autoLoadEntities: true,
+      synchronize: true, // 🔹 solo para demo
     }),
+    FilialModule, // 🔹 asegúrate de importar tu módulo
   ],
 })
 export class AppModule {}
