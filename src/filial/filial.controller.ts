@@ -52,8 +52,8 @@ export class FilialController {
 
   // ===== FUNCIÓN AUXILIAR =====
   private agregarUltimoMovimiento(filial: Filial): any {
-    // Convertir a objeto plano para poder agregar propiedades
-    const filialObj = { ...filial };
+    // Crear objeto con todas las propiedades de filial más ultimoMovimiento
+    const filialObj: any = { ...filial };
     
     // Calcular último movimiento
     let ultimoMovimiento = 'Sin información';
