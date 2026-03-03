@@ -59,16 +59,16 @@ export class FilialController {
     let ultimoMovimiento = 'Sin información';
     
     if (filial.fecha_baja && filial.usuario_baja) {
-      ultimoMovimiento = `${filial.usuario_baja} - BAJA - ${this.formatearFecha(filial.fecha_baja)}`;
+      ultimoMovimiento = `${filial.usuario_baja} - BAJA - ${this.formatearFechaArgentina(filial.fecha_baja)}`;
     } 
     else if (filial.fecha_modificacion && 
              filial.fecha_alta && 
              new Date(filial.fecha_modificacion).getTime() !== new Date(filial.fecha_alta).getTime() && 
              filial.usuario_modificacion) {
-      ultimoMovimiento = `${filial.usuario_modificacion} - MODIFICACIÓN - ${this.formatearFecha(filial.fecha_modificacion)}`;
+      ultimoMovimiento = `${filial.usuario_modificacion} - MODIFICACIÓN - ${this.formatearFechaArgentina(filial.fecha_modificacion)}`;
     } 
     else if (filial.usuario_alta) {
-      ultimoMovimiento = `${filial.usuario_alta} - ALTA - ${this.formatearFecha(filial.fecha_alta)}`;
+      ultimoMovimiento = `${filial.usuario_alta} - ALTA - ${this.formatearFechaArgentina(filial.fecha_alta)}`;
     }
     
     // Agregar el campo al objeto
@@ -77,13 +77,27 @@ export class FilialController {
     return filialObj;
   }
 
-  private formatearFecha(fecha: Date): string {
+  private formatearFechaArgentina(fecha: Date): string {
+    // Opción 1: Usar toLocaleString con zona horaria explícita
     return new Date(fecha).toLocaleString('es-AR', {
+      timeZone: 'America/Argentina/Buenos_Aires',
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      hour12: false // Para formato 24 horas
     }).replace(',', '');
+    
+    // Opción 2 (alternativa más simple si la anterior no funciona):
+    // const fechaArg = new Date(fecha);
+    // fechaArg.setHours(fechaArg.getHours() - 3); // Restar 3 horas (UTC-3)
+    // return fechaArg.toLocaleString('es-AR', {
+    //   day: '2-digit',
+    //   month: '2-digit',
+    //   year: 'numeric',
+    //   hour: '2-digit',
+    //   minute: '2-digit'
+    // }).replace(',', '');
   }
 }
