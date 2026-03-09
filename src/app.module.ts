@@ -1,24 +1,25 @@
-// src/app.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FilialModule } from './filial/filial.module';
+import { ActividadModule } from './actividades/actividad.module'; // 👈 AGREGADO
 
 @Module({
   imports: [
     TypeOrmModule.forRoot({
       type: 'postgres',
-      url: process.env.DATABASE_URL, // URL de Supabase guardada como variable de entorno en Render
+      url: process.env.DATABASE_URL,
       ssl: {
-        rejectUnauthorized: false, // necesario porque Supabase pooler usa certificado autofirmado
+        rejectUnauthorized: false,
       },
       extra: {
-        family: 4, // fuerza IPv4, evita errores ENETUNREACH en Render
+        family: 4,
       },
-      entities: [__dirname + '/**/*.entity{.ts,.js}'], // 🔹 ruta correcta para dev y prod
+      entities: [__dirname + '/**/*.entity{.ts,.js}'],
       autoLoadEntities: true,
-      synchronize: true, // 🔹 solo para demo
+      synchronize: true,
     }),
-    FilialModule, // 🔹 asegúrate de importar tu módulo
+    FilialModule,
+    ActividadModule, // 👈 AGREGADO
   ],
 })
 export class AppModule {}
