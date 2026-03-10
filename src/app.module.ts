@@ -1,7 +1,9 @@
+// src/app.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FilialModule } from './filial/filial.module';
-import { ActividadModule } from './actividades/actividad.module'; // 👈 AGREGADO
+import { ActividadModule } from './actividades/actividad.module';
+import { UsuariosModule } from './usuarios/usuarios.module'; // 👈 AGREGADO
 
 @Module({
   imports: [
@@ -19,7 +21,8 @@ import { ActividadModule } from './actividades/actividad.module'; // 👈 AGREGA
       synchronize: true,
     }),
     FilialModule,
-    ActividadModule, // 👈 AGREGADO
+    ActividadModule,
+    UsuariosModule, // 👈 AGREGADO
   ],
 })
 export class AppModule {}
