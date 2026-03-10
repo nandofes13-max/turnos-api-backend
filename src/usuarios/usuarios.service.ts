@@ -5,6 +5,7 @@ import { Repository, IsNull } from 'typeorm';
 import { Usuario } from './entities/usuario.entity';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
+import { DOMINIOS_VALIDOS } from './constants/dominios-email';
 import * as dns from 'dns';
 import { promisify } from 'util';
 
@@ -25,8 +26,70 @@ export class UsuariosService {
       const mxRecords = await resolveMx(dominio);
       return mxRecords && mxRecords.length > 0;
     } catch (error) {
-      return false; // El dominio no existe o no tiene MX
+      return false;
     }
+  }
+
+  // ===== VALIDACIÓN DE DOMINIO CONOCIDO =====
+  private validarDominioConocido(email: string): { valido: boolean; sugerencia?: string } {
+    const dominio = email.split('@')[1];
+    
+    // Si el dominio está en la lista de conocidos, es válido
+    if (DOMINIOS_VALIDOS.includes(dominio)) {
+      return { valido: true };
+    }
+    
+    // Detectar errores comunes en Gmail
+    if (dominio.startsWith('gmail.')) {
+      return { 
+        valido: false, 
+        sugerencia: '¿Quisiste decir gmail.com?' 
+      };
+    }
+    
+    // Detectar gnail → gmail
+    if (dominio === 'gnail.com' || dominio === 'gmai.com' || dominio === 'gmal.com') {
+      return { 
+        valido: false, 
+        sugerencia: '¿Quisiste decir gmail.com?' 
+      };
+    }
+    
+    // Detectar hotmal / hotmil → hotmail
+    if (dominio.includes('hotmail') && dominio !== 'hotmail.com' && !dominio.endsWith('.com')) {
+      return { 
+        valido: false, 
+        sugerencia: 'Los dominios de Hotmail suelen ser hotmail.com, hotmail.com.ar, etc.' 
+      };
+    }
+    
+    // Detectar yahoo errores comunes
+    if (dominio === 'yahooo.com' || dominio === 'yahoo.com.ar' || dominio === 'yahoo.com') {
+      return { valido: true }; // estos sí son válidos
+    }
+    if (dominio.startsWith('yahoo.') && dominio !== 'yahoo.com') {
+      return { 
+        valido: false, 
+        sugerencia: '¿Quisiste decir yahoo.com?' 
+      };
+    }
+    
+    // Detectar outlook errores
+    if (dominio === 'outlook.com' || dominio === 'outlook.com.ar' || dominio === 'outlook.com.mx') {
+      return { valido: true };
+    }
+    if (dominio.startsWith('outlook.') && !dominio.endsWith('.com')) {
+      return { 
+        valido: false, 
+        sugerencia: '¿Quisiste decir outlook.com?' 
+      };
+    }
+    
+    // Si el dominio tiene MX pero no está en lista, lo aceptamos pero con advertencia
+    return { 
+      valido: true, 
+      sugerencia: 'El dominio es válido pero poco común. Verificá que sea correcto.' 
+    };
   }
 
   // Obtener todos los usuarios
@@ -45,7 +108,7 @@ export class UsuariosService {
     return usuario;
   }
 
-  // Obtener un usuario por email (útil para login)
+  // Obtener un usuario por email
   async findByEmail(email: string): Promise<Usuario | null> {
     return this.usuariosRepository.findOneBy({ email: email.toLowerCase() });
   }
@@ -53,9 +116,15 @@ export class UsuariosService {
   // Crear usuario con auditoría
   async create(createUsuarioDto: CreateUsuarioDto, usuario?: string): Promise<Usuario> {
     // Validar MX records del dominio
-    const dominioValido = await this.validarMX(createUsuarioDto.email);
-    if (!dominioValido) {
+    const mxValido = await this.validarMX(createUsuarioDto.email);
+    if (!mxValido) {
       throw new BadRequestException('El dominio del email no existe o no puede recibir correos');
+    }
+
+    // Validar dominio conocido y obtener sugerencia
+    const dominioValido = this.validarDominioConocido(createUsuarioDto.email);
+    if (!dominioValido.valido) {
+      throw new BadRequestException(dominioValido.sugerencia || 'El dominio del email no es válido');
     }
 
     // Convertir email a minúsculas
@@ -86,12 +155,18 @@ export class UsuariosService {
   async update(id: number, updateUsuarioDto: UpdateUsuarioDto, usuario?: string): Promise<Usuario> {
     const usuarioExistente = await this.findOne(id);
 
-    // Si se actualiza el email, validar MX
+    // Si se actualiza el email, validar MX y dominio
     if (updateUsuarioDto.email) {
-      const dominioValido = await this.validarMX(updateUsuarioDto.email);
-      if (!dominioValido) {
+      const mxValido = await this.validarMX(updateUsuarioDto.email);
+      if (!mxValido) {
         throw new BadRequestException('El dominio del email no existe o no puede recibir correos');
       }
+
+      const dominioValido = this.validarDominioConocido(updateUsuarioDto.email);
+      if (!dominioValido.valido) {
+        throw new BadRequestException(dominioValido.sugerencia || 'El dominio del email no es válido');
+      }
+
       updateUsuarioDto.email = updateUsuarioDto.email.toLowerCase();
     }
 
