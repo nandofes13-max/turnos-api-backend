@@ -1,7 +1,7 @@
 // src/usuarios/usuarios.service.ts
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { Usuario } from './entities/usuario.entity';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
@@ -64,7 +64,7 @@ export class UsuariosService {
     // Verificar si ya existe un usuario activo con ese email
     const existente = await this.usuariosRepository.findOneBy({ 
       email: emailLower,
-      fecha_baja: null 
+      fecha_baja: IsNull()
     });
     
     if (existente) {
