@@ -3,7 +3,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FilialModule } from './filial/filial.module';
 import { ActividadModule } from './actividades/actividad.module';
-import { UsuariosModule } from './usuarios/usuarios.module'; // 👈 AGREGADO
+import { UsuariosModule } from './usuarios/usuarios.module';
+import { RolesModule } from './roles/roles.module'; // 👈 AGREGADO
 
 @Module({
   imports: [
@@ -22,7 +23,8 @@ import { UsuariosModule } from './usuarios/usuarios.module'; // 👈 AGREGADO
     }),
     FilialModule,
     ActividadModule,
-    UsuariosModule, // 👈 AGREGADO
+    UsuariosModule,
+    RolesModule, // 👈 AGREGADO
   ],
 })
 export class AppModule {}
