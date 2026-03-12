@@ -4,7 +4,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { FilialModule } from './filial/filial.module';
 import { ActividadModule } from './actividades/actividad.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
-import { RolesModule } from './roles/roles.module'; // 👈 AGREGADO
+import { RolesModule } from './roles/roles.module';
+import { NegociosModule } from './negocios/negocios.module'; // 👈 AGREGADO
 
 @Module({
   imports: [
@@ -24,7 +25,8 @@ import { RolesModule } from './roles/roles.module'; // 👈 AGREGADO
     FilialModule,
     ActividadModule,
     UsuariosModule,
-    RolesModule, // 👈 AGREGADO
+    RolesModule,
+    NegociosModule, // 👈 AGREGADO
   ],
 })
 export class AppModule {}
