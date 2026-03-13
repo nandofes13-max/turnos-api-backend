@@ -5,6 +5,7 @@ import { Repository, IsNull } from 'typeorm';
 import { Negocio } from './entities/negocio.entity';
 import { CreateNegocioDto } from './dto/create-negocio.dto';
 import { UpdateNegocioDto } from './dto/update-negocio.dto';
+import { parsePhoneNumber } from 'libphonenumber-js';
 
 @Injectable()
 export class NegociosService {
@@ -13,9 +14,34 @@ export class NegociosService {
     private readonly negociosRepository: Repository<Negocio>,
   ) {}
 
+  // ===== VALIDACIÓN DE WHATSAPP CON LIBPHONENUMBER =====
+  private validarWhatsApp(country_code: number, national_number: string): string {
+    // Construir el número completo para validar
+    const numeroCompleto = `+${country_code}${national_number.replace(/\D/g, '')}`;
+    
+    try {
+      const phoneNumber = parsePhoneNumber(numeroCompleto);
+      
+      // Verificar que sea un número válido según el país
+      if (!phoneNumber || !phoneNumber.isValid()) {
+        throw new BadRequestException('El número de WhatsApp no es válido para el país seleccionado');
+      }
+      
+      // Opcional: verificar que sea un número móvil (no todos los países distinguen)
+      // if (phoneNumber.getType() !== 'MOBILE') {
+      //   throw new BadRequestException('El número debe ser un teléfono móvil');
+      // }
+      
+      // Devolver el número en formato E.164
+      return phoneNumber.number;
+      
+    } catch (error) {
+      throw new BadRequestException('Error al validar el número de WhatsApp: ' + error.message);
+    }
+  }
+
   // ===== FUNCIÓN PARA GENERAR URL ÚNICA =====
   private async generarUrlUnica(nombre: string): Promise<string> {
-    // Convertir a minúsculas, reemplazar espacios y caracteres especiales
     let baseUrl = nombre
       .toLowerCase()
       .trim()
@@ -25,8 +51,8 @@ export class NegociosService {
       .replace(/[óöôò]/g, 'o')
       .replace(/[úüûù]/g, 'u')
       .replace(/[ñ]/g, 'n')
-      .replace(/[^a-z0-9]+/g, '-') // Reemplazar caracteres no válidos por guiones
-      .replace(/^-+|-+$/g, '');     // Eliminar guiones al inicio o final
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
 
     if (!baseUrl) {
       baseUrl = 'negocio';
@@ -35,7 +61,6 @@ export class NegociosService {
     let url = baseUrl;
     let contador = 1;
 
-    // Verificar si la URL ya existe
     while (await this.negociosRepository.findOneBy({ url, fecha_baja: IsNull() })) {
       url = `${baseUrl}-${contador}`;
       contador++;
@@ -60,7 +85,7 @@ export class NegociosService {
     return negocio;
   }
 
-  // Obtener un negocio por URL (para la agenda pública)
+  // Obtener un negocio por URL
   async findByUrl(url: string): Promise<Negocio | null> {
     return this.negociosRepository.findOneBy({ 
       url,
@@ -68,14 +93,23 @@ export class NegociosService {
     });
   }
 
-  // Crear negocio con auditoría y generación automática de URL
+  // Crear negocio con auditoría
   async create(createNegocioDto: CreateNegocioDto, usuario?: string): Promise<Negocio> {
-    // Generar URL única basada en el nombre
+    // 1. Validar WhatsApp con libphonenumber
+    const whatsappE164 = this.validarWhatsApp(
+      createNegocioDto.country_code,
+      createNegocioDto.national_number
+    );
+
+    // 2. Generar URL única
     const url = await this.generarUrlUnica(createNegocioDto.nombre);
 
+    // 3. Crear la entidad (el hook @BeforeInsert generará whatsapp_e164)
     const negocioEntity = this.negociosRepository.create({
       ...createNegocioDto,
-      url, // URL generada automáticamente
+      url,
+      // Aseguramos que el formato E164 sea el validado
+      whatsapp_e164: whatsappE164,
       usuario_alta: usuario || 'demo',
     });
 
@@ -86,10 +120,25 @@ export class NegociosService {
   async update(id: number, updateNegocioDto: UpdateNegocioDto, usuario?: string): Promise<Negocio> {
     const negocioExistente = await this.findOne(id);
 
-    // Si se actualiza el nombre, regenerar la URL (opcional)
-    // Por ahora, no regeneramos URL automáticamente para evitar romper enlaces existentes
-    // Si se quisiera, habría que implementar lógica similar a create()
+    // Si se actualizan campos de WhatsApp, validar nuevamente
+    if (updateNegocioDto.country_code || updateNegocioDto.national_number) {
+      const country_code = updateNegocioDto.country_code ?? negocioExistente.country_code;
+      const national_number = updateNegocioDto.national_number ?? negocioExistente.national_number;
+      
+      const whatsappE164 = this.validarWhatsApp(country_code, national_number);
+      
+      // Actualizar los campos
+      if (updateNegocioDto.country_code) {
+        negocioExistente.country_code = updateNegocioDto.country_code;
+      }
+      if (updateNegocioDto.national_number) {
+        negocioExistente.national_number = updateNegocioDto.national_number;
+      }
+      
+      // El hook @BeforeUpdate generará whatsapp_e164 automáticamente
+    }
 
+    // Si se actualiza el nombre, no regeneramos URL automáticamente
     Object.assign(negocioExistente, updateNegocioDto);
     negocioExistente.usuario_modificacion = usuario || 'demo';
 
