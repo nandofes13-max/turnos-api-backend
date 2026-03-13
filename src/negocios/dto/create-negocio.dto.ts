@@ -23,8 +23,8 @@ export class CreateNegocioDto {
   @IsString({ message: 'El WhatsApp debe ser texto' })
   @IsNotEmpty({ message: 'El WhatsApp es obligatorio' })
   @MaxLength(20, { message: 'El WhatsApp no puede tener más de 20 caracteres' })
-  @Matches(/^\+?[0-9]{10,15}$/, { 
-    message: 'El WhatsApp debe tener un formato válido (ej: +5491112345678)' 
+  @Matches(/^\+[1-9]{1}[0-9]{1,14}$/, { 
+    message: 'El WhatsApp debe tener formato internacional válido (ej: +5491112345678)' 
   })
   whatsapp: string;
 }
