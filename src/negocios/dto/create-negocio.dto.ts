@@ -1,11 +1,26 @@
 // src/negocios/dto/create-negocio.dto.ts
-import { IsString, IsNotEmpty, MaxLength, IsObject, Matches } from 'class-validator';
+import { IsString, IsNotEmpty, MaxLength, IsObject, IsOptional, IsNumber, Min, Max } from 'class-validator';
 
 export class CreateNegocioDto {
   @IsString({ message: 'El nombre debe ser texto' })
   @IsNotEmpty({ message: 'El nombre del negocio es obligatorio' })
   @MaxLength(100, { message: 'El nombre no puede tener más de 100 caracteres' })
   nombre: string;
+
+  // Campos de WhatsApp (nuevos)
+  @IsNumber({}, { message: 'El código de país debe ser un número' })
+  @IsNotEmpty({ message: 'El código de país es obligatorio' })
+  @Min(1, { message: 'El código de país debe ser mayor a 0' })
+  @Max(999, { message: 'El código de país no puede tener más de 3 dígitos' })
+  country_code: number;
+
+  @IsString({ message: 'El número nacional debe ser texto' })
+  @IsNotEmpty({ message: 'El número nacional es obligatorio' })
+  @MaxLength(15, { message: 'El número nacional no puede tener más de 15 dígitos' })
+  national_number: string;
+
+  // Este campo se generará automáticamente en el servicio, no viene del cliente
+  // whatsapp_e164: string;
 
   @IsObject({ message: 'El domicilio debe ser un objeto válido' })
   @IsNotEmpty({ message: 'El domicilio es obligatorio' })
@@ -19,12 +34,4 @@ export class CreateNegocioDto {
     latitud?: number;
     longitud?: number;
   };
-
-  @IsString({ message: 'El WhatsApp debe ser texto' })
-  @IsNotEmpty({ message: 'El WhatsApp es obligatorio' })
-  @MaxLength(20, { message: 'El WhatsApp no puede tener más de 20 caracteres' })
-  @Matches(/^\+[1-9]{1}[0-9]{1,14}$/, { 
-    message: 'El WhatsApp debe tener formato internacional válido (ej: +5491112345678)' 
-  })
-  whatsapp: string;
 }
