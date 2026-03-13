@@ -1,5 +1,5 @@
 // src/negocios/entities/negocio.entity.ts
-import { Entity, Column } from 'typeorm';
+import { Entity, Column, BeforeInsert, BeforeUpdate } from 'typeorm';
 import { BaseEntityAuditable } from '../../entities/base.entity';
 
 @Entity()
@@ -10,6 +10,16 @@ export class Negocio extends BaseEntityAuditable {
 
   @Column({ length: 100, unique: true })
   url: string;
+
+  // Nuevos campos de WhatsApp
+  @Column({ type: 'int', nullable: false })
+  country_code: number;
+
+  @Column({ length: 15, nullable: false })
+  national_number: string;
+
+  @Column({ length: 16, unique: true, nullable: false })
+  whatsapp_e164: string;
 
   @Column({ type: 'jsonb', nullable: true })
   domicilio: {
@@ -22,9 +32,6 @@ export class Negocio extends BaseEntityAuditable {
     latitud?: number;
     longitud?: number;
   };
-
-  @Column({ length: 20, nullable: true })
-  whatsapp: string;
 
   // Getter para último movimiento (igual que en otras entidades)
   get ultimoMovimiento(): string {
@@ -49,5 +56,16 @@ export class Negocio extends BaseEntityAuditable {
       hour: '2-digit',
       minute: '2-digit'
     }).replace(',', '');
+  }
+
+  // Generar whatsapp_e164 automáticamente antes de insertar/actualizar
+  @BeforeInsert()
+  @BeforeUpdate()
+  generarE164() {
+    if (this.country_code && this.national_number) {
+      // Eliminar cualquier carácter no numérico del número nacional
+      const soloNumeros = this.national_number.replace(/\D/g, '');
+      this.whatsapp_e164 = `+${this.country_code}${soloNumeros}`;
+    }
   }
 }
