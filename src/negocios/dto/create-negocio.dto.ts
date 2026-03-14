@@ -1,13 +1,65 @@
 // src/negocios/dto/create-negocio.dto.ts
-import { IsString, IsNotEmpty, MaxLength, IsObject, IsOptional, IsNumber, Min, Max } from 'class-validator';
+import { IsString, IsNotEmpty, MaxLength, IsNumber, Min, Max, IsObject, ValidateNested, IsOptional, IsLatitude, IsLongitude } from 'class-validator';
+import { Type } from 'class-transformer';
 
+// DTO para el domicilio estructurado
+export class DomicilioDto {
+  @IsString({ message: 'La calle debe ser texto' })
+  @IsNotEmpty({ message: 'La calle es obligatoria' })
+  @MaxLength(120, { message: 'La calle no puede tener más de 120 caracteres' })
+  street: string;
+
+  @IsString({ message: 'El número debe ser texto' })
+  @IsNotEmpty({ message: 'El número es obligatorio' })
+  @MaxLength(20, { message: 'El número no puede tener más de 20 caracteres' })
+  street_number: string;
+
+  @IsString({ message: 'El código postal debe ser texto' })
+  @IsNotEmpty({ message: 'El código postal es obligatorio' })
+  @MaxLength(20, { message: 'El código postal no puede tener más de 20 caracteres' })
+  postal_code: string;
+
+  @IsString({ message: 'La ciudad debe ser texto' })
+  @IsNotEmpty({ message: 'La ciudad es obligatoria' })
+  @MaxLength(120, { message: 'La ciudad no puede tener más de 120 caracteres' })
+  city: string;
+
+  @IsString({ message: 'La provincia debe ser texto' })
+  @IsNotEmpty({ message: 'La provincia es obligatoria' })
+  @MaxLength(120, { message: 'La provincia no puede tener más de 120 caracteres' })
+  state: string;
+
+  @IsString({ message: 'El país debe ser texto' })
+  @IsNotEmpty({ message: 'El país es obligatorio' })
+  @MaxLength(120, { message: 'El país no puede tener más de 120 caracteres' })
+  country: string;
+
+  @IsString({ message: 'El código de país debe ser texto' })
+  @IsNotEmpty({ message: 'El código de país es obligatorio' })
+  @MaxLength(2, { message: 'El código de país debe tener 2 caracteres' })
+  country_code: string;
+
+  @IsLatitude({ message: 'La latitud no es válida' })
+  @IsNotEmpty({ message: 'La latitud es obligatoria' })
+  latitude: number;
+
+  @IsLongitude({ message: 'La longitud no es válida' })
+  @IsNotEmpty({ message: 'La longitud es obligatoria' })
+  longitude: number;
+
+  @IsString({ message: 'La dirección formateada debe ser texto' })
+  @IsNotEmpty({ message: 'La dirección formateada es obligatoria' })
+  formatted_address: string;
+}
+
+// DTO principal para crear negocio
 export class CreateNegocioDto {
   @IsString({ message: 'El nombre debe ser texto' })
   @IsNotEmpty({ message: 'El nombre del negocio es obligatorio' })
   @MaxLength(100, { message: 'El nombre no puede tener más de 100 caracteres' })
   nombre: string;
 
-  // Campos de WhatsApp (nuevos)
+  // WhatsApp
   @IsNumber({}, { message: 'El código de país debe ser un número' })
   @IsNotEmpty({ message: 'El código de país es obligatorio' })
   @Min(1, { message: 'El código de país debe ser mayor a 0' })
@@ -19,19 +71,10 @@ export class CreateNegocioDto {
   @MaxLength(15, { message: 'El número nacional no puede tener más de 15 dígitos' })
   national_number: string;
 
-  // Este campo se generará automáticamente en el servicio, no viene del cliente
-  // whatsapp_e164: string;
-
+  // Domicilio
   @IsObject({ message: 'El domicilio debe ser un objeto válido' })
+  @ValidateNested()
+  @Type(() => DomicilioDto)
   @IsNotEmpty({ message: 'El domicilio es obligatorio' })
-  domicilio: {
-    calle: string;
-    numero: string;
-    codigo_postal: string;
-    localidad: string;
-    provincia: string;
-    pais: string;
-    latitud?: number;
-    longitud?: number;
-  };
+  domicilio: DomicilioDto;
 }
