@@ -16,28 +16,58 @@ export class NegociosService {
 
   // ===== VALIDACIÓN DE WHATSAPP CON LIBPHONENUMBER =====
   private validarWhatsApp(country_code: number, national_number: string): string {
-    // Construir el número completo para validar
     const numeroCompleto = `+${country_code}${national_number.replace(/\D/g, '')}`;
     
     try {
       const phoneNumber = parsePhoneNumber(numeroCompleto);
       
-      // Verificar que sea un número válido según el país
       if (!phoneNumber || !phoneNumber.isValid()) {
         throw new BadRequestException('El número de WhatsApp no es válido para el país seleccionado');
       }
       
-      // Opcional: verificar que sea un número móvil (no todos los países distinguen)
-      // if (phoneNumber.getType() !== 'MOBILE') {
-      //   throw new BadRequestException('El número debe ser un teléfono móvil');
-      // }
-      
-      // Devolver el número en formato E.164
       return phoneNumber.number;
       
     } catch (error) {
       throw new BadRequestException('Error al validar el número de WhatsApp: ' + error.message);
     }
+  }
+
+  // ===== VALIDACIÓN DE DIRECCIÓN =====
+  private validarDireccion(domicilio: any) {
+    // Validar que tenga todos los campos requeridos
+    const camposRequeridos = [
+      'street', 'street_number', 'postal_code', 'city', 
+      'state', 'country', 'country_code', 'latitude', 
+      'longitude', 'formatted_address'
+    ];
+
+    for (const campo of camposRequeridos) {
+      if (!domicilio[campo]) {
+        throw new BadRequestException(`El campo ${campo} de la dirección es obligatorio`);
+      }
+    }
+
+    // Validar que las coordenadas sean números válidos
+    if (isNaN(domicilio.latitude) || domicilio.latitude < -90 || domicilio.latitude > 90) {
+      throw new BadRequestException('La latitud debe ser un número entre -90 y 90');
+    }
+
+    if (isNaN(domicilio.longitude) || domicilio.longitude < -180 || domicilio.longitude > 180) {
+      throw new BadRequestException('La longitud debe ser un número entre -180 y 180');
+    }
+
+    // Validar que el código de país ISO sea de 2 letras
+    if (!/^[A-Z]{2}$/.test(domicilio.country_code)) {
+      throw new BadRequestException('El código de país debe tener 2 letras mayúsculas (ISO 3166-1 alpha-2)');
+    }
+
+    // Opcional: validar que la dirección vino de la API (por ahora solo aceptamos)
+    // Podríamos verificar que el formatted_address tenga un formato esperado
+    if (domicilio.formatted_address.length < 10) {
+      throw new BadRequestException('La dirección no parece válida');
+    }
+
+    return true;
   }
 
   // ===== FUNCIÓN PARA GENERAR URL ÚNICA =====
@@ -95,21 +125,36 @@ export class NegociosService {
 
   // Crear negocio con auditoría
   async create(createNegocioDto: CreateNegocioDto, usuario?: string): Promise<Negocio> {
-    // 1. Validar WhatsApp con libphonenumber
+    // 1. Validar WhatsApp
     const whatsappE164 = this.validarWhatsApp(
       createNegocioDto.country_code,
       createNegocioDto.national_number
     );
 
-    // 2. Generar URL única
+    // 2. Validar dirección
+    this.validarDireccion(createNegocioDto.domicilio);
+
+    // 3. Generar URL única
     const url = await this.generarUrlUnica(createNegocioDto.nombre);
 
-    // 3. Crear la entidad (el hook @BeforeInsert generará whatsapp_e164)
+    // 4. Crear la entidad (mapear domicilio a campos individuales)
     const negocioEntity = this.negociosRepository.create({
-      ...createNegocioDto,
-      url,
-      // Aseguramos que el formato E164 sea el validado
+      nombre: createNegocioDto.nombre.toUpperCase(),
+      country_code: createNegocioDto.country_code,
+      national_number: createNegocioDto.national_number,
       whatsapp_e164: whatsappE164,
+      url,
+      // Mapear domicilio
+      street: createNegocioDto.domicilio.street,
+      street_number: createNegocioDto.domicilio.street_number,
+      postal_code: createNegocioDto.domicilio.postal_code,
+      city: createNegocioDto.domicilio.city,
+      state: createNegocioDto.domicilio.state,
+      country: createNegocioDto.domicilio.country,
+      country_code_iso: createNegocioDto.domicilio.country_code,
+      latitude: createNegocioDto.domicilio.latitude,
+      longitude: createNegocioDto.domicilio.longitude,
+      formatted_address: createNegocioDto.domicilio.formatted_address,
       usuario_alta: usuario || 'demo',
     });
 
@@ -126,20 +171,37 @@ export class NegociosService {
       const national_number = updateNegocioDto.national_number ?? negocioExistente.national_number;
       
       const whatsappE164 = this.validarWhatsApp(country_code, national_number);
-      
-      // Actualizar los campos
-      if (updateNegocioDto.country_code) {
-        negocioExistente.country_code = updateNegocioDto.country_code;
-      }
-      if (updateNegocioDto.national_number) {
-        negocioExistente.national_number = updateNegocioDto.national_number;
-      }
-      
-      // El hook @BeforeUpdate generará whatsapp_e164 automáticamente
+      negocioExistente.whatsapp_e164 = whatsappE164;
     }
 
-    // Si se actualiza el nombre, no regeneramos URL automáticamente
-    Object.assign(negocioExistente, updateNegocioDto);
+    // Si se actualiza el domicilio, validar
+    if (updateNegocioDto.domicilio) {
+      this.validarDireccion(updateNegocioDto.domicilio);
+      
+      // Mapear domicilio a campos individuales
+      negocioExistente.street = updateNegocioDto.domicilio.street;
+      negocioExistente.street_number = updateNegocioDto.domicilio.street_number;
+      negocioExistente.postal_code = updateNegocioDto.domicilio.postal_code;
+      negocioExistente.city = updateNegocioDto.domicilio.city;
+      negocioExistente.state = updateNegocioDto.domicilio.state;
+      negocioExistente.country = updateNegocioDto.domicilio.country;
+      negocioExistente.country_code_iso = updateNegocioDto.domicilio.country_code;
+      negocioExistente.latitude = updateNegocioDto.domicilio.latitude;
+      negocioExistente.longitude = updateNegocioDto.domicilio.longitude;
+      negocioExistente.formatted_address = updateNegocioDto.domicilio.formatted_address;
+    }
+
+    // Actualizar otros campos
+    if (updateNegocioDto.nombre) {
+      negocioExistente.nombre = updateNegocioDto.nombre.toUpperCase();
+    }
+    if (updateNegocioDto.country_code) {
+      negocioExistente.country_code = updateNegocioDto.country_code;
+    }
+    if (updateNegocioDto.national_number) {
+      negocioExistente.national_number = updateNegocioDto.national_number;
+    }
+
     negocioExistente.usuario_modificacion = usuario || 'demo';
 
     return this.negociosRepository.save(negocioExistente);
