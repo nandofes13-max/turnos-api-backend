@@ -11,7 +11,7 @@ export class Negocio extends BaseEntityAuditable {
   @Column({ length: 100, unique: true })
   url: string;
 
-  // Nuevos campos de WhatsApp
+  // WhatsApp
   @Column({ type: 'int', nullable: false })
   country_code: number;
 
@@ -21,19 +21,38 @@ export class Negocio extends BaseEntityAuditable {
   @Column({ length: 16, unique: true, nullable: false })
   whatsapp_e164: string;
 
-  @Column({ type: 'jsonb', nullable: true })
-  domicilio: {
-    calle?: string;
-    numero?: string;
-    codigo_postal?: string;
-    localidad?: string;
-    provincia?: string;
-    pais?: string;
-    latitud?: number;
-    longitud?: number;
-  };
+  // Domicilio estructurado
+  @Column({ length: 120, nullable: true })
+  street: string;
 
-  // Getter para último movimiento (igual que en otras entidades)
+  @Column({ length: 20, nullable: true })
+  street_number: string;
+
+  @Column({ length: 20, nullable: true })
+  postal_code: string;
+
+  @Column({ length: 120, nullable: true })
+  city: string;
+
+  @Column({ length: 120, nullable: true })
+  state: string;
+
+  @Column({ length: 120, nullable: true })
+  country: string;
+
+  @Column({ length: 2, nullable: true })
+  country_code_iso: string;
+
+  @Column({ type: 'decimal', precision: 10, scale: 8, nullable: true })
+  latitude: number;
+
+  @Column({ type: 'decimal', precision: 11, scale: 8, nullable: true })
+  longitude: number;
+
+  @Column({ type: 'text', nullable: true })
+  formatted_address: string;
+
+  // Getter para último movimiento
   get ultimoMovimiento(): string {
     if (this.fecha_baja && this.usuario_baja) {
       return `${this.usuario_baja} - BAJA - ${this.formatearFecha(this.fecha_baja)}`;
@@ -58,12 +77,11 @@ export class Negocio extends BaseEntityAuditable {
     }).replace(',', '');
   }
 
-  // Generar whatsapp_e164 automáticamente antes de insertar/actualizar
+  // Generar whatsapp_e164 automáticamente
   @BeforeInsert()
   @BeforeUpdate()
   generarE164() {
     if (this.country_code && this.national_number) {
-      // Eliminar cualquier carácter no numérico del número nacional
       const soloNumeros = this.national_number.replace(/\D/g, '');
       this.whatsapp_e164 = `+${this.country_code}${soloNumeros}`;
     }
