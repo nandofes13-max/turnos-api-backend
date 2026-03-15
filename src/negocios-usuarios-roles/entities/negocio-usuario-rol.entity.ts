@@ -29,6 +29,5 @@ export class NegocioUsuarioRol extends BaseEntityAuditable {
   @Column({ name: 'rol_id' })
   rolId: number;
 
-  @Column({ type: 'boolean', default: true })
-  activo: boolean;
+  // El campo "activo" ha sido eliminado. Usar fecha_baja (heredado) para saber si está activo.
 }
