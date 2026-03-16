@@ -60,6 +60,7 @@ export class NegociosUsuariosRolesController {
   // Actualizar una relación
   @Put(':id')
   async update(@Param('id') id: string, @Body() updateDto: UpdateNegocioUsuarioRolDto): Promise<any> {
+    console.log('Backend recibió updateDto:', updateDto); // 👈 AGREGAR
     const relacion = await this.service.update(Number(id), updateDto, 'demo');
     return this.agregarUltimoMovimiento(relacion);
   }
