@@ -110,7 +110,7 @@ export class NegociosUsuariosRolesService {
     }
 
     // REGLA 2: Si el rol es DUEÑO, verificar que no haya otro DUEÑO activo
-    const ROL_DUENIO = 1; // Ajustá este ID según tu base de datos (probablemente 1)
+    const ROL_DUENIO = 7; // Ajustá este ID según tu base de datos (probablemente 1)
     if (createDto.rolId === ROL_DUENIO) {
       const otroDuenio = await this.repository.findOneBy({
         negocioId: createDto.negocioId,
