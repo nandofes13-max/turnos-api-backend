@@ -117,13 +117,14 @@ export class NegociosUsuariosRolesService {
     return this.repository.save(relacion);
   }
 
-  // Actualizar una relación
+  // Actualizar una relación (patrón igual a roles.service.ts)
   async update(id: number, updateDto: UpdateNegocioUsuarioRolDto, usuario?: string): Promise<NegocioUsuarioRol> {
     const relacion = await this.findOne(id);
 
-    // CASO 1: La relación está inactiva y se quiere reactivar
+    // Si la relación está inactiva, verificar si se quiere reactivar
+    // (la reactivación se detecta porque se llama a update con un DTO que puede no tener rolId)
     if (relacion.fecha_baja) {
-      // Verificar que no exista otra relación activa con el mismo par (negocio, usuario)
+      // Verificar que no exista otra relación activa con el mismo par
       const existente = await this.repository.findOneBy({
         negocioId: relacion.negocioId,
         usuarioId: relacion.usuarioId,
@@ -134,29 +135,20 @@ export class NegociosUsuariosRolesService {
         throw new BadRequestException('Ya existe una relación activa para este negocio y usuario');
       }
 
-      // Reactivar
-      (relacion as any).fecha_baja = null;
-      (relacion as any).usuario_baja = null;
+      // Reactivar (poner fecha_baja en null)
+      relacion.fecha_baja = null;
+      relacion.usuario_baja = null;
     }
 
-    // Si se actualiza el rol, verificar que exista
-    if (updateDto.rolId) {
-      const rol = await this.rolRepository.findOneBy({ 
-        id: updateDto.rolId,
-        fecha_baja: IsNull() 
-      });
-      if (!rol) {
-        throw new BadRequestException(`El rol con id ${updateDto.rolId} no existe o no está activo`);
-      }
-      relacion.rolId = updateDto.rolId;
-    }
-
+    // Aplicar los cambios del DTO (exactamente como en roles.service.ts)
+    // Esto incluye rolId si viene en el DTO
+    Object.assign(relacion, updateDto);
+    
+    // Actualizar usuario de modificación
     relacion.usuario_modificacion = usuario || 'demo';
- // 👇 ACÁ VAN LOS CONSOLE.LOG
-    console.log('ANTES del save - relacion.rolId:', relacion.rolId);
-    const resultado = await this.repository.save(relacion);
-    console.log('DESPUÉS del save - resultado.rolId:', resultado.rolId);
-    return resultado;
+
+    // Guardar y devolver
+    return this.repository.save(relacion);
   }
 
   // Soft delete (desactivar) una relación
