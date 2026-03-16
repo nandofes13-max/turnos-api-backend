@@ -117,10 +117,13 @@ export class NegociosUsuariosRolesService {
     return this.repository.save(relacion);
   }
 
-  // Actualizar una relación (VERSIÓN FINAL - funciona)
+  // Actualizar una relación (versión final con update directo y todos los campos)
   async update(id: number, updateDto: UpdateNegocioUsuarioRolDto, usuario?: string): Promise<NegocioUsuarioRol> {
-    // Actualización directa del rol
-    await this.repository.update(id, { rolId: updateDto.rolId });
+    // Actualizar TODOS los campos que vienen en el DTO (rolId, fecha_baja, usuario_baja)
+    await this.repository.update(id, {
+      ...updateDto,
+      usuario_modificacion: usuario || 'demo'
+    });
     
     // Devolver la relación actualizada
     return this.findOne(id);
