@@ -152,8 +152,11 @@ export class NegociosUsuariosRolesService {
     }
 
     relacion.usuario_modificacion = usuario || 'demo';
-
-    return this.repository.save(relacion);
+ // 👇 ACÁ VAN LOS CONSOLE.LOG
+    console.log('ANTES del save - relacion.rolId:', relacion.rolId);
+    const resultado = await this.repository.save(relacion);
+    console.log('DESPUÉS del save - resultado.rolId:', resultado.rolId);
+    return resultado;
   }
 
   // Soft delete (desactivar) una relación
