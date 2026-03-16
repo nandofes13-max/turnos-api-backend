@@ -117,18 +117,13 @@ export class NegociosUsuariosRolesService {
     return this.repository.save(relacion);
   }
 
-  // Actualizar una relación (VERSIÓN DE PRUEBA CON UPDATE DIRECTO)
+  // Actualizar una relación (VERSIÓN FINAL - funciona)
   async update(id: number, updateDto: UpdateNegocioUsuarioRolDto, usuario?: string): Promise<NegocioUsuarioRol> {
-    console.log('UPDATE - Iniciando con id:', id, 'updateDto:', updateDto);
-    
-    // Actualización directa con SQL (bypasseando TypeORM)
+    // Actualización directa del rol
     await this.repository.update(id, { rolId: updateDto.rolId });
     
-    // Verificar que se actualizó
-    const resultado = await this.findOne(id);
-    console.log('UPDATE - Resultado después de update directo:', resultado);
-    
-    return resultado;
+    // Devolver la relación actualizada
+    return this.findOne(id);
   }
 
   // Soft delete (desactivar) una relación
