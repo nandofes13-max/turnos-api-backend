@@ -135,9 +135,8 @@ export class NegociosUsuariosRolesService {
       }
 
       // Reactivar
-     // Usar aserción de tipo para evitar el error de TypeScript
-(relacion as any).fecha_baja = null;
-(relacion as any).usuario_baja = null;;
+      (relacion as any).fecha_baja = null;
+      (relacion as any).usuario_baja = null;
     }
 
     // Si se actualiza el rol, verificar que exista
