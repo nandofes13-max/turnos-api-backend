@@ -117,31 +117,52 @@ export class NegociosUsuariosRolesService {
     return this.repository.save(relacion);
   }
 
-  // Actualizar una relación (solo se puede si está activa)
-  async update(id: number, updateDto: UpdateNegocioUsuarioRolDto, usuario?: string): Promise<NegocioUsuarioRol> {
-    const relacion = await this.findOne(id);
+ async update(id: number, updateDto: UpdateNegocioUsuarioRolDto, usuario?: string): Promise<NegocioUsuarioRol> {
+  const relacion = await this.findOne(id);
 
-    if (relacion.fecha_baja) {
-      throw new BadRequestException('No se puede modificar una relación inactiva');
+  // CASO 1: Se está reactivando (fecha_baja: null en el DTO)
+  if (updateDto.fecha_baja === null) {
+    // Si ya está activa, no se puede "reactivar"
+    if (!relacion.fecha_baja) {
+      throw new BadRequestException('La relación ya está activa');
+    }
+    
+    // Verificar que no exista otra relación activa con el mismo par (negocio, usuario)
+    const existente = await this.repository.findOneBy({
+      negocioId: relacion.negocioId,
+      usuarioId: relacion.usuarioId,
+      fecha_baja: IsNull(),
+    });
+
+    if (existente && existente.id !== id) {
+      throw new BadRequestException('Ya existe una relación activa para este negocio y usuario');
     }
 
-    // Si cambia el rol, verificar que exista
-    if (updateDto.rolId) {
-      const rol = await this.rolRepository.findOneBy({ 
-        id: updateDto.rolId,
-        fecha_baja: IsNull() 
-      });
-      if (!rol) {
-        throw new BadRequestException(`El rol con id ${updateDto.rolId} no existe o no está activo`);
-      }
-    }
-
-    Object.assign(relacion, updateDto);
-    relacion.usuario_modificacion = usuario || 'demo';
-
-    return this.repository.save(relacion);
+    // Permitir reactivar
+    relacion.fecha_baja = null;
+    relacion.usuario_baja = null;
+  }
+  // CASO 2: Modificación normal (solo si está activa)
+  else if (relacion.fecha_baja) {
+    throw new BadRequestException('No se puede modificar una relación inactiva');
   }
 
+  // Si se actualiza el rol, verificar que exista
+  if (updateDto.rolId) {
+    const rol = await this.rolRepository.findOneBy({ 
+      id: updateDto.rolId,
+      fecha_baja: IsNull() 
+    });
+    if (!rol) {
+      throw new BadRequestException(`El rol con id ${updateDto.rolId} no existe o no está activo`);
+    }
+    relacion.rolId = updateDto.rolId;
+  }
+
+  relacion.usuario_modificacion = usuario || 'demo';
+
+  return this.repository.save(relacion);
+}
   // Soft delete (desactivar) una relación
   async softDelete(id: number, usuario?: string): Promise<void> {
     const relacion = await this.findOne(id);
