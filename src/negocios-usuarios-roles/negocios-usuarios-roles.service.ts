@@ -117,36 +117,18 @@ export class NegociosUsuariosRolesService {
     return this.repository.save(relacion);
   }
 
-  // Actualizar una relación (patrón igual a roles.service.ts)
+  // Actualizar una relación (VERSIÓN DE PRUEBA CON UPDATE DIRECTO)
   async update(id: number, updateDto: UpdateNegocioUsuarioRolDto, usuario?: string): Promise<NegocioUsuarioRol> {
-    const relacion = await this.findOne(id);
-
-    // Si la relación está inactiva, verificar si se quiere reactivar
-    if (relacion.fecha_baja) {
-      // Verificar que no exista otra relación activa con el mismo par
-      const existente = await this.repository.findOneBy({
-        negocioId: relacion.negocioId,
-        usuarioId: relacion.usuarioId,
-        fecha_baja: IsNull(),
-      });
-
-      if (existente && existente.id !== id) {
-        throw new BadRequestException('Ya existe una relación activa para este negocio y usuario');
-      }
-
-      // Reactivar (usar aserción de tipo para evitar error de TypeScript)
-      (relacion as any).fecha_baja = null;
-      (relacion as any).usuario_baja = null;
-    }
-
-    // Aplicar los cambios del DTO (incluye rolId si viene)
-    Object.assign(relacion, updateDto);
+    console.log('UPDATE - Iniciando con id:', id, 'updateDto:', updateDto);
     
-    // Actualizar usuario de modificación
-    relacion.usuario_modificacion = usuario || 'demo';
-
-    // Guardar y devolver
-    return this.repository.save(relacion);
+    // Actualización directa con SQL (bypasseando TypeORM)
+    await this.repository.update(id, { rolId: updateDto.rolId });
+    
+    // Verificar que se actualizó
+    const resultado = await this.findOne(id);
+    console.log('UPDATE - Resultado después de update directo:', resultado);
+    
+    return resultado;
   }
 
   // Soft delete (desactivar) una relación
