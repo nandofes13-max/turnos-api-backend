@@ -122,7 +122,6 @@ export class NegociosUsuariosRolesService {
     const relacion = await this.findOne(id);
 
     // Si la relación está inactiva, verificar si se quiere reactivar
-    // (la reactivación se detecta porque se llama a update con un DTO que puede no tener rolId)
     if (relacion.fecha_baja) {
       // Verificar que no exista otra relación activa con el mismo par
       const existente = await this.repository.findOneBy({
@@ -135,13 +134,12 @@ export class NegociosUsuariosRolesService {
         throw new BadRequestException('Ya existe una relación activa para este negocio y usuario');
       }
 
-      // Reactivar (poner fecha_baja en null)
-      relacion.fecha_baja = null;
-      relacion.usuario_baja = null;
+      // Reactivar (usar aserción de tipo para evitar error de TypeScript)
+      (relacion as any).fecha_baja = null;
+      (relacion as any).usuario_baja = null;
     }
 
-    // Aplicar los cambios del DTO (exactamente como en roles.service.ts)
-    // Esto incluye rolId si viene en el DTO
+    // Aplicar los cambios del DTO (incluye rolId si viene)
     Object.assign(relacion, updateDto);
     
     // Actualizar usuario de modificación
