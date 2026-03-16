@@ -98,15 +98,28 @@ export class NegociosUsuariosRolesService {
       throw new BadRequestException(`El rol con id ${createDto.rolId} no existe o no está activo`);
     }
 
-    // Verificar que no exista ya una relación activa
-    const existente = await this.repository.findOneBy({
+    // REGLA 1: No puede haber la misma combinación activa
+    const mismaCombinacion = await this.repository.findOneBy({
       negocioId: createDto.negocioId,
       usuarioId: createDto.usuarioId,
+      rolId: createDto.rolId,
       fecha_baja: IsNull(),
     });
+    if (mismaCombinacion) {
+      throw new BadRequestException('El usuario ya tiene este rol activo en el negocio');
+    }
 
-    if (existente) {
-      throw new BadRequestException('El usuario ya tiene una relación activa con este negocio');
+    // REGLA 2: Si el rol es DUEÑO, verificar que no haya otro DUEÑO activo
+    const ROL_DUENIO = 1; // Ajustá este ID según tu base de datos (probablemente 1)
+    if (createDto.rolId === ROL_DUENIO) {
+      const otroDuenio = await this.repository.findOneBy({
+        negocioId: createDto.negocioId,
+        rolId: ROL_DUENIO,
+        fecha_baja: IsNull(),
+      });
+      if (otroDuenio) {
+        throw new BadRequestException('Este negocio ya tiene un dueño activo');
+      }
     }
 
     const relacion = this.repository.create({
@@ -117,15 +130,31 @@ export class NegociosUsuariosRolesService {
     return this.repository.save(relacion);
   }
 
-  // Actualizar una relación (versión final con update directo y todos los campos)
+  // Actualizar una relación
   async update(id: number, updateDto: UpdateNegocioUsuarioRolDto, usuario?: string): Promise<NegocioUsuarioRol> {
-    // Actualizar TODOS los campos que vienen en el DTO (rolId, fecha_baja, usuario_baja)
+    const relacion = await this.findOne(id);
+
+    // Si se está cambiando el rol a DUEÑO, verificar que no haya otro DUEÑO activo
+    if (updateDto.rolId) {
+      const ROL_DUENIO = 1; // Mismo ID que en create
+      if (updateDto.rolId === ROL_DUENIO) {
+        const otroDuenio = await this.repository.findOneBy({
+          negocioId: relacion.negocioId,
+          rolId: ROL_DUENIO,
+          fecha_baja: IsNull(),
+        });
+        if (otroDuenio && otroDuenio.id !== id) {
+          throw new BadRequestException('Este negocio ya tiene un dueño activo');
+        }
+      }
+    }
+
+    // Actualizar TODOS los campos del DTO
     await this.repository.update(id, {
       ...updateDto,
       usuario_modificacion: usuario || 'demo'
     });
     
-    // Devolver la relación actualizada
     return this.findOne(id);
   }
 
