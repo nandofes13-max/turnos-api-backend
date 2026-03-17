@@ -135,8 +135,9 @@ export class NegociosUsuariosRolesService {
     const relacion = await this.findOne(id);
     const ROL_DUENIO = 7; // Mismo ID
 
-    // CASO 1: Se está reactivando (fecha_baja viene en el DTO)
-    if (updateDto.fecha_baja === null) {
+    // CASO 1: Se está reactivando (fecha_baja viene en el DTO, aunque no esté tipado)
+    const dtoConFecha = updateDto as any;
+    if (dtoConFecha.fecha_baja === null) {
       // Verificar que no haya otro dueño activo (si el rol actual es DUEÑO o se cambia a DUEÑO)
       const rolFinal = updateDto.rolId ?? relacion.rolId;
       if (rolFinal === ROL_DUENIO) {
