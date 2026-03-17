@@ -1,11 +1,12 @@
 // src/negocios-usuarios-roles/entities/negocio-usuario-rol.entity.ts
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, Unique } from 'typeorm';
 import { BaseEntityAuditable } from '../../entities/base.entity';
 import { Negocio } from '../../negocios/entities/negocio.entity';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { Rol } from '../../roles/entities/rol.entity';
 
 @Entity('negocios_usuarios_roles')
+@Unique('unique_negocio_usuario_rol', ['negocioId', 'usuarioId', 'rolId'])  // 👈 AGREGADO
 export class NegocioUsuarioRol extends BaseEntityAuditable {
   
   @ManyToOne(() => Negocio)
@@ -28,6 +29,4 @@ export class NegocioUsuarioRol extends BaseEntityAuditable {
 
   @Column({ name: 'rol_id' })
   rolId: number;
-
-  // El campo "activo" ha sido eliminado. Usar fecha_baja (heredado) para saber si está activo.
 }
