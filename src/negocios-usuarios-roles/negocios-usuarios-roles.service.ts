@@ -110,7 +110,7 @@ export class NegociosUsuariosRolesService {
     }
 
     // REGLA 2: Si el rol es DUEÑO, verificar que no haya otro DUEÑO activo
-    const ROL_DUENIO = 7; // Ajustá este ID según tu base de datos (probablemente 1)
+    const ROL_DUENIO = 7; // ID del rol DUEÑO (según tu BD)
     if (createDto.rolId === ROL_DUENIO) {
       const otroDuenio = await this.repository.findOneBy({
         negocioId: createDto.negocioId,
@@ -130,14 +130,16 @@ export class NegociosUsuariosRolesService {
     return this.repository.save(relacion);
   }
 
-  // Actualizar una relación
+  // Actualizar una relación (incluye reactivación y cambio de rol)
   async update(id: number, updateDto: UpdateNegocioUsuarioRolDto, usuario?: string): Promise<NegocioUsuarioRol> {
     const relacion = await this.findOne(id);
+    const ROL_DUENIO = 7; // Mismo ID
 
-    // Si se está cambiando el rol a DUEÑO, verificar que no haya otro DUEÑO activo
-    if (updateDto.rolId) {
-      const ROL_DUENIO = 1; // Mismo ID que en create
-      if (updateDto.rolId === ROL_DUENIO) {
+    // CASO 1: Se está reactivando (fecha_baja viene en el DTO)
+    if (updateDto.fecha_baja === null) {
+      // Verificar que no haya otro dueño activo (si el rol actual es DUEÑO o se cambia a DUEÑO)
+      const rolFinal = updateDto.rolId ?? relacion.rolId;
+      if (rolFinal === ROL_DUENIO) {
         const otroDuenio = await this.repository.findOneBy({
           negocioId: relacion.negocioId,
           rolId: ROL_DUENIO,
@@ -149,7 +151,19 @@ export class NegociosUsuariosRolesService {
       }
     }
 
-    // Actualizar TODOS los campos del DTO
+    // CASO 2: Se está cambiando el rol a DUEÑO (sin reactivar)
+    if (updateDto.rolId && updateDto.rolId === ROL_DUENIO && relacion.rolId !== ROL_DUENIO) {
+      const otroDuenio = await this.repository.findOneBy({
+        negocioId: relacion.negocioId,
+        rolId: ROL_DUENIO,
+        fecha_baja: IsNull(),
+      });
+      if (otroDuenio && otroDuenio.id !== id) {
+        throw new BadRequestException('Este negocio ya tiene un dueño activo');
+      }
+    }
+
+    // Actualizar TODOS los campos del DTO (incluye fecha_baja si viene)
     await this.repository.update(id, {
       ...updateDto,
       usuario_modificacion: usuario || 'demo'
