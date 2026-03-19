@@ -5,14 +5,14 @@ import { Repository, IsNull } from 'typeorm';
 import { Actividad } from './entities/actividad.entity';
 import { CreateActividadDto } from './dto/create-actividad.dto';
 import { UpdateActividadDto } from './dto/update-actividad.dto';
-import { Negocio } from '../negocios/entities/negocio.entity'; // 👈 IMPORTAR
+import { Negocio } from '../negocios/entities/negocio.entity';
 
 @Injectable()
 export class ActividadService {
   constructor(
     @InjectRepository(Actividad)
     private readonly actividadRepository: Repository<Actividad>,
-    @InjectRepository(Negocio) // 👈 AGREGAR
+    @InjectRepository(Negocio)
     private readonly negocioRepository: Repository<Negocio>,
   ) {}
 
@@ -70,14 +70,35 @@ export class ActividadService {
 
   // Actualizar actividad
   async update(id: number, updateActividadDto: UpdateActividadDto, usuario?: string): Promise<Actividad> {
-    const actividad = await this.findOne(id, updateActividadDto.negocioId);
+    // Primero obtenemos la actividad actual para saber su negocioId
+    // Necesitamos un negocioId temporal para la búsqueda (usamos 0, pero findOne lanzará error si no encuentra)
+    // Mejor: si viene negocioId en el DTO, lo usamos; si no, buscamos por id sin filtrar por negocio (con cuidado)
+    let actividad: Actividad;
+    
+    if (updateActividadDto.negocioId) {
+      // Si viene negocioId, lo usamos para la búsqueda
+      actividad = await this.findOne(id, updateActividadDto.negocioId);
+    } else {
+      // Si no viene, buscamos la actividad sin filtrar por negocio (solo para obtener el negocioId actual)
+      actividad = await this.actividadRepository.findOne({
+        where: { id, fecha_baja: IsNull() },
+      });
+      if (!actividad) {
+        throw new NotFoundException(`Actividad con id ${id} no encontrada`);
+      }
+    }
+
+    // Determinar el negocioId final (prioridad: DTO > existente)
+    const negocioIdFinal = updateActividadDto.negocioId ?? actividad.negocioId;
 
     // Si se actualiza el negocioId, validar que el nuevo exista
     if (updateActividadDto.negocioId && updateActividadDto.negocioId !== actividad.negocioId) {
       await this.validarNegocio(updateActividadDto.negocioId);
     }
 
+    // Aplicar cambios
     Object.assign(actividad, updateActividadDto);
+    actividad.negocioId = negocioIdFinal; // Asegurar que quede el correcto
     actividad.usuario_modificacion = usuario || 'demo';
 
     return this.actividadRepository.save(actividad);
