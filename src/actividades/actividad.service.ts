@@ -68,24 +68,15 @@ export class ActividadService {
     return this.actividadRepository.save(actividad);
   }
 
-  // Actualizar actividad
+  // Actualizar actividad (versión corregida)
   async update(id: number, updateActividadDto: UpdateActividadDto, usuario?: string): Promise<Actividad> {
-    // Primero obtenemos la actividad actual para saber su negocioId
-    // Necesitamos un negocioId temporal para la búsqueda (usamos 0, pero findOne lanzará error si no encuentra)
-    // Mejor: si viene negocioId en el DTO, lo usamos; si no, buscamos por id sin filtrar por negocio (con cuidado)
-    let actividad: Actividad;
-    
-    if (updateActividadDto.negocioId) {
-      // Si viene negocioId, lo usamos para la búsqueda
-      actividad = await this.findOne(id, updateActividadDto.negocioId);
-    } else {
-      // Si no viene, buscamos la actividad sin filtrar por negocio (solo para obtener el negocioId actual)
-      actividad = await this.actividadRepository.findOne({
-        where: { id, fecha_baja: IsNull() },
-      });
-      if (!actividad) {
-        throw new NotFoundException(`Actividad con id ${id} no encontrada`);
-      }
+    // Buscar la actividad sin filtrar por negocio (para obtener el negocioId actual)
+    const actividad = await this.actividadRepository.findOne({
+      where: { id, fecha_baja: IsNull() },
+    });
+
+    if (!actividad) {
+      throw new NotFoundException(`Actividad con id ${id} no encontrada`);
     }
 
     // Determinar el negocioId final (prioridad: DTO > existente)
