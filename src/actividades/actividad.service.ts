@@ -1,7 +1,7 @@
 // src/actividades/actividad.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { Actividad } from './entities/actividad.entity';
 import { CreateActividadDto } from './dto/create-actividad.dto';
 import { UpdateActividadDto } from './dto/update-actividad.dto';
@@ -23,7 +23,7 @@ export class ActividadService {
     const actividad = await this.actividadRepository.findOneBy({ id });
 
     if (!actividad) {
-      throw new NotFoundException(`Actividad with id ${id} not found`);
+      throw new NotFoundException(`Actividad con id ${id} no encontrada`);
     }
 
     return actividad;
@@ -39,11 +39,19 @@ export class ActividadService {
     return this.actividadRepository.save(actividad);
   }
 
-  // Actualizar actividad con auditoría
+  // Actualizar actividad con auditoría (incluye reactivación)
   async update(id: number, updateActividadDto: UpdateActividadDto, usuario?: string): Promise<Actividad> {
     const actividad = await this.findOne(id);
 
-    Object.assign(actividad, updateActividadDto);
+    // Si se reactiva (fecha_baja viene como null)
+    if (updateActividadDto.fecha_baja === null) {
+      actividad.fecha_baja = null;
+      actividad.usuario_baja = null;
+    } else {
+      // Actualización normal de otros campos
+      Object.assign(actividad, updateActividadDto);
+    }
+    
     actividad.usuario_modificacion = usuario || 'demo';
 
     return this.actividadRepository.save(actividad);
@@ -63,8 +71,7 @@ export class ActividadService {
     return this.actividadRepository.query(`
       SELECT column_name, data_type, is_nullable
       FROM information_schema.columns
-      WHERE table_name = 'actividad'
-         OR table_name = 'actividades';
+      WHERE table_name = 'actividad';
     `);
   }
 }
