@@ -140,8 +140,9 @@ export class NegocioActividadesService {
       throw new BadRequestException('Ya existe una relación activa para este negocio y actividad');
     }
 
-    relacion.fecha_baja = null;
-    relacion.usuario_baja = null;
+    // Usar aserción de tipo para evitar error de TypeScript
+    (relacion as any).fecha_baja = null;
+    (relacion as any).usuario_baja = null;
     relacion.usuario_modificacion = usuario || 'demo';
 
     return this.repository.save(relacion);
