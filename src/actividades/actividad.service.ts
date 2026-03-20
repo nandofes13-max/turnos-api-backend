@@ -41,21 +41,20 @@ export class ActividadService {
 
   // Actualizar actividad con auditoría (incluye reactivación)
   async update(id: number, updateActividadDto: UpdateActividadDto, usuario?: string): Promise<Actividad> {
-    const actividad = await this.findOne(id);
+  const actividad = await this.findOne(id);
 
-    // Si se reactiva (fecha_baja viene como null)
-    if (updateActividadDto.fecha_baja === null) {
-      (actividad as any).fecha_baja = null;
-(actividad as any).usuario_baja = null;
-    } else {
-      // Actualización normal de otros campos
-      Object.assign(actividad, updateActividadDto);
-    }
-    
-    actividad.usuario_modificacion = usuario || 'demo';
-
-    return this.actividadRepository.save(actividad);
+  // Si se reactiva (fecha_baja viene como null)
+  if (updateActividadDto.fecha_baja === null) {
+    (actividad as any).fecha_baja = null;
+    (actividad as any).usuario_baja = null;
+  } else {
+    Object.assign(actividad, updateActividadDto);
   }
+  
+  actividad.usuario_modificacion = usuario || 'demo';
+
+  return this.actividadRepository.save(actividad);
+}
 
   // Soft delete con auditoría
   async softDelete(id: number, usuario?: string): Promise<void> {
