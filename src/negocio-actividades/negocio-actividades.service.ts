@@ -41,14 +41,12 @@ export class NegocioActividadesService {
   }
 
   // ===== CRUD =====
-  // Obtener todas las relaciones
   async findAll(): Promise<NegocioActividad[]> {
     return this.repository.find({
       relations: ['negocio', 'actividad'],
     });
   }
 
-  // Obtener una relación por ID
   async findOne(id: number): Promise<NegocioActividad> {
     const relacion = await this.repository.findOne({
       where: { id },
@@ -62,7 +60,6 @@ export class NegocioActividadesService {
     return relacion;
   }
 
-  // Obtener relaciones por negocio (solo activas)
   async findByNegocio(negocioId: number): Promise<NegocioActividad[]> {
     return this.repository.find({
       where: { negocioId, fecha_baja: IsNull() },
@@ -70,7 +67,6 @@ export class NegocioActividadesService {
     });
   }
 
-  // Obtener relaciones por actividad (solo activas)
   async findByActividad(actividadId: number): Promise<NegocioActividad[]> {
     return this.repository.find({
       where: { actividadId, fecha_baja: IsNull() },
@@ -78,23 +74,31 @@ export class NegocioActividadesService {
     });
   }
 
-  // Crear una nueva relación
+  // Crear o reactivar una relación
   async create(createDto: CreateNegocioActividadDto, usuario?: string): Promise<NegocioActividad> {
     // Validar que existan las entidades relacionadas (solo activas)
     await this.validarNegocio(createDto.negocioId);
     await this.validarActividad(createDto.actividadId);
 
-    // Verificar que no exista ya una relación activa
+    // Buscar si ya existe una relación (activa o inactiva)
     const existente = await this.repository.findOneBy({
       negocioId: createDto.negocioId,
       actividadId: createDto.actividadId,
-      fecha_baja: IsNull(),
     });
 
     if (existente) {
-      throw new BadRequestException('Esta actividad ya está asignada a este negocio');
+      if (existente.fecha_baja) {
+        // Reactivar la relación inactiva
+        existente.fecha_baja = null;
+        existente.usuario_baja = null;
+        existente.usuario_modificacion = usuario || 'demo';
+        return this.repository.save(existente);
+      } else {
+        throw new BadRequestException('Esta actividad ya está asignada activamente a este negocio');
+      }
     }
 
+    // Crear nueva relación
     const relacion = this.repository.create({
       ...createDto,
       usuario_alta: usuario || 'demo',
@@ -103,7 +107,6 @@ export class NegocioActividadesService {
     return this.repository.save(relacion);
   }
 
-  // Actualizar una relación (solo cambiar negocio o actividad)
   async update(id: number, updateDto: UpdateNegocioActividadDto, usuario?: string): Promise<NegocioActividad> {
     const relacion = await this.findOne(id);
 
@@ -121,7 +124,6 @@ export class NegocioActividadesService {
     return this.repository.save(relacion);
   }
 
-  // Reactivar una relación inactiva
   async reactivar(id: number, usuario?: string): Promise<NegocioActividad> {
     const relacion = await this.findOne(id);
     
@@ -129,26 +131,13 @@ export class NegocioActividadesService {
       throw new BadRequestException('La relación ya está activa');
     }
 
-    // Verificar que no exista otra relación activa con el mismo par
-    const existente = await this.repository.findOneBy({
-      negocioId: relacion.negocioId,
-      actividadId: relacion.actividadId,
-      fecha_baja: IsNull(),
-    });
-
-    if (existente && existente.id !== id) {
-      throw new BadRequestException('Ya existe una relación activa para este negocio y actividad');
-    }
-
-    // Usar aserción de tipo para evitar error de TypeScript
-    (relacion as any).fecha_baja = null;
-    (relacion as any).usuario_baja = null;
+    relacion.fecha_baja = null;
+    relacion.usuario_baja = null;
     relacion.usuario_modificacion = usuario || 'demo';
 
     return this.repository.save(relacion);
   }
 
-  // Soft delete (desactivar) una relación
   async softDelete(id: number, usuario?: string): Promise<void> {
     const relacion = await this.findOne(id);
 
@@ -162,7 +151,6 @@ export class NegocioActividadesService {
     await this.repository.save(relacion);
   }
 
-  // Debug de estructura de tabla
   async debugStructure(): Promise<any> {
     return this.repository.query(`
       SELECT column_name, data_type, is_nullable
