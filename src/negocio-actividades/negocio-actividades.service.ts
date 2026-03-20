@@ -89,8 +89,8 @@ export class NegocioActividadesService {
     if (existente) {
       if (existente.fecha_baja) {
         // Reactivar la relación inactiva
-        existente.fecha_baja = null;
-        existente.usuario_baja = null;
+        (existente as any).fecha_baja = null;
+        (existente as any).usuario_baja = null;
         existente.usuario_modificacion = usuario || 'demo';
         return this.repository.save(existente);
       } else {
@@ -131,8 +131,8 @@ export class NegocioActividadesService {
       throw new BadRequestException('La relación ya está activa');
     }
 
-    relacion.fecha_baja = null;
-    relacion.usuario_baja = null;
+    (relacion as any).fecha_baja = null;
+    (relacion as any).usuario_baja = null;
     relacion.usuario_modificacion = usuario || 'demo';
 
     return this.repository.save(relacion);
