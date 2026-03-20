@@ -6,7 +6,8 @@ import { ActividadModule } from './actividades/actividad.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { RolesModule } from './roles/roles.module';
 import { NegociosModule } from './negocios/negocios.module';
-import { NegociosUsuariosRolesModule } from './negocios-usuarios-roles/negocios-usuarios-roles.module'; // 👈 AGREGADO
+import { NegociosUsuariosRolesModule } from './negocios-usuarios-roles/negocios-usuarios-roles.module';
+import { NegocioActividadesModule } from './negocio-actividades/negocio-actividades.module'; // 👈 AGREGADO
 
 @Module({
   imports: [
@@ -28,7 +29,8 @@ import { NegociosUsuariosRolesModule } from './negocios-usuarios-roles/negocios-
     UsuariosModule,
     RolesModule,
     NegociosModule,
-    NegociosUsuariosRolesModule, // 👈 AGREGADO
+    NegociosUsuariosRolesModule,
+    NegocioActividadesModule, // 👈 AGREGADO
   ],
 })
 export class AppModule {}
