@@ -44,10 +44,17 @@ export class NegocioActividadesController {
     return this.agregarUltimoMovimiento(relacion);
   }
 
-  // Actualizar una relación (reactivar)
+  // Actualizar una relación (cambiar negocio o actividad)
   @Put(':id')
   async update(@Param('id') id: string, @Body() updateDto: UpdateNegocioActividadDto): Promise<any> {
     const relacion = await this.service.update(Number(id), updateDto, 'demo');
+    return this.agregarUltimoMovimiento(relacion);
+  }
+
+  // Reactivar una relación inactiva
+  @Put('reactivar/:id')
+  async reactivar(@Param('id') id: string): Promise<any> {
+    const relacion = await this.service.reactivar(Number(id), 'demo');
     return this.agregarUltimoMovimiento(relacion);
   }
 
