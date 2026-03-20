@@ -9,53 +9,44 @@ import { UpdateActividadDto } from './dto/update-actividad.dto';
 export class ActividadController {
   constructor(private readonly actividadService: ActividadService) {}
 
-  // Listar todas las actividades de un negocio
-  @Get('negocio/:negocioId')
-  async findAll(@Param('negocioId') negocioId: string): Promise<any[]> {
-    const actividades = await this.actividadService.findAll(Number(negocioId));
+  // Listar todas las actividades con último movimiento calculado
+  @Get()
+  async findAll(): Promise<any[]> {
+    const actividades = await this.actividadService.findAll();
+    
+    // Agregar campo ultimoMovimiento a cada actividad
     return actividades.map(actividad => this.agregarUltimoMovimiento(actividad));
   }
 
-  // Obtener una actividad por ID (requiere negocioId para verificar pertenencia)
-  @Get(':id/negocio/:negocioId')
-  async findOne(
-    @Param('id') id: string,
-    @Param('negocioId') negocioId: string
-  ): Promise<any> {
-    const actividad = await this.actividadService.findOne(Number(id), Number(negocioId));
+  // Obtener una actividad por ID con último movimiento calculado
+  @Get(':id')
+  async findOne(@Param('id') id: string): Promise<any> {
+    const actividad = await this.actividadService.findOne(Number(id));
     return this.agregarUltimoMovimiento(actividad);
   }
 
-  // Crear nueva actividad (el DTO ya incluye negocioId)
+  // Crear nueva actividad
   @Post()
   async create(@Body() createActividadDto: CreateActividadDto): Promise<any> {
+    // Para demo, usuario por defecto "demo"
     const actividad = await this.actividadService.create(createActividadDto, 'demo');
     return this.agregarUltimoMovimiento(actividad);
   }
 
   // Actualizar actividad existente
-  @Put(':id/negocio/:negocioId')
-  async update(
-    @Param('id') id: string,
-    @Param('negocioId') negocioId: string,
-    @Body() updateActividadDto: UpdateActividadDto
-  ): Promise<any> {
-    // Asegurar que el DTO tenga el negocioId correcto
-    updateActividadDto.negocioId = Number(negocioId);
+  @Put(':id')
+  async update(@Param('id') id: string, @Body() updateActividadDto: UpdateActividadDto): Promise<any> {
     const actividad = await this.actividadService.update(Number(id), updateActividadDto, 'demo');
     return this.agregarUltimoMovimiento(actividad);
   }
 
-  // Soft delete
-  @Delete(':id/negocio/:negocioId')
-  softDelete(
-    @Param('id') id: string,
-    @Param('negocioId') negocioId: string
-  ): Promise<void> {
-    return this.actividadService.softDelete(Number(id), Number(negocioId), 'demo');
+  // Soft delete de una actividad
+  @Delete(':id')
+  softDelete(@Param('id') id: string): Promise<void> {
+    return this.actividadService.softDelete(Number(id), 'demo');
   }
 
-  // Debug: ver estructura de tabla (opcional)
+  // Debug: ver estructura de tabla
   @Get('debug/structure')
   debugStructure() {
     return this.actividadService.debugStructure();
