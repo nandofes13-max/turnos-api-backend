@@ -4,12 +4,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Actividad } from './entities/actividad.entity';
 import { ActividadService } from './actividad.service';
 import { ActividadController } from './actividad.controller';
-import { Negocio } from '../negocios/entities/negocio.entity'; // 👈 IMPORTAR
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Actividad, Negocio]), // 👈 AGREGAR Negocio
-  ],
+  imports: [TypeOrmModule.forFeature([Actividad])],
   providers: [ActividadService],
   controllers: [ActividadController],
 })
