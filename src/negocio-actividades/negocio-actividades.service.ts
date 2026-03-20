@@ -103,28 +103,45 @@ export class NegocioActividadesService {
     return this.repository.save(relacion);
   }
 
-  // Actualizar una relación (solo se podría reactivar o cambiar, pero normalmente no se usa)
+  // Actualizar una relación (solo cambiar negocio o actividad)
   async update(id: number, updateDto: UpdateNegocioActividadDto, usuario?: string): Promise<NegocioActividad> {
     const relacion = await this.findOne(id);
 
-    // Si se reactiva (fecha_baja viene como null)
-    if (updateDto.fecha_baja === null) {
-      if (!relacion.fecha_baja) {
-        throw new BadRequestException('La relación ya está activa');
-      }
-      (relacion as any).fecha_baja = null;
-      (relacion as any).usuario_baja = null;
-    } else {
-      // Si se cambia negocio o actividad, validar
-      if (updateDto.negocioId && updateDto.negocioId !== relacion.negocioId) {
-        await this.validarNegocio(updateDto.negocioId);
-      }
-      if (updateDto.actividadId && updateDto.actividadId !== relacion.actividadId) {
-        await this.validarActividad(updateDto.actividadId);
-      }
-      Object.assign(relacion, updateDto);
+    // Si se cambia negocio o actividad, validar
+    if (updateDto.negocioId && updateDto.negocioId !== relacion.negocioId) {
+      await this.validarNegocio(updateDto.negocioId);
+    }
+    if (updateDto.actividadId && updateDto.actividadId !== relacion.actividadId) {
+      await this.validarActividad(updateDto.actividadId);
     }
 
+    Object.assign(relacion, updateDto);
+    relacion.usuario_modificacion = usuario || 'demo';
+
+    return this.repository.save(relacion);
+  }
+
+  // Reactivar una relación inactiva
+  async reactivar(id: number, usuario?: string): Promise<NegocioActividad> {
+    const relacion = await this.findOne(id);
+    
+    if (!relacion.fecha_baja) {
+      throw new BadRequestException('La relación ya está activa');
+    }
+
+    // Verificar que no exista otra relación activa con el mismo par
+    const existente = await this.repository.findOneBy({
+      negocioId: relacion.negocioId,
+      actividadId: relacion.actividadId,
+      fecha_baja: IsNull(),
+    });
+
+    if (existente && existente.id !== id) {
+      throw new BadRequestException('Ya existe una relación activa para este negocio y actividad');
+    }
+
+    relacion.fecha_baja = null;
+    relacion.usuario_baja = null;
     relacion.usuario_modificacion = usuario || 'demo';
 
     return this.repository.save(relacion);
