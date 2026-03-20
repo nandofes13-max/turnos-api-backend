@@ -45,8 +45,8 @@ export class ActividadService {
 
     // Si se reactiva (fecha_baja viene como null)
     if (updateActividadDto.fecha_baja === null) {
-      actividad.fecha_baja = null;
-      actividad.usuario_baja = null;
+      (actividad as any).fecha_baja = null;
+(actividad as any).usuario_baja = null;
     } else {
       // Actualización normal de otros campos
       Object.assign(actividad, updateActividadDto);
