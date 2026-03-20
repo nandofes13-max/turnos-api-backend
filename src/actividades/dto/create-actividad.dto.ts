@@ -1,16 +1,9 @@
-// src/actividades/dto/update-actividad.dto.ts
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateActividadDto } from './create-actividad.dto';
-import { IsOptional, IsDate, IsString } from 'class-validator';
-import { Type } from 'class-transformer';
+// src/actividades/dto/create-actividad.dto.ts
+import { IsString, IsNotEmpty, MaxLength } from 'class-validator';
 
-export class UpdateActividadDto extends PartialType(CreateActividadDto) {
-  @IsOptional()
-  @IsDate()
-  @Type(() => Date)
-  fecha_baja?: Date | null;
-
-  @IsOptional()
-  @IsString()
-  usuario_baja?: string | null;
+export class CreateActividadDto {
+  @IsString({ message: 'El nombre debe ser texto' })
+  @IsNotEmpty({ message: 'El nombre es obligatorio' })
+  @MaxLength(100, { message: 'El nombre no puede tener más de 100 caracteres' })
+  nombre: string;
 }
