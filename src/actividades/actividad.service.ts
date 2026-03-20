@@ -1,5 +1,5 @@
 // src/actividades/actividad.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { Actividad } from './entities/actividad.entity';
@@ -13,6 +13,18 @@ export class ActividadService {
     private readonly actividadRepository: Repository<Actividad>,
   ) {}
 
+  // ===== FUNCIÓN AUXILIAR =====
+  private async verificarNombreUnico(nombre: string, id?: number): Promise<void> {
+    const existente = await this.actividadRepository.findOne({
+      where: { nombre: nombre.toUpperCase() },
+    });
+
+    if (existente && existente.id !== id) {
+      throw new BadRequestException(`Ya existe una actividad con el nombre "${nombre}"`);
+    }
+  }
+
+  // ===== CRUD =====
   // Obtener todas las actividades
   async findAll(): Promise<Actividad[]> {
     return this.actividadRepository.find();
@@ -29,34 +41,44 @@ export class ActividadService {
     return actividad;
   }
 
-  // Crear actividad con auditoría
+  // Crear actividad
   async create(createActividadDto: CreateActividadDto, usuario?: string): Promise<Actividad> {
+    // Validar que el nombre no exista (activo o inactivo)
+    await this.verificarNombreUnico(createActividadDto.nombre);
+
     const actividad = this.actividadRepository.create({
       ...createActividadDto,
+      nombre: createActividadDto.nombre.toUpperCase(),
       usuario_alta: usuario || 'demo',
     });
 
     return this.actividadRepository.save(actividad);
   }
 
-  // Actualizar actividad con auditoría (incluye reactivación)
+  // Actualizar actividad (incluye reactivación)
   async update(id: number, updateActividadDto: UpdateActividadDto, usuario?: string): Promise<Actividad> {
-  const actividad = await this.findOne(id);
+    const actividad = await this.findOne(id);
 
-  // Si se reactiva (fecha_baja viene como null)
-  if (updateActividadDto.fecha_baja === null) {
-    (actividad as any).fecha_baja = null;
-    (actividad as any).usuario_baja = null;
-  } else {
-    Object.assign(actividad, updateActividadDto);
+    // Si se está actualizando el nombre, verificar que no exista otro con ese nombre
+    if (updateActividadDto.nombre) {
+      await this.verificarNombreUnico(updateActividadDto.nombre, id);
+      updateActividadDto.nombre = updateActividadDto.nombre.toUpperCase();
+    }
+
+    // Si se reactiva (fecha_baja viene como null)
+    if (updateActividadDto.fecha_baja === null) {
+      (actividad as any).fecha_baja = null;
+      (actividad as any).usuario_baja = null;
+    } else {
+      Object.assign(actividad, updateActividadDto);
+    }
+    
+    actividad.usuario_modificacion = usuario || 'demo';
+
+    return this.actividadRepository.save(actividad);
   }
-  
-  actividad.usuario_modificacion = usuario || 'demo';
 
-  return this.actividadRepository.save(actividad);
-}
-
-  // Soft delete con auditoría
+  // Soft delete
   async softDelete(id: number, usuario?: string): Promise<void> {
     const actividad = await this.findOne(id);
     actividad.fecha_baja = new Date();
