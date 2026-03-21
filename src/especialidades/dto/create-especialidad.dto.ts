@@ -1,5 +1,5 @@
 // src/especialidades/dto/create-especialidad.dto.ts
-import { IsString, IsNotEmpty, MaxLength, IsNumber, IsOptional, IsInt } from 'class-validator';
+import { IsString, IsNotEmpty, MaxLength, IsOptional } from 'class-validator';
 
 export class CreateEspecialidadDto {
   @IsString({ message: 'El nombre debe ser texto' })
@@ -10,9 +10,4 @@ export class CreateEspecialidadDto {
   @IsString({ message: 'La descripción debe ser texto' })
   @IsOptional()
   descripcion?: string;
-
-  @IsNumber({}, { message: 'El ID de la actividad debe ser un número' })
-  @IsNotEmpty({ message: 'El ID de la actividad es obligatorio' })
-  @IsInt({ message: 'El ID de la actividad debe ser un número entero' })
-  actividadId: number;
 }
