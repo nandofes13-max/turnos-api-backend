@@ -5,28 +5,15 @@ import { Repository, IsNull } from 'typeorm';
 import { Especialidad } from './entities/especialidad.entity';
 import { CreateEspecialidadDto } from './dto/create-especialidad.dto';
 import { UpdateEspecialidadDto } from './dto/update-especialidad.dto';
-import { Actividad } from '../actividades/entities/actividad.entity';
 
 @Injectable()
 export class EspecialidadesService {
   constructor(
     @InjectRepository(Especialidad)
     private readonly especialidadRepository: Repository<Especialidad>,
-    @InjectRepository(Actividad)
-    private readonly actividadRepository: Repository<Actividad>,
   ) {}
 
   // ===== FUNCIÓN AUXILIAR =====
-  private async validarActividad(actividadId: number): Promise<void> {
-    const actividad = await this.actividadRepository.findOneBy({ 
-      id: actividadId,
-      fecha_baja: IsNull() 
-    });
-    if (!actividad) {
-      throw new BadRequestException(`La actividad con id ${actividadId} no existe o no está activa`);
-    }
-  }
-
   private async verificarNombreUnico(nombre: string, id?: number): Promise<void> {
     const existente = await this.especialidadRepository.findOne({
       where: { nombre: nombre.toUpperCase() },
@@ -39,22 +26,12 @@ export class EspecialidadesService {
 
   // ===== CRUD =====
   async findAll(): Promise<Especialidad[]> {
-    return this.especialidadRepository.find({
-      relations: ['actividad'],
-    });
-  }
-
-  async findByActividad(actividadId: number): Promise<Especialidad[]> {
-    return this.especialidadRepository.find({
-      where: { actividadId, fecha_baja: IsNull() },
-      relations: ['actividad'],
-    });
+    return this.especialidadRepository.find();
   }
 
   async findOne(id: number): Promise<Especialidad> {
     const especialidad = await this.especialidadRepository.findOne({
       where: { id },
-      relations: ['actividad'],
     });
 
     if (!especialidad) {
@@ -65,9 +42,6 @@ export class EspecialidadesService {
   }
 
   async create(createEspecialidadDto: CreateEspecialidadDto, usuario?: string): Promise<Especialidad> {
-    // Validar que la actividad exista
-    await this.validarActividad(createEspecialidadDto.actividadId);
-    
     // Validar que el nombre no exista (activo o inactivo)
     await this.verificarNombreUnico(createEspecialidadDto.nombre);
 
@@ -82,11 +56,6 @@ export class EspecialidadesService {
 
   async update(id: number, updateEspecialidadDto: UpdateEspecialidadDto, usuario?: string): Promise<Especialidad> {
     const especialidad = await this.findOne(id);
-
-    // Si se actualiza la actividad, validar que exista
-    if (updateEspecialidadDto.actividadId && updateEspecialidadDto.actividadId !== especialidad.actividadId) {
-      await this.validarActividad(updateEspecialidadDto.actividadId);
-    }
 
     // Si se actualiza el nombre, verificar que no exista otro con ese nombre
     if (updateEspecialidadDto.nombre) {
