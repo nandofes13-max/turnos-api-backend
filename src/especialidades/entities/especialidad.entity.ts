@@ -1,7 +1,6 @@
 // src/especialidades/entities/especialidad.entity.ts
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column } from 'typeorm';
 import { BaseEntityAuditable } from '../../entities/base.entity';
-import { Actividad } from '../../actividades/entities/actividad.entity';
 
 @Entity()
 export class Especialidad extends BaseEntityAuditable {
@@ -10,13 +9,6 @@ export class Especialidad extends BaseEntityAuditable {
 
   @Column({ type: 'text', nullable: true })
   descripcion: string;
-
-  @ManyToOne(() => Actividad)
-  @JoinColumn({ name: 'actividad_id' })
-  actividad: Actividad;
-
-  @Column({ name: 'actividad_id' })
-  actividadId: number;
 
   // Getter para último movimiento
   get ultimoMovimiento(): string {
