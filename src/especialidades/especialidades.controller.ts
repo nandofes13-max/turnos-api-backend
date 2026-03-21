@@ -1,5 +1,5 @@
 // src/especialidades/especialidades.controller.ts
-import { Body, Controller, Get, Param, Post, Put, Delete, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Delete } from '@nestjs/common';
 import { EspecialidadesService } from './especialidades.service';
 import { Especialidad } from './entities/especialidad.entity';
 import { CreateEspecialidadDto } from './dto/create-especialidad.dto';
@@ -13,13 +13,6 @@ export class EspecialidadesController {
   @Get()
   async findAll(): Promise<any[]> {
     const especialidades = await this.service.findAll();
-    return especialidades.map(e => this.agregarUltimoMovimiento(e));
-  }
-
-  // Listar especialidades por actividad (para el frontend)
-  @Get('por-actividad')
-  async findByActividad(@Query('actividadId') actividadId: string): Promise<any[]> {
-    const especialidades = await this.service.findByActividad(Number(actividadId));
     return especialidades.map(e => this.agregarUltimoMovimiento(e));
   }
 
