@@ -82,6 +82,7 @@ export class ProfesionalService {
       );
     }
 
+    // Asignar los campos actualizados
     Object.assign(profesional, updateProfesionalDto);
     profesional.usuario_modificacion = usuario || 'demo';
 
@@ -94,20 +95,6 @@ export class ProfesionalService {
     profesional.usuario_baja = usuario || 'demo';
 
     await this.profesionalRepository.save(profesional);
-  }
-
-  async reactivate(id: number, usuario?: string): Promise<Profesional> {
-    const profesional = await this.findOne(id);
-    
-    if (!profesional.fecha_baja) {
-      throw new BadRequestException(`El profesional ya está activo`);
-    }
-
-    profesional.fecha_baja = null;
-    profesional.usuario_baja = null;
-    profesional.usuario_modificacion = usuario || 'demo';
-
-    return this.profesionalRepository.save(profesional);
   }
 
   async debugStructure(): Promise<any> {
