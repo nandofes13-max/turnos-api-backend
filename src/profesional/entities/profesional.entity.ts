@@ -1,4 +1,4 @@
-import { Entity, Column } from 'typeorm';
+import { Entity, Column, BeforeInsert, BeforeUpdate } from 'typeorm';
 import { BaseEntityAuditable } from '../../entities/base.entity';
 
 @Entity('profesional')
@@ -12,8 +12,15 @@ export class Profesional extends BaseEntityAuditable {
   @Column({ type: 'varchar', length: 100, unique: true, nullable: false })
   email: string;
 
-  @Column({ type: 'varchar', length: 20, nullable: false })
-  whatsapp: string;
+  // WhatsApp (igual que Negocios)
+  @Column({ type: 'int', nullable: false })
+  country_code: number;
+
+  @Column({ length: 15, nullable: false })
+  national_number: string;
+
+  @Column({ length: 16, unique: true, nullable: false })
+  whatsapp_e164: string;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
   matricula: string;
@@ -21,7 +28,7 @@ export class Profesional extends BaseEntityAuditable {
   @Column({ type: 'varchar', length: 255, nullable: true })
   foto: string;
 
-  // Getter para último movimiento (opcional, consistente con otras tablas)
+  // Getter para último movimiento
   get ultimoMovimiento(): string {
     if (this.fecha_baja && this.usuario_baja) {
       return `${this.usuario_baja} - BAJA - ${this.formatearFecha(this.fecha_baja)}`;
@@ -44,5 +51,15 @@ export class Profesional extends BaseEntityAuditable {
       hour: '2-digit',
       minute: '2-digit'
     }).replace(',', '');
+  }
+
+  // Generar whatsapp_e164 automáticamente (igual que Negocios)
+  @BeforeInsert()
+  @BeforeUpdate()
+  generarE164() {
+    if (this.country_code && this.national_number) {
+      const soloNumeros = this.national_number.replace(/\D/g, '');
+      this.whatsapp_e164 = `+${this.country_code}${soloNumeros}`;
+    }
   }
 }
