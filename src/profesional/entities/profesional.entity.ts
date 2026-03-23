@@ -76,7 +76,7 @@ export class Profesional {
     type: 'timestamp',
     nullable: true
   })
-  fecha_modificacion: Date;
+  fecha_modificacion?: Date;
 
   @Column({ 
     name: 'usuario_modificacion',
@@ -84,14 +84,14 @@ export class Profesional {
     length: 50, 
     nullable: true
   })
-  usuario_modificacion: string;
+  usuario_modificacion?: string;
 
   @Column({ 
     name: 'fecha_baja',
     type: 'timestamp', 
     nullable: true 
   })
-  fecha_baja: Date;
+  fecha_baja?: Date;
 
   @Column({ 
     name: 'usuario_baja',
@@ -99,5 +99,5 @@ export class Profesional {
     length: 50, 
     nullable: true 
   })
-  usuario_baja: string;
+  usuario_baja?: string;
 }
