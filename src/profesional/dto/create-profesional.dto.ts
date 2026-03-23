@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsOptional, IsNotEmpty, Length, Matches } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsNotEmpty, Length, Matches, IsNumber, Min, Max } from 'class-validator';
 
 export class CreateProfesionalDto {
   @IsString({ message: 'El documento debe ser un texto' })
@@ -15,12 +15,17 @@ export class CreateProfesionalDto {
   @IsNotEmpty({ message: 'El email es obligatorio' })
   email: string;
 
-  @IsString({ message: 'El WhatsApp debe ser un texto' })
-  @IsNotEmpty({ message: 'El WhatsApp es obligatorio' })
-  @Matches(/^\+[1-9]\d{1,14}$/, { 
-    message: 'El WhatsApp debe tener formato internacional: +5491112345678' 
-  })
-  whatsapp: string;
+  // WhatsApp (igual que Negocios)
+  @IsNumber({}, { message: 'El código de país debe ser un número' })
+  @IsNotEmpty({ message: 'El código de país es obligatorio' })
+  @Min(1, { message: 'El código de país debe ser mayor a 0' })
+  @Max(999, { message: 'El código de país no puede tener más de 3 dígitos' })
+  country_code: number;
+
+  @IsString({ message: 'El número nacional debe ser texto' })
+  @IsNotEmpty({ message: 'El número nacional es obligatorio' })
+  @Length(6, 15, { message: 'El número nacional debe tener entre 6 y 15 dígitos' })
+  national_number: string;
 
   @IsString({ message: 'La matrícula debe ser un texto' })
   @IsOptional()
