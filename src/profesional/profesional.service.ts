@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Profesional } from './entities/profesional.entity';
 import { CreateProfesionalDto } from './dto/create-profesional.dto';
 import { UpdateProfesionalDto } from './dto/update-profesional.dto';
+import { parsePhoneNumber } from 'libphonenumber-js';
 
 @Injectable()
 export class ProfesionalService {
@@ -11,6 +12,24 @@ export class ProfesionalService {
     @InjectRepository(Profesional)
     private readonly profesionalRepository: Repository<Profesional>,
   ) {}
+
+  // ===== VALIDACIÓN DE WHATSAPP =====
+  private validarWhatsApp(country_code: number, national_number: string): string {
+    const numeroCompleto = `+${country_code}${national_number.replace(/\D/g, '')}`;
+    
+    try {
+      const phoneNumber = parsePhoneNumber(numeroCompleto);
+      
+      if (!phoneNumber || !phoneNumber.isValid()) {
+        throw new BadRequestException('El número de WhatsApp no es válido para el país seleccionado');
+      }
+      
+      return phoneNumber.number;
+      
+    } catch (error) {
+      throw new BadRequestException('Error al validar el número de WhatsApp: ' + error.message);
+    }
+  }
 
   // ===== FUNCIONES AUXILIARES =====
   private async verificarDocumentoUnico(documento: string, id?: number): Promise<void> {
@@ -62,8 +81,16 @@ export class ProfesionalService {
       createProfesionalDto.email,
     );
 
+    // Validar WhatsApp
+    const whatsappE164 = this.validarWhatsApp(
+      createProfesionalDto.country_code,
+      createProfesionalDto.national_number
+    );
+
     const profesional = this.profesionalRepository.create({
       ...createProfesionalDto,
+      whatsapp_e164: whatsappE164,
+      nombre: createProfesionalDto.nombre.toUpperCase(),
       usuario_alta: usuario || 'demo',
     });
 
@@ -80,6 +107,15 @@ export class ProfesionalService {
         updateProfesionalDto.email || profesional.email,
         id,
       );
+    }
+
+    // Si se actualizan campos de WhatsApp, validar
+    if (updateProfesionalDto.country_code || updateProfesionalDto.national_number) {
+      const country_code = updateProfesionalDto.country_code ?? profesional.country_code;
+      const national_number = updateProfesionalDto.national_number ?? profesional.national_number;
+      
+      const whatsappE164 = this.validarWhatsApp(country_code, national_number);
+      profesional.whatsapp_e164 = whatsappE164;
     }
 
     // Asignar los campos actualizados
