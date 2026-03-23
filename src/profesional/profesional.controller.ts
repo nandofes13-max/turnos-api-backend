@@ -1,13 +1,4 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Put, 
-  Delete, 
-  Body, 
-  Param, 
-  Query 
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Delete } from '@nestjs/common';
 import { ProfesionalService } from './profesional.service';
 import { Profesional } from './entities/profesional.entity';
 import { CreateProfesionalDto } from './dto/create-profesional.dto';
@@ -40,25 +31,15 @@ export class ProfesionalController {
 
   // Actualizar profesional
   @Put(':id')
-  async update(
-    @Param('id') id: string, 
-    @Body() updateDto: UpdateProfesionalDto
-  ): Promise<any> {
+  async update(@Param('id') id: string, @Body() updateDto: UpdateProfesionalDto): Promise<any> {
     const profesional = await this.service.update(Number(id), updateDto, 'demo');
     return this.agregarUltimoMovimiento(profesional);
   }
 
   // Soft delete (dar de baja)
   @Delete(':id')
-  async softDelete(@Param('id') id: string): Promise<void> {
+  softDelete(@Param('id') id: string): Promise<void> {
     return this.service.softDelete(Number(id), 'demo');
-  }
-
-  // Reactivar profesional
-  @Put(':id/reactivar')
-  async reactivate(@Param('id') id: string): Promise<any> {
-    const profesional = await this.service.reactivate(Number(id), 'demo');
-    return this.agregarUltimoMovimiento(profesional);
   }
 
   // Debug: ver estructura de tabla
