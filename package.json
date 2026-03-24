@@ -33,7 +33,8 @@
     "class-validator": "^0.14.1",
     "@nestjs/mapped-types": "^2.0.5",
     "libphonenumber-js": "^1.11.18",
-    "class-transformer": "^0.5.1"
+    "class-transformer": "^0.5.1",
+    "cloudinary": "^2.5.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
