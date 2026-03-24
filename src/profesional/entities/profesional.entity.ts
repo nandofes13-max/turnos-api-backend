@@ -12,7 +12,7 @@ export class Profesional extends BaseEntityAuditable {
   @Column({ type: 'varchar', length: 100, unique: true, nullable: false })
   email: string;
 
-  // WhatsApp (igual que Negocios)
+  // WhatsApp
   @Column({ type: 'int', nullable: false })
   country_code: number;
 
@@ -21,6 +21,10 @@ export class Profesional extends BaseEntityAuditable {
 
   @Column({ length: 16, unique: true, nullable: false })
   whatsapp_e164: string;
+
+  // Género
+  @Column({ type: 'varchar', length: 1, nullable: true })
+  genero: string;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
   matricula: string;
@@ -53,7 +57,6 @@ export class Profesional extends BaseEntityAuditable {
     }).replace(',', '');
   }
 
-  // Generar whatsapp_e164 automáticamente (igual que Negocios)
   @BeforeInsert()
   @BeforeUpdate()
   generarE164() {
