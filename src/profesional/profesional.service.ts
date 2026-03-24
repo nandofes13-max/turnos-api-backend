@@ -13,7 +13,6 @@ export class ProfesionalService {
     private readonly profesionalRepository: Repository<Profesional>,
   ) {}
 
-  // ===== VALIDACIÓN DE WHATSAPP =====
   private validarWhatsApp(country_code: number, national_number: string): string {
     const numeroCompleto = `+${country_code}${national_number.replace(/\D/g, '')}`;
     
@@ -31,7 +30,6 @@ export class ProfesionalService {
     }
   }
 
-  // ===== FUNCIONES AUXILIARES =====
   private async verificarDocumentoUnico(documento: string, id?: number): Promise<void> {
     const existente = await this.profesionalRepository.findOne({
       where: { documento },
@@ -57,7 +55,6 @@ export class ProfesionalService {
     await this.verificarEmailUnico(email, id);
   }
 
-  // ===== CRUD =====
   async findAll(): Promise<Profesional[]> {
     return this.profesionalRepository.find();
   }
@@ -75,13 +72,11 @@ export class ProfesionalService {
   }
 
   async create(createProfesionalDto: CreateProfesionalDto, usuario?: string): Promise<Profesional> {
-    // Validar unicidad de documento y email
     await this.verificarUnicidad(
       createProfesionalDto.documento,
       createProfesionalDto.email,
     );
 
-    // Validar WhatsApp
     const whatsappE164 = this.validarWhatsApp(
       createProfesionalDto.country_code,
       createProfesionalDto.national_number
@@ -100,7 +95,6 @@ export class ProfesionalService {
   async update(id: number, updateProfesionalDto: UpdateProfesionalDto, usuario?: string): Promise<Profesional> {
     const profesional = await this.findOne(id);
 
-    // Si se actualiza documento o email, verificar unicidad
     if (updateProfesionalDto.documento || updateProfesionalDto.email) {
       await this.verificarUnicidad(
         updateProfesionalDto.documento || profesional.documento,
@@ -109,7 +103,6 @@ export class ProfesionalService {
       );
     }
 
-    // Si se actualizan campos de WhatsApp, validar
     if (updateProfesionalDto.country_code || updateProfesionalDto.national_number) {
       const country_code = updateProfesionalDto.country_code ?? profesional.country_code;
       const national_number = updateProfesionalDto.national_number ?? profesional.national_number;
@@ -118,7 +111,6 @@ export class ProfesionalService {
       profesional.whatsapp_e164 = whatsappE164;
     }
 
-    // Asignar los campos actualizados
     Object.assign(profesional, updateProfesionalDto);
     profesional.usuario_modificacion = usuario || 'demo';
 
