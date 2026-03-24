@@ -15,7 +15,7 @@ export class CreateProfesionalDto {
   @IsNotEmpty({ message: 'El email es obligatorio' })
   email: string;
 
-  // WhatsApp (igual que Negocios)
+  // WhatsApp
   @IsNumber({}, { message: 'El código de país debe ser un número' })
   @IsNotEmpty({ message: 'El código de país es obligatorio' })
   @Min(1, { message: 'El código de país debe ser mayor a 0' })
@@ -26,6 +26,12 @@ export class CreateProfesionalDto {
   @IsNotEmpty({ message: 'El número nacional es obligatorio' })
   @Length(6, 15, { message: 'El número nacional debe tener entre 6 y 15 dígitos' })
   national_number: string;
+
+  // Género
+  @IsString({ message: 'El género debe ser un texto' })
+  @IsOptional()
+  @Matches(/^[MF]$/, { message: 'El género debe ser M (Masculino) o F (Femenino)' })
+  genero?: string;
 
   @IsString({ message: 'La matrícula debe ser un texto' })
   @IsOptional()
