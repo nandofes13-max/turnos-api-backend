@@ -11,7 +11,8 @@ import { NegocioActividadesModule } from './negocio-actividades/negocio-activida
 import { EspecialidadesModule } from './especialidades/especialidades.module';
 import { ActividadEspecialidadModule } from './actividad-especialidad/actividad-especialidad.module';
 import { ProfesionalModule } from './profesional/profesional.module';
-import { UploadModule } from './upload/upload.module'; // 👈 AGREGAR
+import { UploadModule } from './upload/upload.module';
+import { ProfesionalEspecialidadModule } from './profesional-especialidad/profesional-especialidad.module'; // 👈 NUEVO
 
 @Module({
   imports: [
@@ -38,7 +39,8 @@ import { UploadModule } from './upload/upload.module'; // 👈 AGREGAR
     EspecialidadesModule,
     ActividadEspecialidadModule,
     ProfesionalModule,
-    UploadModule, // 👈 AGREGAR
+    UploadModule,
+    ProfesionalEspecialidadModule, // 👈 NUEVO
   ],
 })
 export class AppModule {}
