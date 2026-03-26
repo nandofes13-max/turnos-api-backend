@@ -1,8 +1,9 @@
-import { Entity, Column, ManyToOne, JoinColumn, BeforeInsert, BeforeUpdate } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, BeforeInsert, BeforeUpdate, Unique } from 'typeorm';
 import { BaseEntityAuditable } from '../../entities/base.entity';
 import { Negocio } from '../../negocios/entities/negocio.entity';
 
 @Entity('centro')
+@Unique(['negocioId', 'codigo'])
 export class Centro extends BaseEntityAuditable {
   @Column({ name: 'negocio_id' })
   negocioId: number;
@@ -10,7 +11,7 @@ export class Centro extends BaseEntityAuditable {
   @Column({ length: 100 })
   nombre: string;
 
-  @Column({ length: 20, unique: true })
+  @Column({ length: 20 })
   codigo: string;
 
   // WhatsApp
