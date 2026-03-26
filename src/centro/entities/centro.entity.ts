@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, BeforeInsert, BeforeUpdate } from 'typeorm';
 import { BaseEntityAuditable } from '../../entities/base.entity';
 import { Negocio } from '../../negocios/entities/negocio.entity';
 
