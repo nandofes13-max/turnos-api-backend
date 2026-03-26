@@ -66,21 +66,12 @@ export class CentroService {
 
   // ===== FUNCIÓN PARA GENERAR CÓDIGO ÚNICO POR NEGOCIO =====
   private async generarCodigoUnico(negocioId: number): Promise<string> {
-    // Buscar el último centro de este negocio
-    const ultimoCentro = await this.centroRepository.findOne({
-      where: { negocioId, fecha_baja: IsNull() },
-      order: { id: 'DESC' },
+    // Contar TODOS los centros de este negocio (activos + inactivos)
+    const count = await this.centroRepository.count({
+      where: { negocioId },
     });
 
-    let numero = 1;
-    if (ultimoCentro && ultimoCentro.codigo) {
-      const match = ultimoCentro.codigo.match(/C-(\d+)/);
-      if (match) {
-        numero = parseInt(match[1], 10) + 1;
-      }
-    }
-
-    // Formato con 3 dígitos: C-001, C-002, ..., C-999
+    const numero = count + 1;
     return `C-${numero.toString().padStart(3, '0')}`;
   }
 
@@ -121,7 +112,7 @@ export class CentroService {
     // 2. Validar dirección
     this.validarDireccion(createCentroDto.domicilio);
 
-    // 3. Generar código único por negocio
+    // 3. Generar código único por negocio (incluye inactivos)
     const codigo = await this.generarCodigoUnico(createCentroDto.negocioId);
 
     // 4. Crear la entidad
