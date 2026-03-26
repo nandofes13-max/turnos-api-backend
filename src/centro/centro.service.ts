@@ -168,26 +168,12 @@ export class CentroService {
       centroExistente.formatted_address = updateCentroDto.domicilio.formatted_address;
     }
 
-    // Actualizar otros campos
+    // Actualizar todos los campos usando Object.assign (igual que profesional-especialidad)
+    Object.assign(centroExistente, updateCentroDto);
+
+    // Asegurar que nombre se guarde en mayúsculas
     if (updateCentroDto.nombre) {
       centroExistente.nombre = updateCentroDto.nombre.toUpperCase();
-    }
-    if (updateCentroDto.negocioId) {
-      centroExistente.negocioId = updateCentroDto.negocioId;
-    }
-    if (updateCentroDto.country_code) {
-      centroExistente.country_code = updateCentroDto.country_code;
-    }
-    if (updateCentroDto.national_number) {
-      centroExistente.national_number = updateCentroDto.national_number;
-    }
-
-    // Para reactivar (enviar null)
-    if (updateCentroDto.fecha_baja !== undefined) {
-      centroExistente.fecha_baja = updateCentroDto.fecha_baja;
-    }
-    if (updateCentroDto.usuario_baja !== undefined) {
-      centroExistente.usuario_baja = updateCentroDto.usuario_baja;
     }
 
     centroExistente.usuario_modificacion = usuario || 'demo';
