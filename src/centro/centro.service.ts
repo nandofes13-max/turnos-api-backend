@@ -112,7 +112,7 @@ export class CentroService {
     // 2. Validar dirección
     this.validarDireccion(createCentroDto.domicilio);
 
-    // 3. Generar código único por negocio (incluye inactivos)
+    // 3. Generar código único por negocio
     const codigo = await this.generarCodigoUnico(createCentroDto.negocioId);
 
     // 4. Crear la entidad
@@ -180,6 +180,14 @@ export class CentroService {
     }
     if (updateCentroDto.national_number) {
       centroExistente.national_number = updateCentroDto.national_number;
+    }
+
+    // Para reactivar (enviar null)
+    if (updateCentroDto.fecha_baja !== undefined) {
+      centroExistente.fecha_baja = updateCentroDto.fecha_baja;
+    }
+    if (updateCentroDto.usuario_baja !== undefined) {
+      centroExistente.usuario_baja = updateCentroDto.usuario_baja;
     }
 
     centroExistente.usuario_modificacion = usuario || 'demo';
