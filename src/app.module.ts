@@ -12,7 +12,8 @@ import { EspecialidadesModule } from './especialidades/especialidades.module';
 import { ActividadEspecialidadModule } from './actividad-especialidad/actividad-especialidad.module';
 import { ProfesionalModule } from './profesional/profesional.module';
 import { UploadModule } from './upload/upload.module';
-import { ProfesionalEspecialidadModule } from './profesional-especialidad/profesional-especialidad.module'; // 👈 NUEVO
+import { ProfesionalEspecialidadModule } from './profesional-especialidad/profesional-especialidad.module';
+import { CentroModule } from './centro/centro.module'; // 👈 NUEVO
 
 @Module({
   imports: [
@@ -40,7 +41,8 @@ import { ProfesionalEspecialidadModule } from './profesional-especialidad/profes
     ActividadEspecialidadModule,
     ProfesionalModule,
     UploadModule,
-    ProfesionalEspecialidadModule, // 👈 NUEVO
+    ProfesionalEspecialidadModule,
+    CentroModule, // 👈 NUEVO
   ],
 })
 export class AppModule {}
