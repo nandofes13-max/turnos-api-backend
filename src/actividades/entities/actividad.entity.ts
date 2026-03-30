@@ -1,11 +1,19 @@
-// src/actividades/entities/actividad.entity.ts
 import { Entity, Column } from 'typeorm';
 import { BaseEntityAuditable } from '../../entities/base.entity';
 
 @Entity()
 export class Actividad extends BaseEntityAuditable {
-  @Column()
+  @Column({ length: 100 })
   nombre: string;
+
+  @Column({ type: 'text', nullable: true })
+  descripcion: string;
+
+  @Column({ length: 20, unique: true })
+  codigo: string;
+
+  @Column({ default: false })
+  virtual: boolean;
 
   // Getter para último movimiento
   get ultimoMovimiento(): string {
