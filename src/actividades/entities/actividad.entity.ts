@@ -9,7 +9,7 @@ export class Actividad extends BaseEntityAuditable {
   @Column({ type: 'text', nullable: true })
   descripcion: string;
 
-  @Column({ length: 20, unique: true })
+  @Column({ length: 20, unique: true, nullable: true }) // 👈 CAMBIADO a nullable true
   codigo: string;
 
   @Column({ default: false })
