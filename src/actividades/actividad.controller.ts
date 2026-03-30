@@ -1,4 +1,3 @@
-// src/actividades/actividad.controller.ts
 import { Body, Controller, Get, Param, Post, Put, Delete } from '@nestjs/common';
 import { ActividadService } from './actividad.service';
 import { Actividad } from './entities/actividad.entity';
@@ -7,54 +6,51 @@ import { UpdateActividadDto } from './dto/update-actividad.dto';
 
 @Controller('actividades')
 export class ActividadController {
-  constructor(private readonly actividadService: ActividadService) {}
+  constructor(private readonly service: ActividadService) {}
 
-  // Listar todas las actividades con último movimiento calculado
+  // Listar todas las actividades
   @Get()
   async findAll(): Promise<any[]> {
-    const actividades = await this.actividadService.findAll();
-    
-    // Agregar campo ultimoMovimiento a cada actividad
-    return actividades.map(actividad => this.agregarUltimoMovimiento(actividad));
+    const actividades = await this.service.findAll();
+    return actividades.map(a => this.agregarUltimoMovimiento(a));
   }
 
-  // Obtener una actividad por ID con último movimiento calculado
+  // Obtener una actividad por ID
   @Get(':id')
   async findOne(@Param('id') id: string): Promise<any> {
-    const actividad = await this.actividadService.findOne(Number(id));
+    const actividad = await this.service.findOne(Number(id));
     return this.agregarUltimoMovimiento(actividad);
   }
 
   // Crear nueva actividad
   @Post()
-  async create(@Body() createActividadDto: CreateActividadDto): Promise<any> {
-    // Para demo, usuario por defecto "demo"
-    const actividad = await this.actividadService.create(createActividadDto, 'demo');
+  async create(@Body() createDto: CreateActividadDto): Promise<any> {
+    const actividad = await this.service.create(createDto, 'demo');
     return this.agregarUltimoMovimiento(actividad);
   }
 
-  // Actualizar actividad existente
+  // Actualizar actividad
   @Put(':id')
-  async update(@Param('id') id: string, @Body() updateActividadDto: UpdateActividadDto): Promise<any> {
-    const actividad = await this.actividadService.update(Number(id), updateActividadDto, 'demo');
+  async update(@Param('id') id: string, @Body() updateDto: UpdateActividadDto): Promise<any> {
+    const actividad = await this.service.update(Number(id), updateDto, 'demo');
     return this.agregarUltimoMovimiento(actividad);
   }
 
-  // Soft delete de una actividad
+  // Soft delete
   @Delete(':id')
   softDelete(@Param('id') id: string): Promise<void> {
-    return this.actividadService.softDelete(Number(id), 'demo');
+    return this.service.softDelete(Number(id), 'demo');
   }
 
   // Debug: ver estructura de tabla
   @Get('debug/structure')
   debugStructure() {
-    return this.actividadService.debugStructure();
+    return this.service.debugStructure();
   }
 
   // ===== FUNCIÓN AUXILIAR =====
   private agregarUltimoMovimiento(actividad: Actividad): any {
-    const actividadObj: any = { ...actividad };
+    const obj: any = { ...actividad };
     
     let ultimoMovimiento = 'Sin información';
     
@@ -71,9 +67,9 @@ export class ActividadController {
       ultimoMovimiento = `${actividad.usuario_alta} - ALTA - ${this.formatearFechaArgentina(actividad.fecha_alta)}`;
     }
     
-    actividadObj.ultimoMovimiento = ultimoMovimiento;
+    obj.ultimoMovimiento = ultimoMovimiento;
     
-    return actividadObj;
+    return obj;
   }
 
   private formatearFechaArgentina(fecha: Date): string {
