@@ -49,6 +49,7 @@ export class ActividadService {
     const actividad = this.actividadRepository.create({
       ...createActividadDto,
       nombre: createActividadDto.nombre.toUpperCase(),
+      virtual: createActividadDto.virtual || false,
       usuario_alta: usuario || 'demo',
     });
 
