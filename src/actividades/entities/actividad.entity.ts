@@ -7,6 +7,9 @@ export class Actividad extends BaseEntityAuditable {
   @Column()
   nombre: string;
 
+  @Column({ default: false })
+  virtual: boolean;
+
   // Getter para último movimiento
   get ultimoMovimiento(): string {
     if (this.fecha_baja && this.usuario_baja) {
