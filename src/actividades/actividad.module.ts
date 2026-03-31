@@ -1,3 +1,4 @@
+// src/actividades/actividad.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Actividad } from './entities/actividad.entity';
@@ -6,8 +7,7 @@ import { ActividadController } from './actividad.controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Actividad])],
-  controllers: [ActividadController],
   providers: [ActividadService],
-  exports: [ActividadService],
+  controllers: [ActividadController],
 })
 export class ActividadModule {}
