@@ -34,7 +34,6 @@ export class NegociosService {
 
   // ===== VALIDACIÓN DE DIRECCIÓN =====
   private validarDireccion(domicilio: any) {
-    // Validar que tenga todos los campos requeridos
     const camposRequeridos = [
       'street', 'street_number', 'postal_code', 'city', 
       'state', 'country', 'country_code', 'latitude', 
@@ -47,7 +46,6 @@ export class NegociosService {
       }
     }
 
-    // Validar que las coordenadas sean números válidos
     if (isNaN(domicilio.latitude) || domicilio.latitude < -90 || domicilio.latitude > 90) {
       throw new BadRequestException('La latitud debe ser un número entre -90 y 90');
     }
@@ -56,13 +54,10 @@ export class NegociosService {
       throw new BadRequestException('La longitud debe ser un número entre -180 y 180');
     }
 
-    // Validar que el código de país ISO sea de 2 letras
     if (!/^[A-Z]{2}$/.test(domicilio.country_code)) {
       throw new BadRequestException('El código de país debe tener 2 letras mayúsculas (ISO 3166-1 alpha-2)');
     }
 
-    // Opcional: validar que la dirección vino de la API (por ahora solo aceptamos)
-    // Podríamos verificar que el formatted_address tenga un formato esperado
     if (domicilio.formatted_address.length < 10) {
       throw new BadRequestException('La dirección no parece válida');
     }
@@ -99,12 +94,10 @@ export class NegociosService {
     return url;
   }
 
-  // Obtener todos los negocios
   async findAll(): Promise<Negocio[]> {
     return this.negociosRepository.find();
   }
 
-  // Obtener un negocio por ID
   async findOne(id: number): Promise<Negocio> {
     const negocio = await this.negociosRepository.findOneBy({ id });
 
@@ -115,7 +108,6 @@ export class NegociosService {
     return negocio;
   }
 
-  // Obtener un negocio por URL
   async findByUrl(url: string): Promise<Negocio | null> {
     return this.negociosRepository.findOneBy({ 
       url,
@@ -123,28 +115,22 @@ export class NegociosService {
     });
   }
 
-  // Crear negocio con auditoría
   async create(createNegocioDto: CreateNegocioDto, usuario?: string): Promise<Negocio> {
-    // 1. Validar WhatsApp
     const whatsappE164 = this.validarWhatsApp(
       createNegocioDto.country_code,
       createNegocioDto.national_number
     );
 
-    // 2. Validar dirección
     this.validarDireccion(createNegocioDto.domicilio);
 
-    // 3. Generar URL única
     const url = await this.generarUrlUnica(createNegocioDto.nombre);
 
-    // 4. Crear la entidad (mapear domicilio a campos individuales)
     const negocioEntity = this.negociosRepository.create({
       nombre: createNegocioDto.nombre.toUpperCase(),
       country_code: createNegocioDto.country_code,
       national_number: createNegocioDto.national_number,
       whatsapp_e164: whatsappE164,
       url,
-      // Mapear domicilio
       street: createNegocioDto.domicilio.street,
       street_number: createNegocioDto.domicilio.street_number,
       postal_code: createNegocioDto.domicilio.postal_code,
@@ -161,7 +147,6 @@ export class NegociosService {
     return this.negociosRepository.save(negocioEntity);
   }
 
-  // Actualizar negocio con auditoría
   async update(id: number, updateNegocioDto: UpdateNegocioDto, usuario?: string): Promise<Negocio> {
     const negocioExistente = await this.findOne(id);
 
@@ -178,7 +163,6 @@ export class NegociosService {
     if (updateNegocioDto.domicilio) {
       this.validarDireccion(updateNegocioDto.domicilio);
       
-      // Mapear domicilio a campos individuales
       negocioExistente.street = updateNegocioDto.domicilio.street;
       negocioExistente.street_number = updateNegocioDto.domicilio.street_number;
       negocioExistente.postal_code = updateNegocioDto.domicilio.postal_code;
@@ -202,12 +186,19 @@ export class NegociosService {
       negocioExistente.national_number = updateNegocioDto.national_number;
     }
 
+    // 👇 AGREGAR ESTO PARA REACTIVAR (igual que en actividades)
+    if (updateNegocioDto.fecha_baja === null) {
+      (negocioExistente as any).fecha_baja = null;
+      (negocioExistente as any).usuario_baja = null;
+    } else {
+      Object.assign(negocioExistente, updateNegocioDto);
+    }
+
     negocioExistente.usuario_modificacion = usuario || 'demo';
 
     return this.negociosRepository.save(negocioExistente);
   }
 
-  // Soft delete con auditoría
   async softDelete(id: number, usuario?: string): Promise<void> {
     const negocioExistente = await this.findOne(id);
     negocioExistente.fecha_baja = new Date();
@@ -216,7 +207,6 @@ export class NegociosService {
     await this.negociosRepository.save(negocioExistente);
   }
 
-  // Debug de estructura de tabla
   async debugStructure(): Promise<any> {
     return this.negociosRepository.query(`
       SELECT column_name, data_type, is_nullable
