@@ -135,7 +135,7 @@ export class CentroService {
     // 4. Generar código único por negocio
     const codigo = await this.generarCodigoUnico(createCentroDto.negocioId);
 
-    // 5. Crear la entidad
+    // 5. Crear la entidad - usando un objeto simple
     const centroData: any = {
       negocioId: createCentroDto.negocioId,
       nombre: createCentroDto.nombre.toUpperCase(),
@@ -162,7 +162,7 @@ export class CentroService {
     }
 
     const centroEntity = this.centroRepository.create(centroData);
-    return this.centroRepository.save(centroEntity);
+    return await this.centroRepository.save(centroEntity);
   }
 
   async update(id: number, updateCentroDto: UpdateCentroDto, usuario?: string): Promise<Centro> {
@@ -225,7 +225,7 @@ export class CentroService {
 
     centroExistente.usuario_modificacion = usuario || 'demo';
 
-    return this.centroRepository.save(centroExistente);
+    return await this.centroRepository.save(centroExistente);
   }
 
   async softDelete(id: number, usuario?: string): Promise<void> {
