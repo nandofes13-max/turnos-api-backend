@@ -66,13 +66,25 @@ export class CentroService {
 
   // ===== FUNCIÓN PARA GENERAR CÓDIGO ÚNICO POR NEGOCIO =====
   private async generarCodigoUnico(negocioId: number): Promise<string> {
-    // Contar TODOS los centros de este negocio (activos + inactivos)
     const count = await this.centroRepository.count({
       where: { negocioId },
     });
 
     const numero = count + 1;
     return `C-${numero.toString().padStart(3, '0')}`;
+  }
+
+  // ===== VERIFICAR SI EL NEGOCIO YA TIENE UN CENTRO VIRTUAL =====
+  private async verificarCentroVirtualUnico(negocioId: number, es_virtual?: boolean, id?: number): Promise<void> {
+    if (!es_virtual) return;
+    
+    const existeVirtual = await this.centroRepository.findOne({
+      where: { negocioId, es_virtual: true, fecha_baja: IsNull() },
+    });
+    
+    if (existeVirtual && existeVirtual.id !== id) {
+      throw new BadRequestException('Este negocio ya tiene un centro virtual. Solo se permite uno.');
+    }
   }
 
   // ===== CRUD =====
@@ -109,31 +121,40 @@ export class CentroService {
       createCentroDto.national_number
     );
 
-    // 2. Validar dirección
-    this.validarDireccion(createCentroDto.domicilio);
+    // 2. Validar que no haya otro centro virtual para este negocio
+    await this.verificarCentroVirtualUnico(createCentroDto.negocioId, createCentroDto.es_virtual);
 
-    // 3. Generar código único por negocio
+    // 3. Validar dirección (obligatoria si no es virtual)
+    if (!createCentroDto.es_virtual) {
+      if (!createCentroDto.domicilio || !createCentroDto.domicilio.formatted_address) {
+        throw new BadRequestException('El domicilio es obligatorio para centros físicos');
+      }
+      this.validarDireccion(createCentroDto.domicilio);
+    }
+
+    // 4. Generar código único por negocio
     const codigo = await this.generarCodigoUnico(createCentroDto.negocioId);
 
-    // 4. Crear la entidad
+    // 5. Crear la entidad
     const centroEntity = this.centroRepository.create({
       negocioId: createCentroDto.negocioId,
       nombre: createCentroDto.nombre.toUpperCase(),
       codigo,
+      es_virtual: createCentroDto.es_virtual || false,
       country_code: createCentroDto.country_code,
       national_number: createCentroDto.national_number,
       whatsapp_e164: whatsappE164,
-      // Mapear domicilio
-      street: createCentroDto.domicilio.street,
-      street_number: createCentroDto.domicilio.street_number,
-      postal_code: createCentroDto.domicilio.postal_code,
-      city: createCentroDto.domicilio.city,
-      state: createCentroDto.domicilio.state,
-      country: createCentroDto.domicilio.country,
-      country_code_iso: createCentroDto.domicilio.country_code,
-      latitude: createCentroDto.domicilio.latitude,
-      longitude: createCentroDto.domicilio.longitude,
-      formatted_address: createCentroDto.domicilio.formatted_address,
+      // Mapear domicilio (solo si no es virtual)
+      street: createCentroDto.domicilio?.street || null,
+      street_number: createCentroDto.domicilio?.street_number || null,
+      postal_code: createCentroDto.domicilio?.postal_code || null,
+      city: createCentroDto.domicilio?.city || null,
+      state: createCentroDto.domicilio?.state || null,
+      country: createCentroDto.domicilio?.country || null,
+      country_code_iso: createCentroDto.domicilio?.country_code || null,
+      latitude: createCentroDto.domicilio?.latitude || null,
+      longitude: createCentroDto.domicilio?.longitude || null,
+      formatted_address: createCentroDto.domicilio?.formatted_address || null,
       usuario_alta: usuario || 'demo',
     });
 
@@ -152,7 +173,12 @@ export class CentroService {
       centroExistente.whatsapp_e164 = whatsappE164;
     }
 
-    // Si se actualiza el domicilio, validar
+    // Validar que no haya conflicto con otro centro virtual
+    if (updateCentroDto.es_virtual !== undefined) {
+      await this.verificarCentroVirtualUnico(centroExistente.negocioId, updateCentroDto.es_virtual, id);
+    }
+
+    // Si se actualiza el domicilio y no es virtual, validar
     if (updateCentroDto.domicilio) {
       this.validarDireccion(updateCentroDto.domicilio);
       
@@ -168,12 +194,29 @@ export class CentroService {
       centroExistente.formatted_address = updateCentroDto.domicilio.formatted_address;
     }
 
-    // Actualizar todos los campos usando Object.assign (igual que profesional-especialidad)
-    Object.assign(centroExistente, updateCentroDto);
-
-    // Asegurar que nombre se guarde en mayúsculas
+    // Actualizar otros campos
     if (updateCentroDto.nombre) {
       centroExistente.nombre = updateCentroDto.nombre.toUpperCase();
+    }
+    if (updateCentroDto.negocioId) {
+      centroExistente.negocioId = updateCentroDto.negocioId;
+    }
+    if (updateCentroDto.country_code) {
+      centroExistente.country_code = updateCentroDto.country_code;
+    }
+    if (updateCentroDto.national_number) {
+      centroExistente.national_number = updateCentroDto.national_number;
+    }
+    if (updateCentroDto.es_virtual !== undefined) {
+      centroExistente.es_virtual = updateCentroDto.es_virtual;
+    }
+
+    // Para reactivar (enviar null)
+    if (updateCentroDto.fecha_baja !== undefined) {
+      centroExistente.fecha_baja = updateCentroDto.fecha_baja;
+    }
+    if (updateCentroDto.usuario_baja !== undefined) {
+      centroExistente.usuario_baja = updateCentroDto.usuario_baja;
     }
 
     centroExistente.usuario_modificacion = usuario || 'demo';
