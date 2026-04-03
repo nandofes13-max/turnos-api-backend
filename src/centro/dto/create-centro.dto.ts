@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsNumber, Min, Max, IsObject, ValidateNested, IsOptional, IsLatitude, IsLongitude, MaxLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, Min, Max, IsObject, ValidateNested, IsOptional, IsLatitude, IsLongitude, MaxLength, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 
 // DTO para el domicilio estructurado (mismo que Negocios)
@@ -62,6 +62,10 @@ export class CreateCentroDto {
   @MaxLength(100, { message: 'El nombre no puede tener más de 100 caracteres' })
   nombre: string;
 
+  @IsBoolean({ message: 'es_virtual debe ser verdadero o falso' })
+  @IsOptional()
+  es_virtual?: boolean;
+
   // WhatsApp
   @IsNumber({}, { message: 'El código de país debe ser un número' })
   @IsNotEmpty({ message: 'El código de país es obligatorio' })
@@ -74,10 +78,10 @@ export class CreateCentroDto {
   @MaxLength(15, { message: 'El número nacional no puede tener más de 15 dígitos' })
   national_number: string;
 
-  // Domicilio
+  // Domicilio (obligatorio solo si es_virtual = false)
   @IsObject({ message: 'El domicilio debe ser un objeto válido' })
   @ValidateNested()
   @Type(() => DomicilioDto)
-  @IsNotEmpty({ message: 'El domicilio es obligatorio' })
-  domicilio: DomicilioDto;
+  @IsOptional()
+  domicilio?: DomicilioDto;
 }
