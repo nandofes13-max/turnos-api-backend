@@ -13,7 +13,6 @@ export class CentroService {
     private readonly centroRepository: Repository<Centro>,
   ) {}
 
-  // ===== VALIDACIÓN DE WHATSAPP =====
   private validarWhatsApp(country_code: number, national_number: string): string {
     const numeroCompleto = `+${country_code}${national_number.replace(/\D/g, '')}`;
     
@@ -31,7 +30,6 @@ export class CentroService {
     }
   }
 
-  // ===== VALIDACIÓN DE DIRECCIÓN =====
   private validarDireccion(domicilio: DomicilioDto) {
     const camposRequeridos = [
       'street', 'street_number', 'postal_code', 'city', 
@@ -64,7 +62,6 @@ export class CentroService {
     return true;
   }
 
-  // ===== FUNCIÓN PARA GENERAR CÓDIGO ÚNICO POR NEGOCIO =====
   private async generarCodigoUnico(negocioId: number): Promise<string> {
     const count = await this.centroRepository.count({
       where: { negocioId },
@@ -74,7 +71,6 @@ export class CentroService {
     return `C-${numero.toString().padStart(3, '0')}`;
   }
 
-  // ===== VERIFICAR SI EL NEGOCIO YA TIENE UN CENTRO VIRTUAL =====
   private async verificarCentroVirtualUnico(negocioId: number, es_virtual?: boolean, id?: number): Promise<void> {
     if (!es_virtual) return;
     
@@ -87,7 +83,6 @@ export class CentroService {
     }
   }
 
-  // ===== CRUD =====
   async findAll(): Promise<Centro[]> {
     return this.centroRepository.find({
       relations: ['negocio'],
@@ -115,16 +110,13 @@ export class CentroService {
   }
 
   async create(createCentroDto: CreateCentroDto, usuario?: string): Promise<Centro> {
-    // 1. Validar WhatsApp
     const whatsappE164 = this.validarWhatsApp(
       createCentroDto.country_code,
       createCentroDto.national_number
     );
 
-    // 2. Validar que no haya otro centro virtual para este negocio
     await this.verificarCentroVirtualUnico(createCentroDto.negocioId, createCentroDto.es_virtual);
 
-    // 3. Validar dirección (obligatoria si no es virtual)
     if (!createCentroDto.es_virtual) {
       if (!createCentroDto.domicilio || !createCentroDto.domicilio.formatted_address) {
         throw new BadRequestException('El domicilio es obligatorio para centros físicos');
@@ -132,43 +124,38 @@ export class CentroService {
       this.validarDireccion(createCentroDto.domicilio);
     }
 
-    // 4. Generar código único por negocio
     const codigo = await this.generarCodigoUnico(createCentroDto.negocioId);
 
-    // 5. Crear la entidad - usando un objeto simple
-    const centroData: any = {
-      negocioId: createCentroDto.negocioId,
-      nombre: createCentroDto.nombre.toUpperCase(),
-      codigo,
-      es_virtual: createCentroDto.es_virtual || false,
-      country_code: createCentroDto.country_code,
-      national_number: createCentroDto.national_number,
-      whatsapp_e164: whatsappE164,
-      usuario_alta: usuario || 'demo',
-    };
+    // Crear nuevo objeto Centro directamente
+    const nuevoCentro = new Centro();
+    nuevoCentro.negocioId = createCentroDto.negocioId;
+    nuevoCentro.nombre = createCentroDto.nombre.toUpperCase();
+    nuevoCentro.codigo = codigo;
+    nuevoCentro.es_virtual = createCentroDto.es_virtual || false;
+    nuevoCentro.country_code = createCentroDto.country_code;
+    nuevoCentro.national_number = createCentroDto.national_number;
+    nuevoCentro.whatsapp_e164 = whatsappE164;
+    nuevoCentro.usuario_alta = usuario || 'demo';
 
-    // Solo agregar domicilio si no es virtual
     if (!createCentroDto.es_virtual && createCentroDto.domicilio) {
-      centroData.street = createCentroDto.domicilio.street;
-      centroData.street_number = createCentroDto.domicilio.street_number;
-      centroData.postal_code = createCentroDto.domicilio.postal_code;
-      centroData.city = createCentroDto.domicilio.city;
-      centroData.state = createCentroDto.domicilio.state;
-      centroData.country = createCentroDto.domicilio.country;
-      centroData.country_code_iso = createCentroDto.domicilio.country_code;
-      centroData.latitude = createCentroDto.domicilio.latitude;
-      centroData.longitude = createCentroDto.domicilio.longitude;
-      centroData.formatted_address = createCentroDto.domicilio.formatted_address;
+      nuevoCentro.street = createCentroDto.domicilio.street;
+      nuevoCentro.street_number = createCentroDto.domicilio.street_number;
+      nuevoCentro.postal_code = createCentroDto.domicilio.postal_code;
+      nuevoCentro.city = createCentroDto.domicilio.city;
+      nuevoCentro.state = createCentroDto.domicilio.state;
+      nuevoCentro.country = createCentroDto.domicilio.country;
+      nuevoCentro.country_code_iso = createCentroDto.domicilio.country_code;
+      nuevoCentro.latitude = createCentroDto.domicilio.latitude;
+      nuevoCentro.longitude = createCentroDto.domicilio.longitude;
+      nuevoCentro.formatted_address = createCentroDto.domicilio.formatted_address;
     }
 
-    const centroEntity = this.centroRepository.create(centroData);
-    return await this.centroRepository.save(centroEntity);
+    return await this.centroRepository.save(nuevoCentro);
   }
 
   async update(id: number, updateCentroDto: UpdateCentroDto, usuario?: string): Promise<Centro> {
     const centroExistente = await this.findOne(id);
 
-    // Si se actualizan campos de WhatsApp, validar nuevamente
     if (updateCentroDto.country_code || updateCentroDto.national_number) {
       const country_code = updateCentroDto.country_code ?? centroExistente.country_code;
       const national_number = updateCentroDto.national_number ?? centroExistente.national_number;
@@ -177,12 +164,10 @@ export class CentroService {
       centroExistente.whatsapp_e164 = whatsappE164;
     }
 
-    // Validar que no haya conflicto con otro centro virtual
     if (updateCentroDto.es_virtual !== undefined) {
       await this.verificarCentroVirtualUnico(centroExistente.negocioId, updateCentroDto.es_virtual, id);
     }
 
-    // Si se actualiza el domicilio y no es virtual, validar
     if (updateCentroDto.domicilio) {
       this.validarDireccion(updateCentroDto.domicilio);
       
@@ -198,7 +183,6 @@ export class CentroService {
       centroExistente.formatted_address = updateCentroDto.domicilio.formatted_address;
     }
 
-    // Actualizar otros campos
     if (updateCentroDto.nombre) {
       centroExistente.nombre = updateCentroDto.nombre.toUpperCase();
     }
@@ -215,7 +199,6 @@ export class CentroService {
       centroExistente.es_virtual = updateCentroDto.es_virtual;
     }
 
-    // Para reactivar (enviar null) - usar Object.assign para evitar errores de tipo
     if (updateCentroDto.fecha_baja !== undefined) {
       (centroExistente as any).fecha_baja = updateCentroDto.fecha_baja;
     }
