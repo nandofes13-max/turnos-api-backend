@@ -136,7 +136,7 @@ export class CentroService {
     const codigo = await this.generarCodigoUnico(createCentroDto.negocioId);
 
     // 5. Crear la entidad
-    const centroEntity = this.centroRepository.create({
+    const centroData: any = {
       negocioId: createCentroDto.negocioId,
       nombre: createCentroDto.nombre.toUpperCase(),
       codigo,
@@ -144,20 +144,24 @@ export class CentroService {
       country_code: createCentroDto.country_code,
       national_number: createCentroDto.national_number,
       whatsapp_e164: whatsappE164,
-      // Mapear domicilio (solo si no es virtual)
-      street: createCentroDto.domicilio?.street || null,
-      street_number: createCentroDto.domicilio?.street_number || null,
-      postal_code: createCentroDto.domicilio?.postal_code || null,
-      city: createCentroDto.domicilio?.city || null,
-      state: createCentroDto.domicilio?.state || null,
-      country: createCentroDto.domicilio?.country || null,
-      country_code_iso: createCentroDto.domicilio?.country_code || null,
-      latitude: createCentroDto.domicilio?.latitude || null,
-      longitude: createCentroDto.domicilio?.longitude || null,
-      formatted_address: createCentroDto.domicilio?.formatted_address || null,
       usuario_alta: usuario || 'demo',
-    });
+    };
 
+    // Solo agregar domicilio si no es virtual
+    if (!createCentroDto.es_virtual && createCentroDto.domicilio) {
+      centroData.street = createCentroDto.domicilio.street;
+      centroData.street_number = createCentroDto.domicilio.street_number;
+      centroData.postal_code = createCentroDto.domicilio.postal_code;
+      centroData.city = createCentroDto.domicilio.city;
+      centroData.state = createCentroDto.domicilio.state;
+      centroData.country = createCentroDto.domicilio.country;
+      centroData.country_code_iso = createCentroDto.domicilio.country_code;
+      centroData.latitude = createCentroDto.domicilio.latitude;
+      centroData.longitude = createCentroDto.domicilio.longitude;
+      centroData.formatted_address = createCentroDto.domicilio.formatted_address;
+    }
+
+    const centroEntity = this.centroRepository.create(centroData);
     return this.centroRepository.save(centroEntity);
   }
 
@@ -211,12 +215,12 @@ export class CentroService {
       centroExistente.es_virtual = updateCentroDto.es_virtual;
     }
 
-    // Para reactivar (enviar null)
+    // Para reactivar (enviar null) - usar Object.assign para evitar errores de tipo
     if (updateCentroDto.fecha_baja !== undefined) {
-      centroExistente.fecha_baja = updateCentroDto.fecha_baja;
+      (centroExistente as any).fecha_baja = updateCentroDto.fecha_baja;
     }
     if (updateCentroDto.usuario_baja !== undefined) {
-      centroExistente.usuario_baja = updateCentroDto.usuario_baja;
+      (centroExistente as any).usuario_baja = updateCentroDto.usuario_baja;
     }
 
     centroExistente.usuario_modificacion = usuario || 'demo';
