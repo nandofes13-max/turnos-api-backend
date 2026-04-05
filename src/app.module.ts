@@ -13,7 +13,8 @@ import { ActividadEspecialidadModule } from './actividad-especialidad/actividad-
 import { ProfesionalModule } from './profesional/profesional.module';
 import { UploadModule } from './upload/upload.module';
 import { ProfesionalEspecialidadModule } from './profesional-especialidad/profesional-especialidad.module';
-import { CentroModule } from './centro/centro.module'; // 👈 NUEVO
+import { CentroModule } from './centro/centro.module';
+import { ProfesionalCentroModule } from './profesional-centro/profesional-centro.module'; // 👈 NUEVO
 
 @Module({
   imports: [
@@ -42,7 +43,8 @@ import { CentroModule } from './centro/centro.module'; // 👈 NUEVO
     ProfesionalModule,
     UploadModule,
     ProfesionalEspecialidadModule,
-    CentroModule, // 👈 NUEVO
+    CentroModule,
+    ProfesionalCentroModule, // 👈 NUEVO
   ],
 })
 export class AppModule {}
