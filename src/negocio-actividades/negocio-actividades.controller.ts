@@ -37,14 +37,6 @@ export class NegocioActividadesController {
     return relaciones.map(r => this.agregarUltimoMovimiento(r));
   }
 
-  // NUEVO ENDPOINT: Obtener solo IDs de negocios por actividad (para filtrar en frontend)
-  @Get('negocios-por-actividad/:actividadId')
-  async getNegocioIdsByActividad(@Param('actividadId') actividadId: string): Promise<{ negocioIds: number[] }> {
-    const relaciones = await this.service.findByActividad(Number(actividadId));
-    const negocioIds = [...new Set(relaciones.map(r => r.negocioId))];
-    return { negocioIds };
-  }
-
   // Crear nueva relación
   @Post()
   async create(@Body() createDto: CreateNegocioActividadDto): Promise<any> {
