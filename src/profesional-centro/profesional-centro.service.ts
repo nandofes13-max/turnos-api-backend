@@ -7,6 +7,8 @@ import { UpdateProfesionalCentroDto } from './dto/update-profesional-centro.dto'
 import { Profesional } from '../profesional/entities/profesional.entity';
 import { Especialidad } from '../especialidades/entities/especialidad.entity';
 import { Centro } from '../centro/entities/centro.entity';
+import { ActividadEspecialidad } from '../actividad-especialidad/entities/actividad-especialidad.entity';
+import { NegocioActividad } from '../negocio-actividades/entities/negocio-actividad.entity';
 
 @Injectable()
 export class ProfesionalCentroService {
@@ -19,6 +21,10 @@ export class ProfesionalCentroService {
     private readonly especialidadRepository: Repository<Especialidad>,
     @InjectRepository(Centro)
     private readonly centroRepository: Repository<Centro>,
+    @InjectRepository(ActividadEspecialidad)
+    private readonly actividadEspecialidadRepository: Repository<ActividadEspecialidad>,
+    @InjectRepository(NegocioActividad)
+    private readonly negocioActividadRepository: Repository<NegocioActividad>,
   ) {}
 
   // ===== FUNCIONES AUXILIARES =====
@@ -56,6 +62,47 @@ export class ProfesionalCentroService {
 
     if (existente && existente.id !== id) {
       throw new BadRequestException(`El profesional ya tiene asignada esta especialidad en este centro`);
+    }
+  }
+
+  // NUEVA VALIDACIÓN: Verificar que el centro pertenezca a un negocio que tenga la actividad de la especialidad
+  private async verificarActividadCoincideConCentro(especialidadId: number, centroId: number): Promise<void> {
+    // 1. Obtener la actividad de la especialidad
+    const actividadEspecialidad = await this.actividadEspecialidadRepository.findOne({
+      where: { especialidadId, fecha_baja: null },
+    });
+
+    if (!actividadEspecialidad) {
+      throw new BadRequestException(`La especialidad no tiene una actividad asociada`);
+    }
+
+    const actividadId = actividadEspecialidad.actividadId;
+
+    // 2. Obtener el negocio del centro
+    const centro = await this.centroRepository.findOne({
+      where: { id: centroId, fecha_baja: null },
+    });
+
+    if (!centro) {
+      throw new BadRequestException(`El centro no existe o está inactivo`);
+    }
+
+    const negocioId = centro.negocioId;
+
+    // 3. Verificar que el negocio tenga esa actividad
+    const negocioActividad = await this.negocioActividadRepository.findOne({
+      where: {
+        negocioId: negocioId,
+        actividadId: actividadId,
+        fecha_baja: null,
+      },
+    });
+
+    if (!negocioActividad) {
+      throw new BadRequestException(
+        `El centro pertenece a un negocio que no ofrece la actividad requerida para esta especialidad. ` +
+        `Actividad ID: ${actividadId}, Negocio ID: ${negocioId}`
+      );
     }
   }
 
@@ -99,6 +146,12 @@ export class ProfesionalCentroService {
     await this.verificarEspecialidadActiva(createDto.especialidadId);
     await this.verificarCentroActivo(createDto.centroId);
     
+    // NUEVA VALIDACIÓN: Verificar que el centro tenga la actividad correcta
+    await this.verificarActividadCoincideConCentro(
+      createDto.especialidadId,
+      createDto.centroId,
+    );
+    
     // Validar combinación única
     await this.verificarCombinacionUnica(
       createDto.profesionalId,
@@ -134,6 +187,11 @@ export class ProfesionalCentroService {
     const centroId = updateDto.centroId ?? registro.centroId;
     
     await this.verificarCombinacionUnica(profesionalId, especialidadId, centroId, id);
+
+    // Si cambia especialidad o centro, validar la relación actividad-negocio
+    if (updateDto.especialidadId || updateDto.centroId) {
+      await this.verificarActividadCoincideConCentro(especialidadId, centroId);
+    }
 
     // Para reactivar (enviar null)
     if (updateDto.fecha_baja !== undefined) {
