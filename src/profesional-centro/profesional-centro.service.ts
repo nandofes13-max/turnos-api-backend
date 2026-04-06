@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { ProfesionalCentro } from './entities/profesional-centro.entity';
 import { CreateProfesionalCentroDto } from './dto/create-profesional-centro.dto';
 import { UpdateProfesionalCentroDto } from './dto/update-profesional-centro.dto';
@@ -30,34 +30,34 @@ export class ProfesionalCentroService {
   // ===== FUNCIONES AUXILIARES =====
   private async verificarProfesionalActivo(id: number): Promise<void> {
     const profesional = await this.profesionalRepository.findOne({
-      where: { id },
+      where: { id, fecha_baja: IsNull() },
     });
-    if (!profesional || profesional.fecha_baja) {
+    if (!profesional) {
       throw new BadRequestException(`El profesional no existe o está inactivo`);
     }
   }
 
   private async verificarEspecialidadActiva(id: number): Promise<void> {
     const especialidad = await this.especialidadRepository.findOne({
-      where: { id },
+      where: { id, fecha_baja: IsNull() },
     });
-    if (!especialidad || especialidad.fecha_baja) {
+    if (!especialidad) {
       throw new BadRequestException(`La especialidad no existe o está inactiva`);
     }
   }
 
   private async verificarCentroActivo(id: number): Promise<void> {
     const centro = await this.centroRepository.findOne({
-      where: { id },
+      where: { id, fecha_baja: IsNull() },
     });
-    if (!centro || centro.fecha_baja) {
+    if (!centro) {
       throw new BadRequestException(`El centro no existe o está inactivo`);
     }
   }
 
   private async verificarCombinacionUnica(profesionalId: number, especialidadId: number, centroId: number, id?: number): Promise<void> {
     const existente = await this.repository.findOne({
-      where: { profesionalId, especialidadId, centroId },
+      where: { profesionalId, especialidadId, centroId, fecha_baja: IsNull() },
     });
 
     if (existente && existente.id !== id) {
@@ -69,7 +69,7 @@ export class ProfesionalCentroService {
   private async verificarActividadCoincideConCentro(especialidadId: number, centroId: number): Promise<void> {
     // 1. Obtener la actividad de la especialidad
     const actividadEspecialidad = await this.actividadEspecialidadRepository.findOne({
-      where: { especialidadId, fecha_baja: null },
+      where: { especialidadId, fecha_baja: IsNull() },
     });
 
     if (!actividadEspecialidad) {
@@ -80,7 +80,7 @@ export class ProfesionalCentroService {
 
     // 2. Obtener el negocio del centro
     const centro = await this.centroRepository.findOne({
-      where: { id: centroId, fecha_baja: null },
+      where: { id: centroId, fecha_baja: IsNull() },
     });
 
     if (!centro) {
@@ -94,7 +94,7 @@ export class ProfesionalCentroService {
       where: {
         negocioId: negocioId,
         actividadId: actividadId,
-        fecha_baja: null,
+        fecha_baja: IsNull(),
       },
     });
 
