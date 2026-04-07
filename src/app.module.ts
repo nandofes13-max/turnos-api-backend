@@ -14,7 +14,8 @@ import { ProfesionalModule } from './profesional/profesional.module';
 import { UploadModule } from './upload/upload.module';
 import { ProfesionalEspecialidadModule } from './profesional-especialidad/profesional-especialidad.module';
 import { CentroModule } from './centro/centro.module';
-import { ProfesionalCentroModule } from './profesional-centro/profesional-centro.module'; // 👈 NUEVO
+import { ProfesionalCentroModule } from './profesional-centro/profesional-centro.module';
+import { AgendaDisponibilidadModule } from './agenda-disponibilidad/agenda-disponibilidad.module'; // 👈 NUEVO
 
 @Module({
   imports: [
@@ -44,7 +45,8 @@ import { ProfesionalCentroModule } from './profesional-centro/profesional-centro
     UploadModule,
     ProfesionalEspecialidadModule,
     CentroModule,
-    ProfesionalCentroModule, // 👈 NUEVO
+    ProfesionalCentroModule,
+    AgendaDisponibilidadModule, // 👈 NUEVO
   ],
 })
 export class AppModule {}
