@@ -1,11 +1,11 @@
-import { Entity, Column, ManyToOne, JoinColumn, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntityAuditable } from '../../entities/base.entity';
 import { ProfesionalCentro } from '../../profesional-centro/entities/profesional-centro.entity';
 
 @Entity('agenda_disponibilidad')
 export class AgendaDisponibilidad extends BaseEntityAuditable {
-  @PrimaryGeneratedColumn()
-  id: number;
+  // ❌ ELIMINAR esta línea: id: number;
+  // El id ya viene de BaseEntityAuditable
 
   @Column({ name: 'profesional_centro_id' })
   profesionalCentroId: number;
