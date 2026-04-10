@@ -44,6 +44,51 @@ export class AgendaDisponibilidadService {
     }
   }
 
+  private async verificarDuracionRangoValido(
+    horaDesde: string,
+    horaHasta: string,
+    duracionTurno: number,
+    bufferMinutos: number,
+  ): Promise<void> {
+    // Calcular minutos totales del rango
+    const [desdeH, desdeM] = horaDesde.split(':').map(Number);
+    const [hastaH, hastaM] = horaHasta.split(':').map(Number);
+    const minutosTotales = (hastaH * 60 + hastaM) - (desdeH * 60 + desdeM);
+    
+    if (minutosTotales <= 0) {
+      throw new BadRequestException(`El horario desde debe ser menor al horario hasta`);
+    }
+    
+    // Si buffer es 0, validar divisibilidad exacta
+    if (bufferMinutos === 0) {
+      if (minutosTotales % duracionTurno !== 0) {
+        throw new BadRequestException(
+          `La duración del turno (${duracionTurno} min) no divide exactamente el rango horario de ${minutosTotales} minutos. ` +
+          `Los turnos no se generarían correctamente.`
+        );
+      }
+    } else {
+      // Con buffer > 0, validar fórmula: n * duracion + (n-1) * buffer = minutosTotales
+      let n = 1;
+      let valido = false;
+      while (n * duracionTurno <= minutosTotales) {
+        const totalConBuffer = n * duracionTurno + (n - 1) * bufferMinutos;
+        if (totalConBuffer === minutosTotales) {
+          valido = true;
+          break;
+        }
+        n++;
+      }
+      
+      if (!valido) {
+        throw new BadRequestException(
+          `La combinación de duración (${duracionTurno} min) y buffer (${bufferMinutos} min) ` +
+          `no permite generar turnos exactos en el rango de ${minutosTotales} minutos.`
+        );
+      }
+    }
+  }
+
   private async verificarSolapamiento(
     profesionalCentroId: number,
     diaSemana: number,
@@ -125,6 +170,14 @@ export class AgendaDisponibilidadService {
     // Validar horario
     await this.verificarHorarioValido(createDto.horaDesde, createDto.horaHasta);
     
+    // Validar duración vs rango
+    await this.verificarDuracionRangoValido(
+      createDto.horaDesde,
+      createDto.horaHasta,
+      createDto.duracionTurno,
+      createDto.bufferMinutos || 0,
+    );
+    
     // Validar fechas
     await this.verificarFechasValidas(createDto.fechaDesde, createDto.fechaHasta || null);
     
@@ -158,6 +211,11 @@ export class AgendaDisponibilidadService {
     const horaDesde = updateDto.horaDesde ?? registro.horaDesde;
     const horaHasta = updateDto.horaHasta ?? registro.horaHasta;
     await this.verificarHorarioValido(horaDesde, horaHasta);
+
+    // Validar duración vs rango si cambian valores relevantes
+    const duracionTurno = updateDto.duracionTurno ?? registro.duracionTurno;
+    const bufferMinutos = updateDto.bufferMinutos ?? registro.bufferMinutos;
+    await this.verificarDuracionRangoValido(horaDesde, horaHasta, duracionTurno, bufferMinutos);
 
     // Validar fechas si se actualizan
     const fechaDesde = updateDto.fechaDesde ?? registro.fechaDesde;
