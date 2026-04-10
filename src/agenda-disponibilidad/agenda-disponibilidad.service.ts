@@ -25,9 +25,27 @@ export class AgendaDisponibilidadService {
     }
   }
 
+  private async verificarDiaSemanaValido(diaSemana: number): Promise<void> {
+    if (diaSemana < 0 || diaSemana > 6) {
+      throw new BadRequestException(`El día de la semana debe estar entre 0 (Domingo) y 6 (Sábado)`);
+    }
+  }
+
   private async verificarHorarioValido(horaDesde: string, horaHasta: string): Promise<void> {
     if (horaDesde >= horaHasta) {
       throw new BadRequestException(`La hora desde debe ser menor a la hora hasta`);
+    }
+  }
+
+  private async verificarDuracionTurnoValida(duracionTurno: number): Promise<void> {
+    if (duracionTurno <= 0) {
+      throw new BadRequestException(`La duración del turno debe ser mayor a 0 minutos`);
+    }
+  }
+
+  private async verificarBufferMinutosValido(bufferMinutos: number): Promise<void> {
+    if (bufferMinutos < 0) {
+      throw new BadRequestException(`El buffer entre turnos no puede ser negativo`);
     }
   }
 
@@ -167,8 +185,17 @@ export class AgendaDisponibilidadService {
     // Validar que la relación profesional-centro exista y esté activa
     await this.verificarProfesionalCentroActivo(createDto.profesionalCentroId);
     
+    // Validar día de la semana
+    await this.verificarDiaSemanaValido(createDto.diaSemana);
+    
     // Validar horario
     await this.verificarHorarioValido(createDto.horaDesde, createDto.horaHasta);
+    
+    // Validar duración del turno
+    await this.verificarDuracionTurnoValida(createDto.duracionTurno);
+    
+    // Validar buffer
+    await this.verificarBufferMinutosValido(createDto.bufferMinutos || 0);
     
     // Validar duración vs rango
     await this.verificarDuracionRangoValido(
@@ -207,14 +234,24 @@ export class AgendaDisponibilidadService {
       await this.verificarProfesionalCentroActivo(updateDto.profesionalCentroId);
     }
 
+    // Validar día de la semana si se actualiza
+    const diaSemana = updateDto.diaSemana ?? registro.diaSemana;
+    await this.verificarDiaSemanaValido(diaSemana);
+
     // Validar horario si se actualiza
     const horaDesde = updateDto.horaDesde ?? registro.horaDesde;
     const horaHasta = updateDto.horaHasta ?? registro.horaHasta;
     await this.verificarHorarioValido(horaDesde, horaHasta);
 
-    // Validar duración vs rango si cambian valores relevantes
+    // Validar duración del turno si se actualiza
     const duracionTurno = updateDto.duracionTurno ?? registro.duracionTurno;
+    await this.verificarDuracionTurnoValida(duracionTurno);
+
+    // Validar buffer si se actualiza
     const bufferMinutos = updateDto.bufferMinutos ?? registro.bufferMinutos;
+    await this.verificarBufferMinutosValido(bufferMinutos);
+
+    // Validar duración vs rango si cambian valores relevantes
     await this.verificarDuracionRangoValido(horaDesde, horaHasta, duracionTurno, bufferMinutos);
 
     // Validar fechas si se actualizan
@@ -224,7 +261,6 @@ export class AgendaDisponibilidadService {
 
     // Validar solapamiento si cambian datos relevantes
     const profesionalCentroId = updateDto.profesionalCentroId ?? registro.profesionalCentroId;
-    const diaSemana = updateDto.diaSemana ?? registro.diaSemana;
     
     await this.verificarSolapamiento(
       profesionalCentroId,
