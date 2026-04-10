@@ -49,6 +49,27 @@ export class AgendaDisponibilidadService {
     }
   }
 
+  private async verificarBufferValido(duracionTurno: number, bufferMinutos: number): Promise<void> {
+    if (bufferMinutos > duracionTurno) {
+      throw new BadRequestException(
+        `El buffer entre turnos (${bufferMinutos} min) no puede ser mayor que la duración del turno (${duracionTurno} min)`
+      );
+    }
+  }
+
+  private async verificarRangoHorarioNocturno(
+    horaDesde: string,
+    horaHasta: string,
+  ): Promise<void> {
+    // Si hora_hasta <= hora_desde, cruza medianoche
+    // Por ahora lo permitimos sin restricción adicional
+    if (horaHasta <= horaDesde) {
+      // Es un horario nocturno (cruza medianoche)
+      // Aquí podrías agregar validaciones específicas si el negocio lo requiere
+      return;
+    }
+  }
+
   private async verificarFechasValidas(fechaDesde: Date, fechaHasta: Date | null): Promise<void> {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
@@ -68,10 +89,17 @@ export class AgendaDisponibilidadService {
     duracionTurno: number,
     bufferMinutos: number,
   ): Promise<void> {
-    // Calcular minutos totales del rango
+    // Calcular minutos totales del rango (considerando cruce de medianoche)
     const [desdeH, desdeM] = horaDesde.split(':').map(Number);
     const [hastaH, hastaM] = horaHasta.split(':').map(Number);
-    const minutosTotales = (hastaH * 60 + hastaM) - (desdeH * 60 + desdeM);
+    
+    let minutosTotales;
+    if (horaHasta <= horaDesde) {
+      // Cruza medianoche: desde hasta 24:00 + hasta
+      minutosTotales = (24 * 60 - (desdeH * 60 + desdeM)) + (hastaH * 60 + hastaM);
+    } else {
+      minutosTotales = (hastaH * 60 + hastaM) - (desdeH * 60 + desdeM);
+    }
     
     if (minutosTotales <= 0) {
       throw new BadRequestException(`El horario desde debe ser menor al horario hasta`);
@@ -116,7 +144,6 @@ export class AgendaDisponibilidadService {
     fechaHasta: Date | null,
     id?: number,
   ): Promise<void> {
-    // Buscar agendas existentes para el mismo profesional-centro y mismo día
     const agendasExistentes = await this.repository.find({
       where: {
         profesionalCentroId,
@@ -128,14 +155,12 @@ export class AgendaDisponibilidadService {
     for (const agenda of agendasExistentes) {
       if (id && agenda.id === id) continue;
 
-      // Verificar solapamiento de rangos horarios
       const existeSolapamiento = (
         (horaDesde < agenda.horaHasta && horaHasta > agenda.horaDesde)
       );
 
       if (!existeSolapamiento) continue;
 
-      // Verificar solapamiento de rangos de fechas
       const agendaFechaHasta = agenda.fechaHasta || new Date('9999-12-31');
       const nuevaFechaHasta = fechaHasta || new Date('9999-12-31');
       
@@ -182,33 +207,20 @@ export class AgendaDisponibilidadService {
   }
 
   async create(createDto: CreateAgendaDisponibilidadDto, usuario?: string): Promise<AgendaDisponibilidad> {
-    // Validar que la relación profesional-centro exista y esté activa
     await this.verificarProfesionalCentroActivo(createDto.profesionalCentroId);
-    
-    // Validar día de la semana
     await this.verificarDiaSemanaValido(createDto.diaSemana);
-    
-    // Validar horario
     await this.verificarHorarioValido(createDto.horaDesde, createDto.horaHasta);
-    
-    // Validar duración del turno
     await this.verificarDuracionTurnoValida(createDto.duracionTurno);
-    
-    // Validar buffer
     await this.verificarBufferMinutosValido(createDto.bufferMinutos || 0);
-    
-    // Validar duración vs rango
+    await this.verificarBufferValido(createDto.duracionTurno, createDto.bufferMinutos || 0);
+    await this.verificarRangoHorarioNocturno(createDto.horaDesde, createDto.horaHasta);
     await this.verificarDuracionRangoValido(
       createDto.horaDesde,
       createDto.horaHasta,
       createDto.duracionTurno,
       createDto.bufferMinutos || 0,
     );
-    
-    // Validar fechas
     await this.verificarFechasValidas(createDto.fechaDesde, createDto.fechaHasta || null);
-    
-    // Validar solapamiento
     await this.verificarSolapamiento(
       createDto.profesionalCentroId,
       createDto.diaSemana,
@@ -229,37 +241,30 @@ export class AgendaDisponibilidadService {
   async update(id: number, updateDto: UpdateAgendaDisponibilidadDto, usuario?: string): Promise<AgendaDisponibilidad> {
     const registro = await this.findOne(id);
 
-    // Validar relación profesional-centro si se actualiza
     if (updateDto.profesionalCentroId && updateDto.profesionalCentroId !== registro.profesionalCentroId) {
       await this.verificarProfesionalCentroActivo(updateDto.profesionalCentroId);
     }
 
-    // Validar día de la semana si se actualiza
     const diaSemana = updateDto.diaSemana ?? registro.diaSemana;
     await this.verificarDiaSemanaValido(diaSemana);
 
-    // Validar horario si se actualiza
     const horaDesde = updateDto.horaDesde ?? registro.horaDesde;
     const horaHasta = updateDto.horaHasta ?? registro.horaHasta;
     await this.verificarHorarioValido(horaDesde, horaHasta);
 
-    // Validar duración del turno si se actualiza
     const duracionTurno = updateDto.duracionTurno ?? registro.duracionTurno;
     await this.verificarDuracionTurnoValida(duracionTurno);
 
-    // Validar buffer si se actualiza
     const bufferMinutos = updateDto.bufferMinutos ?? registro.bufferMinutos;
     await this.verificarBufferMinutosValido(bufferMinutos);
-
-    // Validar duración vs rango si cambian valores relevantes
+    await this.verificarBufferValido(duracionTurno, bufferMinutos);
+    await this.verificarRangoHorarioNocturno(horaDesde, horaHasta);
     await this.verificarDuracionRangoValido(horaDesde, horaHasta, duracionTurno, bufferMinutos);
 
-    // Validar fechas si se actualizan
     const fechaDesde = updateDto.fechaDesde ?? registro.fechaDesde;
     const fechaHasta = updateDto.fechaHasta ?? registro.fechaHasta;
     await this.verificarFechasValidas(fechaDesde, fechaHasta);
 
-    // Validar solapamiento si cambian datos relevantes
     const profesionalCentroId = updateDto.profesionalCentroId ?? registro.profesionalCentroId;
     
     await this.verificarSolapamiento(
