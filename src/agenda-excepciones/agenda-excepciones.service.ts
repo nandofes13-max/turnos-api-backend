@@ -15,7 +15,6 @@ export class AgendaExcepcionesService {
     private readonly agendaRepository: Repository<AgendaDisponibilidad>,
   ) {}
 
-  // ===== FUNCIONES AUXILIARES =====
   private async verificarAgendaActiva(id: number): Promise<void> {
     const agenda = await this.agendaRepository.findOne({
       where: { id, fecha_baja: IsNull() },
@@ -54,7 +53,6 @@ export class AgendaExcepcionesService {
     }
   }
 
-  // ===== CRUD =====
   async findAll(): Promise<AgendaExcepcion[]> {
     return this.repository.find({
       relations: ['agendaDisponibilidad'],
@@ -90,13 +88,8 @@ export class AgendaExcepcionesService {
   }
 
   async create(createDto: CreateAgendaExcepcionDto, usuario?: string): Promise<AgendaExcepcion> {
-    // Validar que la agenda exista y esté activa
     await this.verificarAgendaActiva(createDto.agendaDisponibilidadId);
-    
-    // Validar fecha
     await this.verificarFechaValida(createDto.fecha);
-    
-    // Validar que no exista duplicado
     await this.verificarDuplicado(
       createDto.agendaDisponibilidadId,
       createDto.fecha,
@@ -114,17 +107,14 @@ export class AgendaExcepcionesService {
   async update(id: number, updateDto: UpdateAgendaExcepcionDto, usuario?: string): Promise<AgendaExcepcion> {
     const registro = await this.findOne(id);
 
-    // Si se cambia la agenda, validar que exista
     if (updateDto.agendaDisponibilidadId && updateDto.agendaDisponibilidadId !== registro.agendaDisponibilidadId) {
       await this.verificarAgendaActiva(updateDto.agendaDisponibilidadId);
     }
 
-    // Si se cambia fecha, validar
     if (updateDto.fecha) {
       await this.verificarFechaValida(updateDto.fecha);
     }
 
-    // Validar duplicado si cambian datos relevantes
     const agendaId = updateDto.agendaDisponibilidadId ?? registro.agendaDisponibilidadId;
     const fecha = updateDto.fecha ?? registro.fecha;
     const hora = updateDto.hora ?? registro.hora;
