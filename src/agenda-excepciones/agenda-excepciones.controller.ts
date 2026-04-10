@@ -17,42 +17,36 @@ import { UpdateAgendaExcepcionDto } from './dto/update-agenda-excepcion.dto';
 export class AgendaExcepcionesController {
   constructor(private readonly service: AgendaExcepcionesService) {}
 
-  // Listar todas las excepciones
   @Get()
   async findAll(): Promise<any[]> {
     const registros = await this.service.findAll();
     return registros.map(r => this.agregarUltimoMovimiento(r));
   }
 
-  // Obtener una excepción por ID
   @Get(':id')
   async findOne(@Param('id') id: string): Promise<any> {
     const registro = await this.service.findOne(Number(id));
     return this.agregarUltimoMovimiento(registro);
   }
 
-  // Obtener excepciones por agenda
   @Get('por-agenda/:agendaDisponibilidadId')
   async findByAgenda(@Param('agendaDisponibilidadId') agendaDisponibilidadId: string): Promise<any[]> {
     const registros = await this.service.findByAgenda(Number(agendaDisponibilidadId));
     return registros.map(r => this.agregarUltimoMovimiento(r));
   }
 
-  // Obtener excepciones por fecha
   @Get('por-fecha/:fecha')
   async findByFecha(@Param('fecha') fecha: string): Promise<any[]> {
     const registros = await this.service.findByFecha(new Date(fecha));
     return registros.map(r => this.agregarUltimoMovimiento(r));
   }
 
-  // Crear nueva excepción
   @Post()
   async create(@Body() createDto: CreateAgendaExcepcionDto): Promise<any> {
     const registro = await this.service.create(createDto, 'demo');
     return this.agregarUltimoMovimiento(registro);
   }
 
-  // Actualizar excepción
   @Put(':id')
   async update(
     @Param('id') id: string, 
@@ -62,19 +56,16 @@ export class AgendaExcepcionesController {
     return this.agregarUltimoMovimiento(registro);
   }
 
-  // Soft delete
   @Delete(':id')
   softDelete(@Param('id') id: string): Promise<void> {
     return this.service.softDelete(Number(id), 'demo');
   }
 
-  // Debug: ver estructura de tabla
   @Get('debug/structure')
   debugStructure() {
     return this.service.debugStructure();
   }
 
-  // ===== FUNCIÓN AUXILIAR =====
   private agregarUltimoMovimiento(registro: AgendaExcepcion): any {
     const obj: any = { ...registro };
     
