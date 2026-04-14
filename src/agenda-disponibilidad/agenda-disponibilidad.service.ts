@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { AgendaDisponibilidad } from './entities/agenda-disponibilidad.entity';
@@ -7,13 +7,56 @@ import { UpdateAgendaDisponibilidadDto } from './dto/update-agenda-disponibilida
 import { ProfesionalCentro } from '../profesional-centro/entities/profesional-centro.entity';
 
 @Injectable()
-export class AgendaDisponibilidadService {
+export class AgendaDisponibilidadService implements OnModuleInit {
   constructor(
     @InjectRepository(AgendaDisponibilidad)
     private readonly repository: Repository<AgendaDisponibilidad>,
     @InjectRepository(ProfesionalCentro)
     private readonly profesionalCentroRepository: Repository<ProfesionalCentro>,
   ) {}
+
+  // ===== CREAR CONSTRAINT DE EXCLUSIÓN AL INICIAR =====
+  async onModuleInit() {
+    await this.crearConstraintExclusion();
+  }
+
+  private async crearConstraintExclusion() {
+    try {
+      // Verificar si la constraint ya existe
+      const result = await this.repository.query(`
+        SELECT conname 
+        FROM pg_constraint 
+        WHERE conrelid = 'agenda_disponibilidad'::regclass 
+        AND conname = 'ex_agenda_no_solapada'
+      `);
+      
+      if (result.length > 0) {
+        console.log('✅ Constraint ex_agenda_no_solapada ya existe');
+        return;
+      }
+      
+      // Crear la constraint
+      await this.repository.query(`
+        CREATE EXTENSION IF NOT EXISTS btree_gist;
+        
+        ALTER TABLE agenda_disponibilidad
+        ADD CONSTRAINT ex_agenda_no_solapada
+        EXCLUDE USING gist (
+          profesional_centro_id WITH =,
+          dia_semana WITH =,
+          tsrange(
+            (fecha_desde + hora_desde::INTERVAL),
+            (COALESCE(fecha_hasta, '9999-12-31'::date) + hora_hasta::INTERVAL)
+          ) WITH &&
+        )
+        WHERE (fecha_baja IS NULL);
+      `);
+      
+      console.log('✅ Constraint ex_agenda_no_solapada creada exitosamente');
+    } catch (error) {
+      console.error('❌ Error creando constraint ex_agenda_no_solapada:', error.message);
+    }
+  }
 
   // ===== FUNCIONES AUXILIARES =====
   private async verificarProfesionalCentroActivo(id: number): Promise<void> {
