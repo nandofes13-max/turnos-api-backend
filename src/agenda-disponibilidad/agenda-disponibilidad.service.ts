@@ -84,22 +84,34 @@ export class AgendaDisponibilidadService {
   }
 
   private async verificarDuracionRangoValido(
-    horaDesde: string,
-    horaHasta: string,
-    duracionTurno: number,
-    bufferMinutos: number,
-  ): Promise<void> {
-    // Calcular minutos totales del rango (considerando cruce de medianoche)
-    const [desdeH, desdeM] = horaDesde.split(':').map(Number);
-    const [hastaH, hastaM] = horaHasta.split(':').map(Number);
-    
-    let minutosTotales;
-    if (horaHasta <= horaDesde) {
-      // Cruza medianoche: desde hasta 24:00 + hasta
-      minutosTotales = (24 * 60 - (desdeH * 60 + desdeM)) + (hastaH * 60 + hastaM);
-    } else {
-      minutosTotales = (hastaH * 60 + hastaM) - (desdeH * 60 + desdeM);
-    }
+  horaDesde: string,
+  horaHasta: string,
+  duracionTurno: number,
+  bufferMinutos: number,
+): Promise<void> {
+  // 👇 AGREGAR ESTOS LOGS
+  console.log('===== DIAGNÓSTICO DURACIÓN VS RANGO =====');
+  console.log('horaDesde:', horaDesde);
+  console.log('horaHasta:', horaHasta);
+  console.log('duracionTurno:', duracionTurno);
+  
+  // Calcular minutos totales del rango
+  const [desdeH, desdeM] = horaDesde.split(':').map(Number);
+  const [hastaH, hastaM] = horaHasta.split(':').map(Number);
+  
+  console.log('desdeH:', desdeH, 'desdeM:', desdeM);
+  console.log('hastaH:', hastaH, 'hastaM:', hastaM);
+  
+  let minutosTotales;
+  if (horaHasta <= horaDesde) {
+    minutosTotales = (24 * 60 - (desdeH * 60 + desdeM)) + (hastaH * 60 + hastaM);
+  } else {
+    minutosTotales = (hastaH * 60 + hastaM) - (desdeH * 60 + desdeM);
+  }
+  
+  console.log('minutosTotales calculados:', minutosTotales);
+  // ... resto del código
+}
     
     if (minutosTotales <= 0) {
       throw new BadRequestException(`El horario desde debe ser menor al horario hasta`);
