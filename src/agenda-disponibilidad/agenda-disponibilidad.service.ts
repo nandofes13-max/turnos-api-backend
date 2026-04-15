@@ -22,7 +22,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
 
   private async crearConstraintExclusion() {
     try {
-      // Verificar si la constraint ya existe
       const result = await this.repository.query(`
         SELECT conname 
         FROM pg_constraint 
@@ -35,7 +34,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         return;
       }
       
-      // Crear la constraint
       await this.repository.query(`
         CREATE EXTENSION IF NOT EXISTS btree_gist;
         
@@ -284,7 +282,18 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       usuario_alta: usuario || 'demo',
     });
 
-    return this.repository.save(registro);
+    try {
+      return await this.repository.save(registro);
+    } catch (error: any) {
+      // Código 23P01 = violation of exclusion constraint
+      if (error.code === '23P01') {
+        throw new BadRequestException(
+          'No se puede guardar: Este horario solapa con una agenda existente para el mismo día. ' +
+          'Por favor, revise los días y horarios configurados.'
+        );
+      }
+      throw error;
+    }
   }
 
   async update(id: number, updateDto: UpdateAgendaDisponibilidadDto, usuario?: string): Promise<AgendaDisponibilidad> {
@@ -329,7 +338,16 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     Object.assign(registro, updateDto);
     registro.usuario_modificacion = usuario || 'demo';
 
-    return this.repository.save(registro);
+    try {
+      return await this.repository.save(registro);
+    } catch (error: any) {
+      if (error.code === '23P01') {
+        throw new BadRequestException(
+          'No se puede actualizar: Este horario solapa con una agenda existente para el mismo día.'
+        );
+      }
+      throw error;
+    }
   }
 
   async softDelete(id: number, usuario?: string): Promise<void> {
