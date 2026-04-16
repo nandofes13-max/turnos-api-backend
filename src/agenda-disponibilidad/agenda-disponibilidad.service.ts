@@ -5,7 +5,7 @@ import { AgendaDisponibilidad } from './entities/agenda-disponibilidad.entity';
 import { CreateAgendaDisponibilidadDto } from './dto/create-agenda-disponibilidad.dto';
 import { UpdateAgendaDisponibilidadDto } from './dto/update-agenda-disponibilidad.dto';
 import { ProfesionalCentro } from '../profesional-centro/entities/profesional-centro.entity';
-import { AgendaExcepcion } from '../agenda-excepciones/entities/agenda-excepcion.entity';
+
 
 @Injectable()
 export class AgendaDisponibilidadService implements OnModuleInit {
