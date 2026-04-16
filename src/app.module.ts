@@ -16,7 +16,9 @@ import { ProfesionalEspecialidadModule } from './profesional-especialidad/profes
 import { CentroModule } from './centro/centro.module';
 import { ProfesionalCentroModule } from './profesional-centro/profesional-centro.module';
 import { AgendaDisponibilidadModule } from './agenda-disponibilidad/agenda-disponibilidad.module';
-import { AgendaExcepcionesModule } from './agenda-excepciones/agenda-excepciones.module'; // 👈 NUEVO
+import { ExcepcionesRecurrentesModule } from './excepciones-recurrentes/excepciones-recurrentes.module';
+import { ExcepcionesFechasModule } from './excepciones-fechas/excepciones-fechas.module';
+
 
 @Module({
   imports: [
@@ -48,7 +50,8 @@ import { AgendaExcepcionesModule } from './agenda-excepciones/agenda-excepciones
     CentroModule,
     ProfesionalCentroModule,
     AgendaDisponibilidadModule,
-    AgendaExcepcionesModule, // 👈 NUEVO
+    ExcepcionesRecurrentesModule,
+    ExcepcionesFechasModule,
   ],
 })
 export class AppModule {}
