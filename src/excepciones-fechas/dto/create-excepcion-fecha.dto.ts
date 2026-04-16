@@ -1,37 +1,33 @@
-import { IsNumber, IsNotEmpty, IsString, IsOptional, IsIn, IsDate, ValidateIf } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsDateString, IsString, MaxLength, IsIn, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateExcepcionFechaDto {
-  @IsNumber({}, { message: 'El ID de la agenda es obligatorio' })
-  @IsNotEmpty({ message: 'El ID de la agenda es obligatorio' })
-  agendaDisponibilidadId: number;
+  @IsNotEmpty({ message: 'El profesionalCentroEspecialidadId es obligatorio' })
+  @IsNumber({}, { message: 'profesionalCentroEspecialidadId debe ser un número' })
+  profesionalCentroEspecialidadId: number;
 
-  @IsDate({ message: 'La fecha desde debe ser una fecha válida' })
   @IsNotEmpty({ message: 'La fecha desde es obligatoria' })
-  @Type(() => Date)
+  @IsDateString({}, { message: 'fechaDesde debe ser una fecha válida (YYYY-MM-DD)' })
   fechaDesde: Date;
 
-  @IsDate({ message: 'La fecha hasta debe ser una fecha válida' })
   @IsOptional()
-  @Type(() => Date)
+  @IsDateString({}, { message: 'fechaHasta debe ser una fecha válida (YYYY-MM-DD)' })
   fechaHasta?: Date | null;
 
-  @ValidateIf(o => o.horaHasta !== undefined)
-  @IsString({ message: 'La hora desde debe ser un texto' })
   @IsOptional()
+  @IsString({ message: 'horaDesde debe ser una hora válida' })
   horaDesde?: string | null;
 
-  @ValidateIf(o => o.horaDesde !== undefined)
-  @IsString({ message: 'La hora hasta debe ser un texto' })
   @IsOptional()
+  @IsString({ message: 'horaHasta debe ser una hora válida' })
   horaHasta?: string | null;
 
-  @IsString({ message: 'El tipo debe ser texto' })
   @IsNotEmpty({ message: 'El tipo es obligatorio' })
-  @IsIn(['deshabilitado', 'bloqueado'], { message: 'Tipo debe ser "deshabilitado" o "bloqueado"' })
+  @IsIn(['deshabilitado', 'bloqueado'], { message: 'tipo debe ser "deshabilitado" o "bloqueado"' })
   tipo: string;
 
-  @IsString({ message: 'El motivo debe ser texto' })
   @IsOptional()
+  @IsString({ message: 'motivo debe ser texto' })
+  @MaxLength(500, { message: 'motivo no puede superar los 500 caracteres' })
   motivo?: string | null;
 }
