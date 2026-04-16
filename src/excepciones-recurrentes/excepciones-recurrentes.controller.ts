@@ -1,3 +1,4 @@
+// src/excepciones-recurrentes/excepciones-recurrentes.controller.ts
 import { 
   Controller, 
   Get, 
