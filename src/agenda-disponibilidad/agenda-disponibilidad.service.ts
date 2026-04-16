@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, LessThanOrEqual } from 'typeorm';
+import { Repository, IsNull, Not, LessThanOrEqual } from 'typeorm';
 import { AgendaDisponibilidad } from './entities/agenda-disponibilidad.entity';
 import { CreateAgendaDisponibilidadDto } from './dto/create-agenda-disponibilidad.dto';
 import { UpdateAgendaDisponibilidadDto } from './dto/update-agenda-disponibilidad.dto';
@@ -129,13 +129,11 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     duracionTurno: number,
     bufferMinutos: number,
   ): Promise<void> {
-    // Logs de diagnóstico
     console.log('===== DIAGNÓSTICO DURACIÓN VS RANGO =====');
     console.log('horaDesde:', horaDesde);
     console.log('horaHasta:', horaHasta);
     console.log('duracionTurno:', duracionTurno);
     
-    // Calcular minutos totales del rango
     const [desdeH, desdeM] = horaDesde.split(':').map(Number);
     const [hastaH, hastaM] = horaHasta.split(':').map(Number);
     
@@ -155,7 +153,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       throw new BadRequestException(`El horario desde debe ser menor al horario hasta`);
     }
     
-    // Si buffer es 0, validar divisibilidad exacta
     if (bufferMinutos === 0) {
       if (minutosTotales % duracionTurno !== 0) {
         throw new BadRequestException(
@@ -164,7 +161,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         );
       }
     } else {
-      // Con buffer > 0, validar fórmula: n * duracion + (n-1) * buffer = minutosTotales
       let n = 1;
       let valido = false;
       while (n * duracionTurno <= minutosTotales) {
@@ -228,14 +224,13 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     }
   }
 
-  // ===== GENERAR SLOTS (NUEVO) =====
+  // ===== GENERAR SLOTS =====
   async generarSlots(
     profesionalCentroId: number,
     fecha: string,
   ): Promise<{ disponible: boolean; hora: string; bloqueado: boolean }[]> {
-    // 1. Obtener la agenda para ese día
     const fechaObj = new Date(fecha);
-    const diaSemana = fechaObj.getDay(); // 0=Domingo, 1=Lunes, ...
+    const diaSemana = fechaObj.getDay();
     
     const agenda = await this.repository.findOne({
       where: {
@@ -248,17 +243,15 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     });
     
     if (!agenda) {
-      return []; // No hay agenda para este día
+      return [];
     }
     
-    // 2. Generar slots según duración
     const slots: { hora: string; bloqueado: boolean }[] = [];
     let horaActual = agenda.horaDesde;
     const horaFin = agenda.horaHasta;
     
     while (horaActual < horaFin) {
       slots.push({ hora: horaActual, bloqueado: false });
-      // Sumar duración
       const [h, m] = horaActual.split(':').map(Number);
       let minutos = m + agenda.duracionTurno;
       let horas = h;
@@ -269,7 +262,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       horaActual = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
     }
     
-    // 3. Obtener excepciones para esta agenda y fecha
     const excepciones = await this.excepcionesRepository.find({
       where: {
         agendaDisponibilidadId: agenda.id,
@@ -278,7 +270,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       },
     });
     
-    // 4. Marcar slots bloqueados según excepciones
     for (const excepcion of excepciones) {
       for (let i = 0; i < slots.length; i++) {
         if (slots[i].hora >= excepcion.horaDesde && slots[i].hora < excepcion.horaHasta) {
@@ -287,7 +278,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       }
     }
     
-    // 5. Agregar campo disponible (no bloqueado)
     return slots.map(slot => ({
       ...slot,
       disponible: !slot.bloqueado,
@@ -346,6 +336,42 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       createDto.fechaHasta || null,
     );
 
+    // 👇 VALIDACIÓN DE DUPLICADOS
+    const existenteActivo = await this.repository.findOne({
+      where: {
+        profesionalCentroId: createDto.profesionalCentroId,
+        diaSemana: createDto.diaSemana,
+        horaDesde: createDto.horaDesde,
+        horaHasta: createDto.horaHasta,
+        fechaDesde: createDto.fechaDesde,
+        fechaHasta: createDto.fechaHasta || IsNull(),
+        fecha_baja: IsNull(),
+      },
+    });
+    
+    if (existenteActivo) {
+      throw new BadRequestException('Ya existe una agenda activa con los mismos datos.');
+    }
+    
+    const existenteEliminado = await this.repository.findOne({
+      where: {
+        profesionalCentroId: createDto.profesionalCentroId,
+        diaSemana: createDto.diaSemana,
+        horaDesde: createDto.horaDesde,
+        horaHasta: createDto.horaHasta,
+        fechaDesde: createDto.fechaDesde,
+        fechaHasta: createDto.fechaHasta || IsNull(),
+        fecha_baja: Not(IsNull()),
+      },
+    });
+    
+    if (existenteEliminado) {
+      existenteEliminado.fecha_baja = null;
+      existenteEliminado.usuario_baja = null;
+      existenteEliminado.usuario_modificacion = usuario || 'demo';
+      return this.repository.save(existenteEliminado);
+    }
+
     const registro = this.repository.create({
       ...createDto,
       usuario_alta: usuario || 'demo',
@@ -356,8 +382,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     } catch (error: any) {
       if (error.code === '23P01') {
         throw new BadRequestException(
-          'No se puede guardar: Este horario solapa con una agenda existente para el mismo día. ' +
-          'Por favor, revise los días y horarios configurados.'
+          'No se puede guardar: Este horario solapa con una agenda existente para el mismo día.'
         );
       }
       throw error;
