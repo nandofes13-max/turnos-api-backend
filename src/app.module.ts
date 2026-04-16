@@ -14,6 +14,7 @@ import { UploadModule } from './upload/upload.module';
 import { ProfesionalEspecialidadModule } from './profesional-especialidad/profesional-especialidad.module';
 import { CentroModule } from './centro/centro.module';
 import { ProfesionalCentroModule } from './profesional-centro/profesional-centro.module';
+import { AgendaDisponibilidadModule } from './agenda-disponibilidad/agenda-disponibilidad.module';  // ← AGREGAR
 import { ExcepcionesRecurrentesModule } from './excepciones-recurrentes/excepciones-recurrentes.module';
 import { ExcepcionesFechasModule } from './excepciones-fechas/excepciones-fechas.module';
 
@@ -42,6 +43,7 @@ import { ExcepcionesFechasModule } from './excepciones-fechas/excepciones-fechas
     ProfesionalEspecialidadModule,
     CentroModule,
     ProfesionalCentroModule,
+    AgendaDisponibilidadModule,  // ← AGREGAR
     ExcepcionesRecurrentesModule,
     ExcepcionesFechasModule,
   ],
