@@ -4,8 +4,6 @@ import { AgendaDisponibilidad } from '../../agenda-disponibilidad/entities/agend
 
 @Entity('excepciones_fechas')
 export class ExcepcionFecha extends BaseEntityAuditable {
-  // ❌ NO declarar id (ya viene de BaseEntityAuditable)
-
   @Column({ name: 'agenda_disponibilidad_id' })
   agendaDisponibilidadId: number;
 
@@ -22,7 +20,7 @@ export class ExcepcionFecha extends BaseEntityAuditable {
   horaHasta: string | null;
 
   @Column({ type: 'varchar', length: 20 })
-  tipo: string; // 'deshabilitado' | 'bloqueado'
+  tipo: string;
 
   @Column({ type: 'text', nullable: true })
   motivo: string | null;
