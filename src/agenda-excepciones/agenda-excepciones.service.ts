@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { AgendaExcepcion } from './entities/agenda-excepcion.entity';
@@ -7,7 +7,7 @@ import { UpdateAgendaExcepcionDto } from './dto/update-agenda-excepcion.dto';
 import { AgendaDisponibilidad } from '../agenda-disponibilidad/entities/agenda-disponibilidad.entity';
 
 @Injectable()
-export class AgendaExcepcionesService {
+export class AgendaExcepcionesService implements OnModuleInit {
   constructor(
     @InjectRepository(AgendaExcepcion)
     private readonly repository: Repository<AgendaExcepcion>,
@@ -15,6 +15,11 @@ export class AgendaExcepcionesService {
     private readonly agendaRepository: Repository<AgendaDisponibilidad>,
   ) {}
 
+  async onModuleInit() {
+    // Verificar constraint de exclusión si es necesaria
+  }
+
+  // ===== FUNCIONES AUXILIARES =====
   private async verificarAgendaActiva(id: number): Promise<void> {
     const agenda = await this.agendaRepository.findOne({
       where: { id, fecha_baja: IsNull() },
@@ -33,26 +38,45 @@ export class AgendaExcepcionesService {
     }
   }
 
-  private async verificarDuplicado(
+  private async verificarHorarioValido(horaDesde: string, horaHasta: string): Promise<void> {
+    if (horaDesde >= horaHasta) {
+      throw new BadRequestException(`La hora desde debe ser menor a la hora hasta`);
+    }
+  }
+
+  private async verificarRangoExcepcion(
     agendaDisponibilidadId: number,
     fecha: Date,
-    hora: string,
+    horaDesde: string,
+    horaHasta: string,
     id?: number,
   ): Promise<void> {
-    const existente = await this.repository.findOne({
+    // Verificar solapamiento con otras excepciones de la misma agenda y fecha
+    const existentes = await this.repository.find({
       where: {
         agendaDisponibilidadId,
         fecha,
-        hora,
         fecha_baja: IsNull(),
       },
     });
 
-    if (existente && existente.id !== id) {
-      throw new BadRequestException(`Ya existe una excepción para esta agenda, fecha y hora`);
+    for (const excepcion of existentes) {
+      if (id && excepcion.id === id) continue;
+
+      const solapa = (
+        horaDesde < excepcion.horaHasta && horaHasta > excepcion.horaDesde
+      );
+
+      if (solapa) {
+        throw new BadRequestException(
+          `El rango horario ${horaDesde} a ${horaHasta} solapa con una excepción existente ` +
+          `(${excepcion.horaDesde} a ${excepcion.horaHasta}) para la misma fecha`
+        );
+      }
     }
   }
 
+  // ===== CRUD =====
   async findAll(): Promise<AgendaExcepcion[]> {
     return this.repository.find({
       relations: ['agendaDisponibilidad'],
@@ -90,10 +114,12 @@ export class AgendaExcepcionesService {
   async create(createDto: CreateAgendaExcepcionDto, usuario?: string): Promise<AgendaExcepcion> {
     await this.verificarAgendaActiva(createDto.agendaDisponibilidadId);
     await this.verificarFechaValida(createDto.fecha);
-    await this.verificarDuplicado(
+    await this.verificarHorarioValido(createDto.horaDesde, createDto.horaHasta);
+    await this.verificarRangoExcepcion(
       createDto.agendaDisponibilidadId,
       createDto.fecha,
-      createDto.hora,
+      createDto.horaDesde,
+      createDto.horaHasta,
     );
 
     const registro = this.repository.create({
@@ -115,11 +141,18 @@ export class AgendaExcepcionesService {
       await this.verificarFechaValida(updateDto.fecha);
     }
 
+    const horaDesde = updateDto.horaDesde ?? registro.horaDesde;
+    const horaHasta = updateDto.horaHasta ?? registro.horaHasta;
+    if (updateDto.horaDesde || updateDto.horaHasta) {
+      await this.verificarHorarioValido(horaDesde, horaHasta);
+    }
+
     const agendaId = updateDto.agendaDisponibilidadId ?? registro.agendaDisponibilidadId;
     const fecha = updateDto.fecha ?? registro.fecha;
-    const hora = updateDto.hora ?? registro.hora;
     
-    await this.verificarDuplicado(agendaId, fecha, hora, id);
+    if (updateDto.horaDesde || updateDto.horaHasta || updateDto.fecha || updateDto.agendaDisponibilidadId) {
+      await this.verificarRangoExcepcion(agendaId, fecha, horaDesde, horaHasta, id);
+    }
 
     Object.assign(registro, updateDto);
     registro.usuario_modificacion = usuario || 'demo';
