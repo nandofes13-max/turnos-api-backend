@@ -11,9 +11,13 @@ export class CreateAgendaExcepcionDto {
   @Type(() => Date)
   fecha: Date;
 
-  @IsString({ message: 'La hora debe ser un texto' })
-  @IsNotEmpty({ message: 'La hora es obligatoria' })
-  hora: string;
+  @IsString({ message: 'La hora desde debe ser un texto' })
+  @IsNotEmpty({ message: 'La hora desde es obligatoria' })
+  horaDesde: string;
+
+  @IsString({ message: 'La hora hasta debe ser un texto' })
+  @IsNotEmpty({ message: 'La hora hasta es obligatoria' })
+  horaHasta: string;
 
   @IsString({ message: 'El tipo debe ser texto' })
   @IsNotEmpty({ message: 'El tipo es obligatorio' })
