@@ -242,7 +242,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         profesionalCentroId,
         diaSemana,
         fecha_baja: IsNull(),
-        fecha_desde: LessThanOrEqual(fechaObj),
+        fechaDesde: LessThanOrEqual(fechaObj),
       },
       relations: ['profesionalCentro'],
     });
