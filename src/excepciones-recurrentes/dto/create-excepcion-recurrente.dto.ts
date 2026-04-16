@@ -1,30 +1,30 @@
-import { IsNumber, IsNotEmpty, IsString, IsOptional, IsIn, Min, Max } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, MaxLength, IsIn, IsNumber, Min, Max } from 'class-validator';
 
 export class CreateExcepcionRecurrenteDto {
-  @IsNumber({}, { message: 'El ID de la agenda es obligatorio' })
-  @IsNotEmpty({ message: 'El ID de la agenda es obligatorio' })
-  agendaDisponibilidadId: number;
+  @IsNotEmpty({ message: 'El profesionalCentroEspecialidadId es obligatorio' })
+  @IsNumber({}, { message: 'profesionalCentroEspecialidadId debe ser un número' })
+  profesionalCentroEspecialidadId: number;
 
-  @IsNumber({}, { message: 'El día de la semana debe ser un número' })
-  @IsNotEmpty({ message: 'El día de la semana es obligatorio' })
-  @Min(0, { message: 'El día debe estar entre 0 (Domingo) y 6 (Sábado)' })
-  @Max(6, { message: 'El día debe estar entre 0 (Domingo) y 6 (Sábado)' })
+  @IsNotEmpty({ message: 'El día de semana es obligatorio' })
+  @IsNumber({}, { message: 'diaSemana debe ser un número' })
+  @Min(0, { message: 'diaSemana debe ser entre 0 (Domingo) y 6 (Sábado)' })
+  @Max(6, { message: 'diaSemana debe ser entre 0 (Domingo) y 6 (Sábado)' })
   diaSemana: number;
 
-  @IsString({ message: 'La hora desde debe ser un texto' })
   @IsNotEmpty({ message: 'La hora desde es obligatoria' })
+  @IsString({ message: 'horaDesde debe ser una hora válida (HH:MM:SS)' })
   horaDesde: string;
 
-  @IsString({ message: 'La hora hasta debe ser un texto' })
   @IsNotEmpty({ message: 'La hora hasta es obligatoria' })
+  @IsString({ message: 'horaHasta debe ser una hora válida (HH:MM:SS)' })
   horaHasta: string;
 
-  @IsString({ message: 'El tipo debe ser texto' })
   @IsNotEmpty({ message: 'El tipo es obligatorio' })
-  @IsIn(['deshabilitado', 'habilitado_extra'], { message: 'Tipo debe ser "deshabilitado" o "habilitado_extra"' })
+  @IsIn(['deshabilitado', 'habilitado_extra'], { message: 'tipo debe ser "deshabilitado" o "habilitado_extra"' })
   tipo: string;
 
-  @IsString({ message: 'El motivo debe ser texto' })
   @IsOptional()
+  @IsString({ message: 'motivo debe ser texto' })
+  @MaxLength(500, { message: 'motivo no puede superar los 500 caracteres' })
   motivo?: string | null;
 }
