@@ -4,17 +4,17 @@ import { AgendaDisponibilidad } from '../../agenda-disponibilidad/entities/agend
 
 @Entity('agenda_excepciones')
 export class AgendaExcepcion extends BaseEntityAuditable {
-  // ❌ ELIMINAR esta línea: id: number;
-  // El id ya viene de BaseEntityAuditable
-
   @Column({ name: 'agenda_disponibilidad_id' })
   agendaDisponibilidadId: number;
 
   @Column({ type: 'date' })
   fecha: Date;
 
-  @Column({ type: 'time' })
-  hora: string;
+  @Column({ name: 'hora_desde', type: 'time' })
+  horaDesde: string;
+
+  @Column({ name: 'hora_hasta', type: 'time' })
+  horaHasta: string;
 
   @Column({ type: 'varchar', length: 20 })
   tipo: string; // 'deshabilitado' | 'habilitado_extra'
