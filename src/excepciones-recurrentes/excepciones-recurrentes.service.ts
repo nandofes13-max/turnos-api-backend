@@ -4,23 +4,23 @@ import { Repository, IsNull } from 'typeorm';
 import { ExcepcionRecurrente } from './entities/excepcion-recurrente.entity';
 import { CreateExcepcionRecurrenteDto } from './dto/create-excepcion-recurrente.dto';
 import { UpdateExcepcionRecurrenteDto } from './dto/update-excepcion-recurrente.dto';
-import { ProfesionalCentroEspecialidad } from '../profesional-centro/entities/profesional-centro-especialidad.entity';
+import { AgendaDisponibilidad } from '../agenda-disponibilidad/entities/agenda-disponibilidad.entity';
 
 @Injectable()
 export class ExcepcionesRecurrentesService {
   constructor(
     @InjectRepository(ExcepcionRecurrente)
     private readonly repository: Repository<ExcepcionRecurrente>,
-    @InjectRepository(ProfesionalCentroEspecialidad)
-    private readonly profesionalCentroRepository: Repository<ProfesionalCentroEspecialidad>,
+    @InjectRepository(AgendaDisponibilidad)
+    private readonly agendaRepository: Repository<AgendaDisponibilidad>,
   ) {}
 
-  private async verificarProfesionalCentroActivo(id: number): Promise<void> {
-    const registro = await this.profesionalCentroRepository.findOne({
+  private async verificarAgendaActiva(id: number): Promise<void> {
+    const agenda = await this.agendaRepository.findOne({
       where: { id, fecha_baja: IsNull() },
     });
-    if (!registro) {
-      throw new BadRequestException(`El profesional-centro-especialidad con id ${id} no existe o está inactivo`);
+    if (!agenda) {
+      throw new BadRequestException(`La agenda con id ${id} no existe o está inactiva`);
     }
   }
 
@@ -30,8 +30,14 @@ export class ExcepcionesRecurrentesService {
     }
   }
 
+  private validarDiaSemana(diaSemana: number): void {
+    if (diaSemana < 0 || diaSemana > 6) {
+      throw new BadRequestException(`El día de semana debe ser un valor entre 0 (Domingo) y 6 (Sábado)`);
+    }
+  }
+
   private async verificarDuplicado(
-    profesionalCentroEspecialidadId: number,
+    agendaDisponibilidadId: number,
     diaSemana: number,
     horaDesde: string,
     horaHasta: string,
@@ -39,7 +45,7 @@ export class ExcepcionesRecurrentesService {
   ): Promise<void> {
     const existente = await this.repository.findOne({
       where: {
-        profesionalCentroEspecialidadId,
+        agendaDisponibilidadId,
         diaSemana,
         horaDesde,
         horaHasta,
@@ -52,15 +58,9 @@ export class ExcepcionesRecurrentesService {
     }
   }
 
-  private validarDiaSemana(diaSemana: number): void {
-    if (diaSemana < 0 || diaSemana > 6) {
-      throw new BadRequestException(`El día de semana debe ser un valor entre 0 (Domingo) y 6 (Sábado)`);
-    }
-  }
-
   async findAll(): Promise<ExcepcionRecurrente[]> {
     return this.repository.find({
-      relations: ['profesionalCentroEspecialidad'],
+      relations: ['agendaDisponibilidad'],
       where: { fecha_baja: IsNull() },
     });
   }
@@ -68,7 +68,7 @@ export class ExcepcionesRecurrentesService {
   async findOne(id: number): Promise<ExcepcionRecurrente> {
     const registro = await this.repository.findOne({
       where: { id },
-      relations: ['profesionalCentroEspecialidad'],
+      relations: ['agendaDisponibilidad'],
     });
 
     if (!registro) {
@@ -78,19 +78,19 @@ export class ExcepcionesRecurrentesService {
     return registro;
   }
 
-  async findByProfesionalCentro(profesionalCentroEspecialidadId: number): Promise<ExcepcionRecurrente[]> {
+  async findByAgenda(agendaDisponibilidadId: number): Promise<ExcepcionRecurrente[]> {
     return this.repository.find({
-      where: { profesionalCentroEspecialidadId, fecha_baja: IsNull() },
-      relations: ['profesionalCentroEspecialidad'],
+      where: { agendaDisponibilidadId, fecha_baja: IsNull() },
+      relations: ['agendaDisponibilidad'],
     });
   }
 
   async create(createDto: CreateExcepcionRecurrenteDto, usuario?: string): Promise<ExcepcionRecurrente> {
-    await this.verificarProfesionalCentroActivo(createDto.profesionalCentroEspecialidadId);
+    await this.verificarAgendaActiva(createDto.agendaDisponibilidadId);
     this.validarDiaSemana(createDto.diaSemana);
     await this.verificarHorarioValido(createDto.horaDesde, createDto.horaHasta);
     await this.verificarDuplicado(
-      createDto.profesionalCentroEspecialidadId,
+      createDto.agendaDisponibilidadId,
       createDto.diaSemana,
       createDto.horaDesde,
       createDto.horaHasta,
@@ -107,8 +107,8 @@ export class ExcepcionesRecurrentesService {
   async update(id: number, updateDto: UpdateExcepcionRecurrenteDto, usuario?: string): Promise<ExcepcionRecurrente> {
     const registro = await this.findOne(id);
 
-    if (updateDto.profesionalCentroEspecialidadId && updateDto.profesionalCentroEspecialidadId !== registro.profesionalCentroEspecialidadId) {
-      await this.verificarProfesionalCentroActivo(updateDto.profesionalCentroEspecialidadId);
+    if (updateDto.agendaDisponibilidadId && updateDto.agendaDisponibilidadId !== registro.agendaDisponibilidadId) {
+      await this.verificarAgendaActiva(updateDto.agendaDisponibilidadId);
     }
 
     if (updateDto.diaSemana !== undefined) {
@@ -121,11 +121,11 @@ export class ExcepcionesRecurrentesService {
       await this.verificarHorarioValido(horaDesde, horaHasta);
     }
 
-    const profesionalCentroId = updateDto.profesionalCentroEspecialidadId ?? registro.profesionalCentroEspecialidadId;
+    const agendaId = updateDto.agendaDisponibilidadId ?? registro.agendaDisponibilidadId;
     const diaSemana = updateDto.diaSemana ?? registro.diaSemana;
     
     await this.verificarDuplicado(
-      profesionalCentroId,
+      agendaId,
       diaSemana,
       horaDesde,
       horaHasta,
