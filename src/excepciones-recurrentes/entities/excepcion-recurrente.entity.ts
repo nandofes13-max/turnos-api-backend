@@ -4,8 +4,6 @@ import { AgendaDisponibilidad } from '../../agenda-disponibilidad/entities/agend
 
 @Entity('excepciones_recurrentes')
 export class ExcepcionRecurrente extends BaseEntityAuditable {
-  // ❌ NO declarar id
-
   @Column({ name: 'agenda_disponibilidad_id' })
   agendaDisponibilidadId: number;
 
