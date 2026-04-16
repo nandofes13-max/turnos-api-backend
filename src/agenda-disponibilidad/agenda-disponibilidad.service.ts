@@ -6,7 +6,6 @@ import { CreateAgendaDisponibilidadDto } from './dto/create-agenda-disponibilida
 import { UpdateAgendaDisponibilidadDto } from './dto/update-agenda-disponibilidad.dto';
 import { ProfesionalCentro } from '../profesional-centro/entities/profesional-centro.entity';
 
-
 @Injectable()
 export class AgendaDisponibilidadService implements OnModuleInit {
   constructor(
@@ -14,8 +13,8 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     private readonly repository: Repository<AgendaDisponibilidad>,
     @InjectRepository(ProfesionalCentro)
     private readonly profesionalCentroRepository: Repository<ProfesionalCentro>,
-    @InjectRepository(AgendaExcepcion)
-    private readonly excepcionesRepository: Repository<AgendaExcepcion>,
+    // ❌ ELIMINADO: @InjectRepository(AgendaExcepcion)
+    // private readonly excepcionesRepository: Repository<AgendaExcepcion>,
   ) {}
 
   // ===== CREAR CONSTRAINT DE EXCLUSIÓN AL INICIAR =====
@@ -225,6 +224,11 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 
   // ===== GENERAR SLOTS =====
+  // ⚠️ NOTA: El método generarSlots ha sido simplificado.
+  // Las excepciones ahora se gestionan a través de los módulos separados:
+  // - excepciones-fechas (para fechas puntuales)
+  // - excepciones-recurrentes (para reglas por día de semana)
+  // Este método ahora solo genera los slots base desde la agenda.
   async generarSlots(
     profesionalCentroId: number,
     fecha: string,
@@ -262,21 +266,9 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       horaActual = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
     }
     
-    const excepciones = await this.excepcionesRepository.find({
-      where: {
-        agendaDisponibilidadId: agenda.id,
-        fecha: fechaObj,
-        fecha_baja: IsNull(),
-      },
-    });
-    
-    for (const excepcion of excepciones) {
-      for (let i = 0; i < slots.length; i++) {
-        if (slots[i].hora >= excepcion.horaDesde && slots[i].hora < excepcion.horaHasta) {
-          slots[i].bloqueado = true;
-        }
-      }
-    }
+    // ⚠️ IMPORTANTE: La lógica de excepciones debe ser implementada
+    // llamando a los servicios de ExcepcionesFechas y ExcepcionesRecurrentes.
+    // Por ahora, se devuelven los slots sin filtrar por excepciones.
     
     return slots.map(slot => ({
       ...slot,
