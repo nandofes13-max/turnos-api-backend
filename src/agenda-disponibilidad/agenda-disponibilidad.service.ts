@@ -228,7 +228,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     }
   }
 
-  // ===== GENERAR SLOTS CON EXCEPCIONES =====
+  // ===== GENERAR SLOTS CON EXCEPCIONES (CORREGIDO) =====
   async generarSlots(
     profesionalCentroId: number,
     fecha: string,
@@ -293,24 +293,26 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       return fechaHasta >= fechaObj;
     });
     
-    // 5. Aplicar excepciones recurrentes
+    // 5. Aplicar excepciones recurrentes (con validación de null)
     for (const excepcion of excepcionesRecurrentes) {
-      for (let i = 0; i < slots.length; i++) {
-        const slotHora = slots[i].hora;
-        if (slotHora >= excepcion.horaDesde && slotHora < excepcion.horaHasta) {
-          slots[i].bloqueado = true;
+      if (excepcion.horaDesde && excepcion.horaHasta) {
+        for (let i = 0; i < slots.length; i++) {
+          const slotHora = slots[i].hora;
+          if (slotHora >= excepcion.horaDesde && slotHora < excepcion.horaHasta) {
+            slots[i].bloqueado = true;
+          }
         }
       }
     }
     
-    // 6. Aplicar excepciones por fecha
+    // 6. Aplicar excepciones por fecha (con validación de null)
     for (const excepcion of excepcionesFechasAplican) {
       // Si no tiene horas (NULL), bloquea el día completo
       if (!excepcion.horaDesde && !excepcion.horaHasta) {
         for (let i = 0; i < slots.length; i++) {
           slots[i].bloqueado = true;
         }
-      } else {
+      } else if (excepcion.horaDesde && excepcion.horaHasta) {
         // Bloquea el rango de horas específico
         for (let i = 0; i < slots.length; i++) {
           const slotHora = slots[i].hora;
