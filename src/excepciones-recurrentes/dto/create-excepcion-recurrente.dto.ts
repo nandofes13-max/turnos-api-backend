@@ -1,9 +1,9 @@
 import { IsNotEmpty, IsOptional, IsString, MaxLength, IsIn, IsNumber, Min, Max } from 'class-validator';
 
 export class CreateExcepcionRecurrenteDto {
-  @IsNotEmpty({ message: 'El profesionalCentroEspecialidadId es obligatorio' })
-  @IsNumber({}, { message: 'profesionalCentroEspecialidadId debe ser un número' })
-  profesionalCentroEspecialidadId: number;
+  @IsNotEmpty({ message: 'El agendaDisponibilidadId es obligatorio' })
+  @IsNumber({}, { message: 'agendaDisponibilidadId debe ser un número' })
+  agendaDisponibilidadId: number;
 
   @IsNotEmpty({ message: 'El día de semana es obligatorio' })
   @IsNumber({}, { message: 'diaSemana debe ser un número' })
