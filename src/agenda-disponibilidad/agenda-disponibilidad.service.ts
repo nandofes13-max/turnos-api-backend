@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
+import { Repository, IsNull, LessThanOrEqual } from 'typeorm';
 import { AgendaDisponibilidad } from './entities/agenda-disponibilidad.entity';
 import { CreateAgendaDisponibilidadDto } from './dto/create-agenda-disponibilidad.dto';
 import { UpdateAgendaDisponibilidadDto } from './dto/update-agenda-disponibilidad.dto';
 import { ProfesionalCentro } from '../profesional-centro/entities/profesional-centro.entity';
+import { AgendaExcepcion } from '../agenda-excepciones/entities/agenda-excepcion.entity';
 
 @Injectable()
 export class AgendaDisponibilidadService implements OnModuleInit {
@@ -13,6 +14,8 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     private readonly repository: Repository<AgendaDisponibilidad>,
     @InjectRepository(ProfesionalCentro)
     private readonly profesionalCentroRepository: Repository<ProfesionalCentro>,
+    @InjectRepository(AgendaExcepcion)
+    private readonly excepcionesRepository: Repository<AgendaExcepcion>,
   ) {}
 
   // ===== CREAR CONSTRAINT DE EXCLUSIÓN AL INICIAR =====
@@ -225,6 +228,72 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     }
   }
 
+  // ===== GENERAR SLOTS (NUEVO) =====
+  async generarSlots(
+    profesionalCentroId: number,
+    fecha: string,
+  ): Promise<{ disponible: boolean; hora: string; bloqueado: boolean }[]> {
+    // 1. Obtener la agenda para ese día
+    const fechaObj = new Date(fecha);
+    const diaSemana = fechaObj.getDay(); // 0=Domingo, 1=Lunes, ...
+    
+    const agenda = await this.repository.findOne({
+      where: {
+        profesionalCentroId,
+        diaSemana,
+        fecha_baja: IsNull(),
+        fecha_desde: LessThanOrEqual(fechaObj),
+      },
+      relations: ['profesionalCentro'],
+    });
+    
+    if (!agenda) {
+      return []; // No hay agenda para este día
+    }
+    
+    // 2. Generar slots según duración
+    const slots: { hora: string; bloqueado: boolean }[] = [];
+    let horaActual = agenda.horaDesde;
+    const horaFin = agenda.horaHasta;
+    
+    while (horaActual < horaFin) {
+      slots.push({ hora: horaActual, bloqueado: false });
+      // Sumar duración
+      const [h, m] = horaActual.split(':').map(Number);
+      let minutos = m + agenda.duracionTurno;
+      let horas = h;
+      if (minutos >= 60) {
+        horas += Math.floor(minutos / 60);
+        minutos = minutos % 60;
+      }
+      horaActual = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
+    }
+    
+    // 3. Obtener excepciones para esta agenda y fecha
+    const excepciones = await this.excepcionesRepository.find({
+      where: {
+        agendaDisponibilidadId: agenda.id,
+        fecha: fechaObj,
+        fecha_baja: IsNull(),
+      },
+    });
+    
+    // 4. Marcar slots bloqueados según excepciones
+    for (const excepcion of excepciones) {
+      for (let i = 0; i < slots.length; i++) {
+        if (slots[i].hora >= excepcion.horaDesde && slots[i].hora < excepcion.horaHasta) {
+          slots[i].bloqueado = true;
+        }
+      }
+    }
+    
+    // 5. Agregar campo disponible (no bloqueado)
+    return slots.map(slot => ({
+      ...slot,
+      disponible: !slot.bloqueado,
+    }));
+  }
+
   // ===== CRUD =====
   async findAll(): Promise<AgendaDisponibilidad[]> {
     return this.repository.find({
@@ -285,7 +354,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     try {
       return await this.repository.save(registro);
     } catch (error: any) {
-      // Código 23P01 = violation of exclusion constraint
       if (error.code === '23P01') {
         throw new BadRequestException(
           'No se puede guardar: Este horario solapa con una agenda existente para el mismo día. ' +
