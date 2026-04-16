@@ -1,4 +1,3 @@
-// src/app.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FilialModule } from './filial/filial.module';
@@ -15,22 +14,17 @@ import { UploadModule } from './upload/upload.module';
 import { ProfesionalEspecialidadModule } from './profesional-especialidad/profesional-especialidad.module';
 import { CentroModule } from './centro/centro.module';
 import { ProfesionalCentroModule } from './profesional-centro/profesional-centro.module';
-import { AgendaDisponibilidadModule } from './agenda-disponibilidad/agenda-disponibilidad.module';
+// ❌ ELIMINAR: import { AgendaDisponibilidadModule } from './agenda-disponibilidad/agenda-disponibilidad.module';
 import { ExcepcionesRecurrentesModule } from './excepciones-recurrentes/excepciones-recurrentes.module';
 import { ExcepcionesFechasModule } from './excepciones-fechas/excepciones-fechas.module';
-
 
 @Module({
   imports: [
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: process.env.DATABASE_URL,
-      ssl: {
-        rejectUnauthorized: false,
-      },
-      extra: {
-        family: 4,
-      },
+      ssl: { rejectUnauthorized: false },
+      extra: { family: 4 },
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       autoLoadEntities: true,
       synchronize: true,
@@ -49,7 +43,7 @@ import { ExcepcionesFechasModule } from './excepciones-fechas/excepciones-fechas
     ProfesionalEspecialidadModule,
     CentroModule,
     ProfesionalCentroModule,
-    AgendaDisponibilidadModule,
+    // ❌ ELIMINAR: AgendaDisponibilidadModule,
     ExcepcionesRecurrentesModule,
     ExcepcionesFechasModule,
   ],
