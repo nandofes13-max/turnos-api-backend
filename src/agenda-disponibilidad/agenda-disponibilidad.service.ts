@@ -366,8 +366,8 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     });
     
     if (existenteEliminado) {
-      existenteEliminado.fecha_baja = null;
-      existenteEliminado.usuario_baja = null;
+      existenteEliminado.fecha_baja = null!;
+existenteEliminado.usuario_baja = null!;
       existenteEliminado.usuario_modificacion = usuario || 'demo';
       return this.repository.save(existenteEliminado);
     }
