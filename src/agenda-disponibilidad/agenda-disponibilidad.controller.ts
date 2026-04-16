@@ -13,6 +13,9 @@ import { AgendaDisponibilidad } from './entities/agenda-disponibilidad.entity';
 import { CreateAgendaDisponibilidadDto } from './dto/create-agenda-disponibilidad.dto';
 import { UpdateAgendaDisponibilidadDto } from './dto/update-agenda-disponibilidad.dto';
 
+// Agregar esto al principio del controlador, después de @Controller
+console.log('=== AGENDA-DISPONIBILIDAD CONTROLLER CARGADO ===');
+
 @Controller('agenda-disponibilidad')
 export class AgendaDisponibilidadController {
   constructor(private readonly service: AgendaDisponibilidadService) {}
