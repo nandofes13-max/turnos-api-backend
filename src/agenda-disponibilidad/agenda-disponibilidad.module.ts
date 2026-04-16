@@ -10,7 +10,6 @@ import { ProfesionalCentro } from '../profesional-centro/entities/profesional-ce
     TypeOrmModule.forFeature([
       AgendaDisponibilidad,
       ProfesionalCentro,
-      AgendaExcepcion,  // 👈 AGREGADO
     ])
   ],
   controllers: [AgendaDisponibilidadController],
