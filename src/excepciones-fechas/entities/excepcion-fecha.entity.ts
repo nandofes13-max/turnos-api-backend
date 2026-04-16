@@ -1,15 +1,13 @@
 import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntityAuditable } from '../../entities/base.entity';
-import { AgendaDisponibilidad } from '../../agenda-disponibilidad/entities/agenda-disponibilidad.entity';
+import { ProfesionalCentroEspecialidad } from '../../profesional-centro/entities/profesional-centro-especialidad.entity';
 
 @Entity('excepciones_fechas')
 export class ExcepcionFecha extends BaseEntityAuditable {
-  // ❌ ELIMINAR esta línea:
-  // @PrimaryGeneratedColumn()
-  // id: number;
+  // ❌ ELIMINAR: @PrimaryGeneratedColumn() id: number; (ya está en BaseEntityAuditable)
 
-  @Column({ name: 'agenda_disponibilidad_id' })
-  agendaDisponibilidadId: number;
+  @Column({ name: 'profesional_centro_especialidad_id' })
+  profesionalCentroEspecialidadId: number;
 
   @Column({ name: 'fecha_desde', type: 'date' })
   fechaDesde: Date;
@@ -24,12 +22,12 @@ export class ExcepcionFecha extends BaseEntityAuditable {
   horaHasta: string | null;
 
   @Column({ type: 'varchar', length: 20 })
-  tipo: string;
+  tipo: string; // 'deshabilitado' | 'bloqueado'
 
   @Column({ type: 'text', nullable: true })
   motivo: string | null;
 
-  @ManyToOne(() => AgendaDisponibilidad)
-  @JoinColumn({ name: 'agenda_disponibilidad_id' })
-  agendaDisponibilidad: AgendaDisponibilidad;
+  @ManyToOne(() => ProfesionalCentroEspecialidad)
+  @JoinColumn({ name: 'profesional_centro_especialidad_id' })
+  profesionalCentroEspecialidad: ProfesionalCentroEspecialidad;
 }
