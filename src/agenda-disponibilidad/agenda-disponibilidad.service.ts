@@ -336,6 +336,17 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       createDto.fechaHasta || null,
     );
 
+     // 👇 AGREGAR ESTE LOG ANTES DE LA VALIDACIÓN DE DUPLICADOS
+  console.log('Buscando duplicado con:', {
+    profesionalCentroId: createDto.profesionalCentroId,
+    diaSemana: createDto.diaSemana,
+    horaDesde: createDto.horaDesde,
+    horaHasta: createDto.horaHasta,
+    duracionTurno: createDto.duracionTurno,
+    fechaDesde: createDto.fechaDesde,
+    fechaHasta: createDto.fechaHasta,
+  });
+
     // 👇 VALIDACIÓN DE DUPLICADOS
     const existenteActivo = await this.repository.findOne({
       where: {
