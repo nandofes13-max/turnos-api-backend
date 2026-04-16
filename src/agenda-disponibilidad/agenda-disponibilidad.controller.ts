@@ -38,6 +38,16 @@ export class AgendaDisponibilidadController {
     return registros.map(r => this.agregarUltimoMovimiento(r));
   }
 
+  // 👇 NUEVO ENDPOINT: Generar slots de disponibilidad para una fecha específica
+  @Get('generar-slots/:profesionalCentroId')
+  async generarSlots(
+    @Param('profesionalCentroId') profesionalCentroId: string,
+    @Query('fecha') fecha: string,
+  ): Promise<any[]> {
+    const slots = await this.service.generarSlots(Number(profesionalCentroId), fecha);
+    return slots;
+  }
+
   // Crear nueva agenda
   @Post()
   async create(@Body() createDto: CreateAgendaDisponibilidadDto): Promise<any> {
