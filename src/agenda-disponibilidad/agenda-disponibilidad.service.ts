@@ -1,10 +1,13 @@
+// src/agenda-disponibilidad/agenda-disponibilidad.service.ts
 import { Injectable, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, Not, LessThanOrEqual } from 'typeorm';
+import { Repository, IsNull, Not, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
 import { AgendaDisponibilidad } from './entities/agenda-disponibilidad.entity';
 import { CreateAgendaDisponibilidadDto } from './dto/create-agenda-disponibilidad.dto';
 import { UpdateAgendaDisponibilidadDto } from './dto/update-agenda-disponibilidad.dto';
 import { ProfesionalCentro } from '../profesional-centro/entities/profesional-centro.entity';
+import { ExcepcionRecurrente } from '../excepciones-recurrentes/entities/excepcion-recurrente.entity';
+import { ExcepcionFecha } from '../excepciones-fechas/entities/excepcion-fecha.entity';
 
 @Injectable()
 export class AgendaDisponibilidadService implements OnModuleInit {
@@ -13,8 +16,10 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     private readonly repository: Repository<AgendaDisponibilidad>,
     @InjectRepository(ProfesionalCentro)
     private readonly profesionalCentroRepository: Repository<ProfesionalCentro>,
-    // ❌ ELIMINADO: @InjectRepository(AgendaExcepcion)
-    // private readonly excepcionesRepository: Repository<AgendaExcepcion>,
+    @InjectRepository(ExcepcionRecurrente)
+    private readonly excepcionesRecurrentesRepository: Repository<ExcepcionRecurrente>,
+    @InjectRepository(ExcepcionFecha)
+    private readonly excepcionesFechasRepository: Repository<ExcepcionFecha>,
   ) {}
 
   // ===== CREAR CONSTRAINT DE EXCLUSIÓN AL INICIAR =====
@@ -223,19 +228,16 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     }
   }
 
-  // ===== GENERAR SLOTS =====
-  // ⚠️ NOTA: El método generarSlots ha sido simplificado.
-  // Las excepciones ahora se gestionan a través de los módulos separados:
-  // - excepciones-fechas (para fechas puntuales)
-  // - excepciones-recurrentes (para reglas por día de semana)
-  // Este método ahora solo genera los slots base desde la agenda.
+  // ===== GENERAR SLOTS CON EXCEPCIONES =====
   async generarSlots(
     profesionalCentroId: number,
     fecha: string,
   ): Promise<{ disponible: boolean; hora: string; bloqueado: boolean }[]> {
     const fechaObj = new Date(fecha);
-    const diaSemana = fechaObj.getDay();
+    const diaSemana = fechaObj.getDay(); // 0=Domingo, 1=Lunes, ..., 6=Sábado
+    const fechaStr = fechaObj.toISOString().split('T')[0];
     
+    // 1. Obtener la agenda base para este profesional-centro y día
     const agenda = await this.repository.findOne({
       where: {
         profesionalCentroId,
@@ -250,6 +252,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       return [];
     }
     
+    // 2. Generar slots base según duración
     const slots: { hora: string; bloqueado: boolean }[] = [];
     let horaActual = agenda.horaDesde;
     const horaFin = agenda.horaHasta;
@@ -266,9 +269,57 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       horaActual = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
     }
     
-    // ⚠️ IMPORTANTE: La lógica de excepciones debe ser implementada
-    // llamando a los servicios de ExcepcionesFechas y ExcepcionesRecurrentes.
-    // Por ahora, se devuelven los slots sin filtrar por excepciones.
+    // 3. Obtener excepciones recurrentes (patrón semanal)
+    const excepcionesRecurrentes = await this.excepcionesRecurrentesRepository.find({
+      where: {
+        agendaDisponibilidadId: agenda.id,
+        diaSemana: diaSemana,
+        fecha_baja: IsNull(),
+      },
+    });
+    
+    // 4. Obtener excepciones por fecha específica
+    const excepcionesFechas = await this.excepcionesFechasRepository.find({
+      where: {
+        agendaDisponibilidadId: agenda.id,
+        fechaDesde: LessThanOrEqual(fechaObj),
+        fecha_baja: IsNull(),
+      },
+    });
+    
+    // Filtrar las que aplican a esta fecha (rango)
+    const excepcionesFechasAplican = excepcionesFechas.filter(exc => {
+      const fechaHasta = exc.fechaHasta || fechaObj;
+      return fechaHasta >= fechaObj;
+    });
+    
+    // 5. Aplicar excepciones recurrentes
+    for (const excepcion of excepcionesRecurrentes) {
+      for (let i = 0; i < slots.length; i++) {
+        const slotHora = slots[i].hora;
+        if (slotHora >= excepcion.horaDesde && slotHora < excepcion.horaHasta) {
+          slots[i].bloqueado = true;
+        }
+      }
+    }
+    
+    // 6. Aplicar excepciones por fecha
+    for (const excepcion of excepcionesFechasAplican) {
+      // Si no tiene horas (NULL), bloquea el día completo
+      if (!excepcion.horaDesde && !excepcion.horaHasta) {
+        for (let i = 0; i < slots.length; i++) {
+          slots[i].bloqueado = true;
+        }
+      } else {
+        // Bloquea el rango de horas específico
+        for (let i = 0; i < slots.length; i++) {
+          const slotHora = slots[i].hora;
+          if (slotHora >= excepcion.horaDesde && slotHora < excepcion.horaHasta) {
+            slots[i].bloqueado = true;
+          }
+        }
+      }
+    }
     
     return slots.map(slot => ({
       ...slot,
