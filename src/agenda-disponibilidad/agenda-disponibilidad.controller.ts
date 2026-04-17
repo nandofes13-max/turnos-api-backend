@@ -20,34 +20,15 @@ console.log('=== AGENDA-DISPONIBILIDAD CONTROLLER CARGADO ===');
 export class AgendaDisponibilidadController {
   constructor(private readonly service: AgendaDisponibilidadService) {}
 
-  @Get()
-  async findAll(): Promise<any[]> {
-    console.log('[Controller] findAll - Inicio');
-    const registros = await this.service.findAll();
-    console.log('[Controller] findAll - Encontrados:', registros.length);
-    return registros.map(r => this.agregarUltimoMovimiento(r));
-  }
-
-  @Get(':id')
-  async findOne(@Param('id') id: string): Promise<any> {
-    console.log('[Controller] findOne - ID recibido:', id);
-    console.log('[Controller] findOne - Tipo:', typeof id);
-    const idNum = Number(id);
-    console.log('[Controller] findOne - ID convertido a número:', idNum);
-    const registro = await this.service.findOne(idNum);
-    return this.agregarUltimoMovimiento(registro);
-  }
+  // ============================================================
+  // PRIMERO: RUTAS FIJAS (sin parámetros dinámicos)
+  // ============================================================
 
   @Get('por-profesional-centro/:profesionalCentroId')
   async findByProfesionalCentro(@Param('profesionalCentroId') profesionalCentroId: string): Promise<any[]> {
     console.log('[Controller] findByProfesionalCentro - ID recibido:', profesionalCentroId);
-    console.log('[Controller] findByProfesionalCentro - Tipo:', typeof profesionalCentroId);
     const idNum = Number(profesionalCentroId);
-    console.log('[Controller] findByProfesionalCentro - ID convertido a número:', idNum);
-    console.log('[Controller] findByProfesionalCentro - Es NaN?', isNaN(idNum));
-    
     const registros = await this.service.findByProfesionalCentro(idNum);
-    console.log('[Controller] findByProfesionalCentro - Registros encontrados:', registros.length);
     return registros.map(r => this.agregarUltimoMovimiento(r));
   }
 
@@ -59,6 +40,40 @@ export class AgendaDisponibilidadController {
     console.log('[Controller] generarSlots - ID:', profesionalCentroId, 'Fecha:', fecha);
     const slots = await this.service.generarSlots(Number(profesionalCentroId), fecha);
     return slots;
+  }
+
+  @Put('activar-desactivar')
+  async activarDesactivarBloques(
+    @Body() body: { ids: number[]; activar: boolean }
+  ) {
+    console.log('[Controller] activarDesactivarBloques - Body:', JSON.stringify(body));
+    await this.service.activarDesactivarBloques(body.ids, body.activar, 'demo');
+    const accion = body.activar ? 'activados' : 'desactivados';
+    return { message: `${body.ids.length} bloque(s) ${accion} correctamente` };
+  }
+
+  @Get('debug/structure')
+  debugStructure() {
+    console.log('[Controller] debugStructure');
+    return this.service.debugStructure();
+  }
+
+  // ============================================================
+  // DESPUÉS: RUTAS CON PARÁMETROS DINÁMICOS
+  // ============================================================
+
+  @Get()
+  async findAll(): Promise<any[]> {
+    console.log('[Controller] findAll - Inicio');
+    const registros = await this.service.findAll();
+    return registros.map(r => this.agregarUltimoMovimiento(r));
+  }
+
+  @Get(':id')
+  async findOne(@Param('id') id: string): Promise<any> {
+    console.log('[Controller] findOne - ID recibido:', id);
+    const registro = await this.service.findOne(Number(id));
+    return this.agregarUltimoMovimiento(registro);
   }
 
   @Post()
@@ -84,26 +99,7 @@ export class AgendaDisponibilidadController {
     return this.service.softDelete(Number(id), 'demo');
   }
 
-  @Put('activar-desactivar')
-  async activarDesactivarBloques(
-    @Body() body: { ids: number[]; activar: boolean }
-  ) {
-    console.log('[Controller] activarDesactivarBloques - Body recibido:', JSON.stringify(body));
-    console.log('[Controller] IDs:', body.ids);
-    console.log('[Controller] Activar:', body.activar);
-    
-    await this.service.activarDesactivarBloques(body.ids, body.activar, 'demo');
-    const accion = body.activar ? 'activados' : 'desactivados';
-    console.log('[Controller] activarDesactivarBloques - Completado');
-    return { message: `${body.ids.length} bloque(s) ${accion} correctamente` };
-  }
-
-  @Get('debug/structure')
-  debugStructure() {
-    console.log('[Controller] debugStructure');
-    return this.service.debugStructure();
-  }
-
+  // ===== FUNCIÓN AUXILIAR =====
   private agregarUltimoMovimiento(registro: AgendaDisponibilidad): any {
     const obj: any = { ...registro };
     
