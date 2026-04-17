@@ -5,23 +5,23 @@ import { Repository, IsNull } from 'typeorm';
 import { ExcepcionFecha } from './entities/excepcion-fecha.entity';
 import { CreateExcepcionFechaDto } from './dto/create-excepcion-fecha.dto';
 import { UpdateExcepcionFechaDto } from './dto/update-excepcion-fecha.dto';
-import { AgendaDisponibilidad } from '../agenda-disponibilidad/entities/agenda-disponibilidad.entity';
+import { ProfesionalCentro } from '../profesional-centro/entities/profesional-centro.entity';
 
 @Injectable()
 export class ExcepcionesFechasService {
   constructor(
     @InjectRepository(ExcepcionFecha)
     private readonly repository: Repository<ExcepcionFecha>,
-    @InjectRepository(AgendaDisponibilidad)
-    private readonly agendaRepository: Repository<AgendaDisponibilidad>,
+    @InjectRepository(ProfesionalCentro)
+    private readonly profesionalCentroRepository: Repository<ProfesionalCentro>,
   ) {}
 
-  private async verificarAgendaActiva(id: number): Promise<void> {
-    const agenda = await this.agendaRepository.findOne({
+  private async verificarProfesionalCentroActivo(id: number): Promise<void> {
+    const profesionalCentro = await this.profesionalCentroRepository.findOne({
       where: { id, fecha_baja: IsNull() },
     });
-    if (!agenda) {
-      throw new BadRequestException(`La agenda con id ${id} no existe o está inactiva`);
+    if (!profesionalCentro) {
+      throw new BadRequestException(`El profesional-centro con id ${id} no existe o está inactivo`);
     }
   }
 
@@ -47,7 +47,7 @@ export class ExcepcionesFechasService {
   }
 
   private async verificarDuplicado(
-    agendaDisponibilidadId: number,
+    profesionalCentroId: number,
     fechaDesde: Date,
     fechaHasta: Date | null,
     horaDesde: string | null,
@@ -56,7 +56,7 @@ export class ExcepcionesFechasService {
   ): Promise<void> {
     const existente = await this.repository.findOne({
       where: {
-        agendaDisponibilidadId,
+        profesionalCentroId,
         fechaDesde,
         fechaHasta: fechaHasta || IsNull(),
         horaDesde: horaDesde || IsNull(),
@@ -72,7 +72,7 @@ export class ExcepcionesFechasService {
 
   async findAll(): Promise<ExcepcionFecha[]> {
     return this.repository.find({
-      relations: ['agendaDisponibilidad'],
+      relations: ['profesionalCentro'],
       where: { fecha_baja: IsNull() },
     });
   }
@@ -80,7 +80,7 @@ export class ExcepcionesFechasService {
   async findOne(id: number): Promise<ExcepcionFecha> {
     const registro = await this.repository.findOne({
       where: { id },
-      relations: ['agendaDisponibilidad'],
+      relations: ['profesionalCentro'],
     });
 
     if (!registro) {
@@ -90,19 +90,19 @@ export class ExcepcionesFechasService {
     return registro;
   }
 
-  async findByAgenda(agendaDisponibilidadId: number): Promise<ExcepcionFecha[]> {
+  async findByProfesionalCentro(profesionalCentroId: number): Promise<ExcepcionFecha[]> {
     return this.repository.find({
-      where: { agendaDisponibilidadId, fecha_baja: IsNull() },
-      relations: ['agendaDisponibilidad'],
+      where: { profesionalCentroId, fecha_baja: IsNull() },
+      relations: ['profesionalCentro'],
     });
   }
 
   async create(createDto: CreateExcepcionFechaDto, usuario?: string): Promise<ExcepcionFecha> {
-    await this.verificarAgendaActiva(createDto.agendaDisponibilidadId);
+    await this.verificarProfesionalCentroActivo(createDto.profesionalCentroId);
     await this.verificarFechasValidas(createDto.fechaDesde, createDto.fechaHasta || null);
     await this.verificarHorarioValido(createDto.horaDesde || null, createDto.horaHasta || null);
     await this.verificarDuplicado(
-      createDto.agendaDisponibilidadId,
+      createDto.profesionalCentroId,
       createDto.fechaDesde,
       createDto.fechaHasta || null,
       createDto.horaDesde || null,
@@ -120,8 +120,8 @@ export class ExcepcionesFechasService {
   async update(id: number, updateDto: UpdateExcepcionFechaDto, usuario?: string): Promise<ExcepcionFecha> {
     const registro = await this.findOne(id);
 
-    if (updateDto.agendaDisponibilidadId && updateDto.agendaDisponibilidadId !== registro.agendaDisponibilidadId) {
-      await this.verificarAgendaActiva(updateDto.agendaDisponibilidadId);
+    if (updateDto.profesionalCentroId && updateDto.profesionalCentroId !== registro.profesionalCentroId) {
+      await this.verificarProfesionalCentroActivo(updateDto.profesionalCentroId);
     }
 
     const fechaDesde = updateDto.fechaDesde ?? registro.fechaDesde;
@@ -136,10 +136,10 @@ export class ExcepcionesFechasService {
       await this.verificarHorarioValido(horaDesde, horaHasta);
     }
 
-    const agendaId = updateDto.agendaDisponibilidadId ?? registro.agendaDisponibilidadId;
+    const profesionalCentroId = updateDto.profesionalCentroId ?? registro.profesionalCentroId;
     
     await this.verificarDuplicado(
-      agendaId,
+      profesionalCentroId,
       fechaDesde,
       fechaHasta,
       horaDesde,
