@@ -4,12 +4,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ExcepcionFecha } from './entities/excepcion-fecha.entity';
 import { ExcepcionesFechasService } from './excepciones-fechas.service';
 import { ExcepcionesFechasController } from './excepciones-fechas.controller';
-import { ProfesionalCentroModule } from '../profesional-centro/profesional-centro.module';
+import { ProfesionalCentro } from '../profesional-centro/entities/profesional-centro.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ExcepcionFecha]),
-    ProfesionalCentroModule, // 👈 Importar el módulo completo
+    TypeOrmModule.forFeature([ExcepcionFecha, ProfesionalCentro]), // 👈 Agregar ProfesionalCentro aquí
   ],
   controllers: [ExcepcionesFechasController],
   providers: [ExcepcionesFechasService],
