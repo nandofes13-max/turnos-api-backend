@@ -14,86 +14,96 @@ import { AgendaDisponibilidad } from './entities/agenda-disponibilidad.entity';
 import { CreateAgendaDisponibilidadDto } from './dto/create-agenda-disponibilidad.dto';
 import { UpdateAgendaDisponibilidadDto } from './dto/update-agenda-disponibilidad.dto';
 
-// Agregar esto al principio del controlador, después de @Controller
 console.log('=== AGENDA-DISPONIBILIDAD CONTROLLER CARGADO ===');
 
 @Controller('agenda-disponibilidad')
 export class AgendaDisponibilidadController {
   constructor(private readonly service: AgendaDisponibilidadService) {}
 
-  // Listar todas las agendas (activas)
   @Get()
   async findAll(): Promise<any[]> {
+    console.log('[Controller] findAll - Inicio');
     const registros = await this.service.findAll();
+    console.log('[Controller] findAll - Encontrados:', registros.length);
     return registros.map(r => this.agregarUltimoMovimiento(r));
   }
 
-  // Obtener una agenda por ID
   @Get(':id')
   async findOne(@Param('id') id: string): Promise<any> {
-    const registro = await this.service.findOne(Number(id));
+    console.log('[Controller] findOne - ID recibido:', id);
+    console.log('[Controller] findOne - Tipo:', typeof id);
+    const idNum = Number(id);
+    console.log('[Controller] findOne - ID convertido a número:', idNum);
+    const registro = await this.service.findOne(idNum);
     return this.agregarUltimoMovimiento(registro);
   }
 
-  // Obtener agendas por profesional-centro
   @Get('por-profesional-centro/:profesionalCentroId')
   async findByProfesionalCentro(@Param('profesionalCentroId') profesionalCentroId: string): Promise<any[]> {
-    const registros = await this.service.findByProfesionalCentro(Number(profesionalCentroId));
+    console.log('[Controller] findByProfesionalCentro - ID recibido:', profesionalCentroId);
+    console.log('[Controller] findByProfesionalCentro - Tipo:', typeof profesionalCentroId);
+    const idNum = Number(profesionalCentroId);
+    console.log('[Controller] findByProfesionalCentro - ID convertido a número:', idNum);
+    console.log('[Controller] findByProfesionalCentro - Es NaN?', isNaN(idNum));
+    
+    const registros = await this.service.findByProfesionalCentro(idNum);
+    console.log('[Controller] findByProfesionalCentro - Registros encontrados:', registros.length);
     return registros.map(r => this.agregarUltimoMovimiento(r));
   }
 
-  // 👇 NUEVO ENDPOINT: Generar slots de disponibilidad para una fecha específica
   @Get('generar-slots/:profesionalCentroId')
   async generarSlots(
     @Param('profesionalCentroId') profesionalCentroId: string,
     @Query('fecha') fecha: string,
   ): Promise<any[]> {
+    console.log('[Controller] generarSlots - ID:', profesionalCentroId, 'Fecha:', fecha);
     const slots = await this.service.generarSlots(Number(profesionalCentroId), fecha);
     return slots;
   }
 
-  // Crear nueva agenda
   @Post()
   async create(@Body() createDto: CreateAgendaDisponibilidadDto): Promise<any> {
+    console.log('[Controller] create - Inicio');
     const registro = await this.service.create(createDto, 'demo');
     return this.agregarUltimoMovimiento(registro);
   }
 
-  // Actualizar agenda
   @Put(':id')
   async update(
     @Param('id') id: string, 
     @Body() updateDto: UpdateAgendaDisponibilidadDto
   ): Promise<any> {
+    console.log('[Controller] update - ID:', id);
     const registro = await this.service.update(Number(id), updateDto, 'demo');
     return this.agregarUltimoMovimiento(registro);
   }
 
-  // Soft delete
   @Delete(':id')
   softDelete(@Param('id') id: string): Promise<void> {
+    console.log('[Controller] softDelete - ID:', id);
     return this.service.softDelete(Number(id), 'demo');
   }
 
-  // ============================================================
-  // NUEVO ENDPOINT: Activar/Desactivar múltiples bloques por IDs
-  // ============================================================
   @Put('activar-desactivar')
   async activarDesactivarBloques(
     @Body() body: { ids: number[]; activar: boolean }
   ) {
+    console.log('[Controller] activarDesactivarBloques - Body recibido:', JSON.stringify(body));
+    console.log('[Controller] IDs:', body.ids);
+    console.log('[Controller] Activar:', body.activar);
+    
     await this.service.activarDesactivarBloques(body.ids, body.activar, 'demo');
     const accion = body.activar ? 'activados' : 'desactivados';
+    console.log('[Controller] activarDesactivarBloques - Completado');
     return { message: `${body.ids.length} bloque(s) ${accion} correctamente` };
   }
 
-  // Debug: ver estructura de tabla
   @Get('debug/structure')
   debugStructure() {
+    console.log('[Controller] debugStructure');
     return this.service.debugStructure();
   }
 
-  // ===== FUNCIÓN AUXILIAR =====
   private agregarUltimoMovimiento(registro: AgendaDisponibilidad): any {
     const obj: any = { ...registro };
     
