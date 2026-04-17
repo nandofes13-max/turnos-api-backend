@@ -1,13 +1,12 @@
 // src/agenda-disponibilidad/agenda-disponibilidad.service.ts
 import { Injectable, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, Not, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
+import { Repository, IsNull, Not, LessThanOrEqual } from 'typeorm';
 import { AgendaDisponibilidad } from './entities/agenda-disponibilidad.entity';
 import { CreateAgendaDisponibilidadDto } from './dto/create-agenda-disponibilidad.dto';
 import { UpdateAgendaDisponibilidadDto } from './dto/update-agenda-disponibilidad.dto';
 import { ProfesionalCentro } from '../profesional-centro/entities/profesional-centro.entity';
 import { ExcepcionRecurrente } from '../excepciones-recurrentes/entities/excepcion-recurrente.entity';
-import { ExcepcionFecha } from '../excepciones-fechas/entities/excepcion-fecha.entity';
 
 @Injectable()
 export class AgendaDisponibilidadService implements OnModuleInit {
@@ -18,11 +17,8 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     private readonly profesionalCentroRepository: Repository<ProfesionalCentro>,
     @InjectRepository(ExcepcionRecurrente)
     private readonly excepcionesRecurrentesRepository: Repository<ExcepcionRecurrente>,
-    @InjectRepository(ExcepcionFecha)
-    private readonly excepcionesFechasRepository: Repository<ExcepcionFecha>,
   ) {}
 
-  // ===== CREAR CONSTRAINT DE EXCLUSIÓN AL INICIAR =====
   async onModuleInit() {
     await this.crearConstraintExclusion();
   }
@@ -63,7 +59,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     }
   }
 
-  // ===== FUNCIONES AUXILIARES =====
   private async verificarProfesionalCentroActivo(id: number): Promise<void> {
     const relacion = await this.profesionalCentroRepository.findOne({
       where: { id, fecha_baja: IsNull() },
@@ -133,16 +128,8 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     duracionTurno: number,
     bufferMinutos: number,
   ): Promise<void> {
-    console.log('===== DIAGNÓSTICO DURACIÓN VS RANGO =====');
-    console.log('horaDesde:', horaDesde);
-    console.log('horaHasta:', horaHasta);
-    console.log('duracionTurno:', duracionTurno);
-    
     const [desdeH, desdeM] = horaDesde.split(':').map(Number);
     const [hastaH, hastaM] = horaHasta.split(':').map(Number);
-    
-    console.log('desdeH:', desdeH, 'desdeM:', desdeM);
-    console.log('hastaH:', hastaH, 'hastaM:', hastaM);
     
     let minutosTotales;
     if (horaHasta <= horaDesde) {
@@ -151,8 +138,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       minutosTotales = (hastaH * 60 + hastaM) - (desdeH * 60 + desdeM);
     }
     
-    console.log('minutosTotales calculados:', minutosTotales);
-    
     if (minutosTotales <= 0) {
       throw new BadRequestException(`El horario desde debe ser menor al horario hasta`);
     }
@@ -160,8 +145,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     if (bufferMinutos === 0) {
       if (minutosTotales % duracionTurno !== 0) {
         throw new BadRequestException(
-          `La duración del turno (${duracionTurno} min) no divide exactamente el rango horario de ${minutosTotales} minutos. ` +
-          `Los turnos no se generarían correctamente.`
+          `La duración del turno (${duracionTurno} min) no divide exactamente el rango horario de ${minutosTotales} minutos.`
         );
       }
     } else {
@@ -228,16 +212,13 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     }
   }
 
-  // ===== GENERAR SLOTS CON EXCEPCIONES (CORREGIDO) =====
   async generarSlots(
     profesionalCentroId: number,
     fecha: string,
   ): Promise<{ disponible: boolean; hora: string; bloqueado: boolean }[]> {
     const fechaObj = new Date(fecha);
-    const diaSemana = fechaObj.getDay(); // 0=Domingo, 1=Lunes, ..., 6=Sábado
-    const fechaStr = fechaObj.toISOString().split('T')[0];
+    const diaSemana = fechaObj.getDay();
     
-    // 1. Obtener la agenda base para este profesional-centro y día
     const agenda = await this.repository.findOne({
       where: {
         profesionalCentroId,
@@ -252,7 +233,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       return [];
     }
     
-    // 2. Generar slots base según duración
     const slots: { hora: string; bloqueado: boolean }[] = [];
     let horaActual = agenda.horaDesde;
     const horaFin = agenda.horaHasta;
@@ -269,7 +249,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       horaActual = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
     }
     
-    // 3. Obtener excepciones recurrentes (patrón semanal)
     const excepcionesRecurrentes = await this.excepcionesRecurrentesRepository.find({
       where: {
         agendaDisponibilidadId: agenda.id,
@@ -278,42 +257,8 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       },
     });
     
-    // 4. Obtener excepciones por fecha específica
-    const excepcionesFechas = await this.excepcionesFechasRepository.find({
-      where: {
-        agendaDisponibilidadId: agenda.id,
-        fechaDesde: LessThanOrEqual(fechaObj),
-        fecha_baja: IsNull(),
-      },
-    });
-    
-    // Filtrar las que aplican a esta fecha (rango)
-    const excepcionesFechasAplican = excepcionesFechas.filter(exc => {
-      const fechaHasta = exc.fechaHasta || fechaObj;
-      return fechaHasta >= fechaObj;
-    });
-    
-    // 5. Aplicar excepciones recurrentes (con validación de null)
     for (const excepcion of excepcionesRecurrentes) {
       if (excepcion.horaDesde && excepcion.horaHasta) {
-        for (let i = 0; i < slots.length; i++) {
-          const slotHora = slots[i].hora;
-          if (slotHora >= excepcion.horaDesde && slotHora < excepcion.horaHasta) {
-            slots[i].bloqueado = true;
-          }
-        }
-      }
-    }
-    
-    // 6. Aplicar excepciones por fecha (con validación de null)
-    for (const excepcion of excepcionesFechasAplican) {
-      // Si no tiene horas (NULL), bloquea el día completo
-      if (!excepcion.horaDesde && !excepcion.horaHasta) {
-        for (let i = 0; i < slots.length; i++) {
-          slots[i].bloqueado = true;
-        }
-      } else if (excepcion.horaDesde && excepcion.horaHasta) {
-        // Bloquea el rango de horas específico
         for (let i = 0; i < slots.length; i++) {
           const slotHora = slots[i].hora;
           if (slotHora >= excepcion.horaDesde && slotHora < excepcion.horaHasta) {
@@ -329,7 +274,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     }));
   }
 
-  // ===== CRUD =====
   async findAll(): Promise<AgendaDisponibilidad[]> {
     return this.repository.find({
       relations: ['profesionalCentro', 'profesionalCentro.profesional', 'profesionalCentro.especialidad', 'profesionalCentro.centro'],
@@ -381,7 +325,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       createDto.fechaHasta || null,
     );
 
-    // 👉 BUSCAR SI YA EXISTE UN REGISTRO ACTIVO (para actualizarlo)
     const existenteActivo = await this.repository.findOne({
       where: {
         profesionalCentroId: createDto.profesionalCentroId,
@@ -396,7 +339,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     });
     
     if (existenteActivo) {
-      // Actualizar el registro existente
       Object.assign(existenteActivo, {
         ...createDto,
         usuario_modificacion: usuario || 'demo',
@@ -404,7 +346,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       return this.repository.save(existenteActivo);
     }
     
-    // BUSCAR SI EXISTE UN REGISTRO ELIMINADO (para reactivarlo)
     const existenteEliminado = await this.repository.findOne({
       where: {
         profesionalCentroId: createDto.profesionalCentroId,
@@ -426,7 +367,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       return this.repository.save(existenteEliminado);
     }
 
-    // SI NO EXISTE NINGUNO, CREAR NUEVO
     const registro = this.repository.create({
       ...createDto,
       usuario_alta: usuario || 'demo',
