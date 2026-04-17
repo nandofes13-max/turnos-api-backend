@@ -151,4 +151,37 @@ export class ExcepcionesRecurrentesService {
 
     await this.repository.save(registro);
   }
+
+  // ============================================================
+  // NUEVO MÉTODO: Habilitar por campos (sin exponer ID)
+  // ============================================================
+  async habilitar(
+    agendaDisponibilidadId: number,
+    diaSemana: number,
+    horaDesde: string,
+    horaHasta: string,
+    usuario?: string
+  ): Promise<void> {
+    // Buscar la excepción activa
+    const excepcion = await this.repository.findOne({
+      where: {
+        agendaDisponibilidadId,
+        diaSemana,
+        horaDesde,
+        horaHasta,
+        fecha_baja: IsNull()
+      }
+    });
+
+    if (!excepcion) {
+      throw new NotFoundException(
+        `No se encontró una excepción activa para la agenda ${agendaDisponibilidadId}, día ${diaSemana}, horario ${horaDesde} a ${horaHasta}`
+      );
+    }
+
+    // Soft delete
+    excepcion.fecha_baja = new Date();
+    excepcion.usuario_baja = usuario || 'demo';
+    await this.repository.save(excepcion);
+  }
 }
