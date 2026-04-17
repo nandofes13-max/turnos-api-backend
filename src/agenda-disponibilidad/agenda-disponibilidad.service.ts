@@ -308,16 +308,20 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     return registro;
   }
 
+  // ============================================================
+  // MÉTODO MODIFICADO: Trae TODOS los bloques (activos e inactivos)
+  // ============================================================
   async findByProfesionalCentro(profesionalCentroId: number): Promise<AgendaDisponibilidad[]> {
     console.log('[Service] findByProfesionalCentro - ID recibido:', profesionalCentroId);
     console.log('[Service] findByProfesionalCentro - Tipo:', typeof profesionalCentroId);
     console.log('[Service] findByProfesionalCentro - Es NaN?', isNaN(profesionalCentroId));
     
+    // 👇 ELIMINAMOS la condición fecha_baja: IsNull() para traer TODOS
     const result = await this.repository.find({
-      where: { profesionalCentroId, fecha_baja: IsNull() },
+      where: { profesionalCentroId },
       relations: ['profesionalCentro'],
     });
-    console.log('[Service] findByProfesionalCentro - Resultados encontrados:', result.length);
+    console.log('[Service] findByProfesionalCentro - Resultados encontrados (activos + inactivos):', result.length);
     return result;
   }
 
@@ -498,13 +502,11 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     console.log('[Service] Es array?', Array.isArray(ids));
     console.log('[Service] Activar:', activar);
     
-    // Validaciones estrictas
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       console.log('[Service] ERROR: No se recibieron IDs válidos');
       throw new BadRequestException('No se recibieron IDs válidos para procesar');
     }
     
-    // Filtrar y validar cada ID
     const idsValidos = ids.filter(id => {
       const idNum = Number(id);
       const esValido = !isNaN(idNum) && isFinite(idNum) && idNum > 0;
