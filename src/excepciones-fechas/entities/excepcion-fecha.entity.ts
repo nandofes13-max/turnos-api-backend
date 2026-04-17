@@ -1,11 +1,12 @@
+// src/excepciones-fechas/entities/excepcion-fecha.entity.ts
 import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntityAuditable } from '../../entities/base.entity';
-import { AgendaDisponibilidad } from '../../agenda-disponibilidad/entities/agenda-disponibilidad.entity';
+import { ProfesionalCentro } from '../../profesional-centro/entities/profesional-centro.entity';
 
 @Entity('excepciones_fechas')
 export class ExcepcionFecha extends BaseEntityAuditable {
-  @Column({ name: 'agenda_disponibilidad_id' })
-  agendaDisponibilidadId: number;
+  @Column({ name: 'profesional_centro_id' })
+  profesionalCentroId: number;
 
   @Column({ name: 'fecha_desde', type: 'date' })
   fechaDesde: Date;
@@ -25,7 +26,7 @@ export class ExcepcionFecha extends BaseEntityAuditable {
   @Column({ type: 'text', nullable: true })
   motivo: string | null;
 
-  @ManyToOne(() => AgendaDisponibilidad)
-  @JoinColumn({ name: 'agenda_disponibilidad_id' })
-  agendaDisponibilidad: AgendaDisponibilidad;
+  @ManyToOne(() => ProfesionalCentro)
+  @JoinColumn({ name: 'profesional_centro_id' })
+  profesionalCentro: ProfesionalCentro;
 }
