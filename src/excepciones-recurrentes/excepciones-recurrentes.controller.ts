@@ -55,6 +55,26 @@ export class ExcepcionesRecurrentesController {
     return this.service.softDelete(Number(id), 'demo');
   }
 
+  // ============================================================
+  // NUEVO ENDPOINT: Habilitar por campos (sin exponer ID)
+  // ============================================================
+  @Post('habilitar')
+  async habilitar(@Body() body: { 
+    agendaDisponibilidadId: number; 
+    diaSemana: number; 
+    horaDesde: string; 
+    horaHasta: string 
+  }) {
+    await this.service.habilitar(
+      body.agendaDisponibilidadId,
+      body.diaSemana,
+      body.horaDesde,
+      body.horaHasta,
+      'demo'
+    );
+    return { message: 'Horario habilitado correctamente' };
+  }
+
   private agregarUltimoMovimiento(registro: ExcepcionRecurrente): any {
     const obj: any = { ...registro };
     
