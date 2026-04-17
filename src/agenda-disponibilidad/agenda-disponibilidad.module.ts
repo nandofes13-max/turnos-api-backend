@@ -13,8 +13,8 @@ import { ExcepcionFecha } from '../excepciones-fechas/entities/excepcion-fecha.e
     TypeOrmModule.forFeature([
       AgendaDisponibilidad,
       ProfesionalCentro,
-      ExcepcionRecurrente,
-      ExcepcionFecha,
+      ExcepcionRecurrente,  // 👈 AGREGAR
+      ExcepcionFecha,       // 👈 AGREGAR
     ])
   ],
   controllers: [AgendaDisponibilidadController],
