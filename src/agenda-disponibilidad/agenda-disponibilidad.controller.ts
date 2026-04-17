@@ -1,3 +1,4 @@
+// src/agenda-disponibilidad/agenda-disponibilidad.controller.ts
 import { 
   Controller, 
   Get, 
@@ -72,6 +73,18 @@ export class AgendaDisponibilidadController {
   @Delete(':id')
   softDelete(@Param('id') id: string): Promise<void> {
     return this.service.softDelete(Number(id), 'demo');
+  }
+
+  // ============================================================
+  // NUEVO ENDPOINT: Activar/Desactivar múltiples bloques por IDs
+  // ============================================================
+  @Put('activar-desactivar')
+  async activarDesactivarBloques(
+    @Body() body: { ids: number[]; activar: boolean }
+  ) {
+    await this.service.activarDesactivarBloques(body.ids, body.activar, 'demo');
+    const accion = body.activar ? 'activados' : 'desactivados';
+    return { message: `${body.ids.length} bloque(s) ${accion} correctamente` };
   }
 
   // Debug: ver estructura de tabla
