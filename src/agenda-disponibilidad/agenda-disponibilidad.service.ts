@@ -470,26 +470,40 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 
   // ============================================================
-  // NUEVO MÉTODO: Activar/Desactivar múltiples bloques por IDs
-  // ============================================================
-  async activarDesactivarBloques(ids: number[], activar: boolean, usuario?: string): Promise<void> {
-    if (!ids || ids.length === 0) {
-      throw new BadRequestException('No se recibieron IDs para procesar');
-    }
+// NUEVO MÉTODO: Activar/Desactivar múltiples bloques por IDs
+// ============================================================
+async activarDesactivarBloques(ids: number[], activar: boolean, usuario?: string): Promise<void> {
+  if (!ids || ids.length === 0) {
+    throw new BadRequestException('No se recibieron IDs para procesar');
+  }
 
-    const fecha_baja = activar ? null : new Date();
+  const ahora = new Date();
+  const usuarioActual = usuario || 'demo';
 
+  if (activar) {
+    // Activar: poner fecha_baja en null
     await this.repository.update(
       { id: In(ids) },
       {
-        fecha_baja: fecha_baja,
-        usuario_baja: fecha_baja ? usuario || 'demo' : null,
-        usuario_modificacion: usuario || 'demo',
-        fecha_modificacion: new Date(),
+        fecha_baja: null as any,
+        usuario_baja: null as any,
+        usuario_modificacion: usuarioActual,
+        fecha_modificacion: ahora,
+      }
+    );
+  } else {
+    // Desactivar: poner fecha_baja con la fecha actual
+    await this.repository.update(
+      { id: In(ids) },
+      {
+        fecha_baja: ahora,
+        usuario_baja: usuarioActual,
+        usuario_modificacion: usuarioActual,
+        fecha_modificacion: ahora,
       }
     );
   }
-
+}
   async debugStructure(): Promise<any> {
     return this.repository.query(`
       SELECT column_name, data_type, is_nullable
