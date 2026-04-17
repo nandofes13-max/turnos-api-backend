@@ -1,17 +1,24 @@
-// src/excepciones-fechas/excepciones-fechas.module.ts
+// src/agenda-disponibilidad/agenda-disponibilidad.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ExcepcionFecha } from './entities/excepcion-fecha.entity';
-import { ExcepcionesFechasService } from './excepciones-fechas.service';
-import { ExcepcionesFechasController } from './excepciones-fechas.controller';
+import { AgendaDisponibilidad } from './entities/agenda-disponibilidad.entity';
+import { AgendaDisponibilidadService } from './agenda-disponibilidad.service';
+import { AgendaDisponibilidadController } from './agenda-disponibilidad.controller';
 import { ProfesionalCentro } from '../profesional-centro/entities/profesional-centro.entity';
+import { ExcepcionRecurrente } from '../excepciones-recurrentes/entities/excepcion-recurrente.entity';
+import { ExcepcionFecha } from '../excepciones-fechas/entities/excepcion-fecha.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ExcepcionFecha, ProfesionalCentro])
+    TypeOrmModule.forFeature([
+      AgendaDisponibilidad,
+      ProfesionalCentro,
+      ExcepcionRecurrente,
+      ExcepcionFecha,
+    ])
   ],
-  controllers: [ExcepcionesFechasController],
-  providers: [ExcepcionesFechasService],
-  exports: [ExcepcionesFechasService],
+  controllers: [AgendaDisponibilidadController],
+  providers: [AgendaDisponibilidadService],
+  exports: [AgendaDisponibilidadService],
 })
-export class ExcepcionesFechasModule {}
+export class AgendaDisponibilidadModule {}
