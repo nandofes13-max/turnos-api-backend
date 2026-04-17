@@ -216,6 +216,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     profesionalCentroId: number,
     fecha: string,
   ): Promise<{ disponible: boolean; hora: string; bloqueado: boolean }[]> {
+    console.log('[Service] generarSlots - profesionalCentroId:', profesionalCentroId, 'fecha:', fecha);
     const fechaObj = new Date(fecha);
     const diaSemana = fechaObj.getDay();
     
@@ -230,9 +231,11 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     });
     
     if (!agenda) {
+      console.log('[Service] generarSlots - No se encontró agenda');
       return [];
     }
     
+    console.log('[Service] generarSlots - Agenda encontrada ID:', agenda.id);
     const slots: { hora: string; bloqueado: boolean }[] = [];
     let horaActual = agenda.horaDesde;
     const horaFin = agenda.horaHasta;
@@ -257,6 +260,8 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       },
     });
     
+    console.log('[Service] generarSlots - Excepciones recurrentes encontradas:', excepcionesRecurrentes.length);
+    
     for (const excepcion of excepcionesRecurrentes) {
       if (excepcion.horaDesde && excepcion.horaHasta) {
         for (let i = 0; i < slots.length; i++) {
@@ -275,33 +280,49 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 
   async findAll(): Promise<AgendaDisponibilidad[]> {
-    return this.repository.find({
+    console.log('[Service] findAll - Inicio');
+    const result = await this.repository.find({
       relations: ['profesionalCentro', 'profesionalCentro.profesional', 'profesionalCentro.especialidad', 'profesionalCentro.centro'],
       where: { fecha_baja: IsNull() },
     });
+    console.log('[Service] findAll - Encontrados:', result.length);
+    return result;
   }
 
   async findOne(id: number): Promise<AgendaDisponibilidad> {
+    console.log('[Service] findOne - ID recibido:', id);
+    console.log('[Service] findOne - Tipo:', typeof id);
+    console.log('[Service] findOne - Es NaN?', isNaN(id));
+    
     const registro = await this.repository.findOne({
       where: { id },
       relations: ['profesionalCentro', 'profesionalCentro.profesional', 'profesionalCentro.especialidad', 'profesionalCentro.centro'],
     });
 
     if (!registro) {
+      console.log('[Service] findOne - No encontrado para ID:', id);
       throw new NotFoundException(`Agenda con id ${id} no encontrada`);
     }
 
+    console.log('[Service] findOne - Encontrado ID:', registro.id);
     return registro;
   }
 
   async findByProfesionalCentro(profesionalCentroId: number): Promise<AgendaDisponibilidad[]> {
-    return this.repository.find({
+    console.log('[Service] findByProfesionalCentro - ID recibido:', profesionalCentroId);
+    console.log('[Service] findByProfesionalCentro - Tipo:', typeof profesionalCentroId);
+    console.log('[Service] findByProfesionalCentro - Es NaN?', isNaN(profesionalCentroId));
+    
+    const result = await this.repository.find({
       where: { profesionalCentroId, fecha_baja: IsNull() },
       relations: ['profesionalCentro'],
     });
+    console.log('[Service] findByProfesionalCentro - Resultados encontrados:', result.length);
+    return result;
   }
 
   async create(createDto: CreateAgendaDisponibilidadDto, usuario?: string): Promise<AgendaDisponibilidad> {
+    console.log('[Service] create - Inicio');
     await this.verificarProfesionalCentroActivo(createDto.profesionalCentroId);
     await this.verificarDiaSemanaValido(createDto.diaSemana);
     await this.verificarHorarioValido(createDto.horaDesde, createDto.horaHasta);
@@ -325,10 +346,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       createDto.fechaHasta || null,
     );
 
-    // ============================================================
-    // VALIDACIÓN DE DUPLICADO (Ajuste 1)
-    // Verificar si existe un bloque ACTIVO con mismo horario y duración
-    // ============================================================
     const bloqueActivoExistente = await this.repository.findOne({
       where: {
         profesionalCentroId: createDto.profesionalCentroId,
@@ -403,6 +420,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 
   async update(id: number, updateDto: UpdateAgendaDisponibilidadDto, usuario?: string): Promise<AgendaDisponibilidad> {
+    console.log('[Service] update - ID:', id);
     const registro = await this.findOne(id);
 
     if (updateDto.profesionalCentroId && updateDto.profesionalCentroId !== registro.profesionalCentroId) {
@@ -457,6 +475,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 
   async softDelete(id: number, usuario?: string): Promise<void> {
+    console.log('[Service] softDelete - ID:', id);
     const registro = await this.findOne(id);
     
     if (registro.fecha_baja) {
@@ -469,58 +488,76 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     await this.repository.save(registro);
   }
 
-// ============================================================
-// NUEVO MÉTODO: Activar/Desactivar múltiples bloques por IDs
-// ============================================================
-async activarDesactivarBloques(ids: number[], activar: boolean, usuario?: string): Promise<void> {
-  // Validaciones estrictas
-  if (!ids || !Array.isArray(ids) || ids.length === 0) {
-    throw new BadRequestException('No se recibieron IDs válidos para procesar');
+  // ============================================================
+  // NUEVO MÉTODO: Activar/Desactivar múltiples bloques por IDs
+  // ============================================================
+  async activarDesactivarBloques(ids: number[], activar: boolean, usuario?: string): Promise<void> {
+    console.log('[Service] activarDesactivarBloques - INICIO');
+    console.log('[Service] IDs recibidos:', ids);
+    console.log('[Service] Tipo de ids:', typeof ids);
+    console.log('[Service] Es array?', Array.isArray(ids));
+    console.log('[Service] Activar:', activar);
+    
+    // Validaciones estrictas
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      console.log('[Service] ERROR: No se recibieron IDs válidos');
+      throw new BadRequestException('No se recibieron IDs válidos para procesar');
+    }
+    
+    // Filtrar y validar cada ID
+    const idsValidos = ids.filter(id => {
+      const idNum = Number(id);
+      const esValido = !isNaN(idNum) && isFinite(idNum) && idNum > 0;
+      if (!esValido) {
+        console.log('[Service] ID inválido detectado:', id, 'convertido a:', idNum);
+      }
+      return esValido;
+    });
+    
+    console.log('[Service] IDs válidos después del filtro:', idsValidos);
+    
+    if (idsValidos.length === 0) {
+      console.log('[Service] ERROR: No hay IDs válidos en la lista');
+      throw new BadRequestException('No hay IDs válidos en la lista. IDs recibidos: ' + JSON.stringify(ids));
+    }
+    
+    const ahora = new Date();
+    const usuarioActual = usuario || 'demo';
+    
+    console.log('[Service] Ejecutando update para', idsValidos.length, 'IDs');
+    
+    if (activar) {
+      console.log('[Service] Modo: ACTIVAR (fecha_baja = null)');
+      const result = await this.repository
+        .createQueryBuilder()
+        .update(AgendaDisponibilidad)
+        .set({ 
+          fecha_baja: null as any,
+          usuario_baja: null as any,
+          usuario_modificacion: usuarioActual,
+          fecha_modificacion: ahora
+        })
+        .where('id IN (:...ids)', { ids: idsValidos })
+        .execute();
+      console.log('[Service] Resultado de update:', result);
+    } else {
+      console.log('[Service] Modo: DESACTIVAR (fecha_baja = ahora)');
+      const result = await this.repository
+        .createQueryBuilder()
+        .update(AgendaDisponibilidad)
+        .set({ 
+          fecha_baja: ahora,
+          usuario_baja: usuarioActual,
+          usuario_modificacion: usuarioActual,
+          fecha_modificacion: ahora
+        })
+        .where('id IN (:...ids)', { ids: idsValidos })
+        .execute();
+      console.log('[Service] Resultado de update:', result);
+    }
+    
+    console.log(`[Service] ✅ ${activar ? 'Activados' : 'Desactivados'} ${idsValidos.length} bloques correctamente`);
   }
-  
-  // Filtrar y validar cada ID
-  const idsValidos = ids.filter(id => {
-    const idNum = Number(id);
-    return !isNaN(idNum) && isFinite(idNum) && idNum > 0;
-  });
-  
-  if (idsValidos.length === 0) {
-    throw new BadRequestException('No hay IDs válidos en la lista. IDs recibidos: ' + JSON.stringify(ids));
-  }
-  
-  const ahora = new Date();
-  const usuarioActual = usuario || 'demo';
-  
-  if (activar) {
-    // Activar: poner fecha_baja en null
-    await this.repository
-      .createQueryBuilder()
-      .update(AgendaDisponibilidad)
-      .set({ 
-        fecha_baja: null as any,
-        usuario_baja: null as any,
-        usuario_modificacion: usuarioActual,
-        fecha_modificacion: ahora
-      })
-      .where('id IN (:...ids)', { ids: idsValidos })
-      .execute();
-  } else {
-    // Desactivar: poner fecha_baja con la fecha actual
-    await this.repository
-      .createQueryBuilder()
-      .update(AgendaDisponibilidad)
-      .set({ 
-        fecha_baja: ahora,
-        usuario_baja: usuarioActual,
-        usuario_modificacion: usuarioActual,
-        fecha_modificacion: ahora
-      })
-      .where('id IN (:...ids)', { ids: idsValidos })
-      .execute();
-  }
-  
-  console.log(`✅ ${activar ? 'Activados' : 'Desactivados'} ${idsValidos.length} bloques:`, idsValidos);
-}
   
   async debugStructure(): Promise<any> {
     return this.repository.query(`
