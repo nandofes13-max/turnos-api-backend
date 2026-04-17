@@ -165,4 +165,54 @@ export class ExcepcionesFechasService {
 
     await this.repository.save(registro);
   }
+
+  // ============================================================
+  // NUEVO MÉTODO: Habilitar por campos (soft delete por datos)
+  // ============================================================
+  async habilitar(
+    profesionalCentroId: number,
+    fechaDesde: string,
+    fechaHasta: string | null,
+    horaDesde: string | null,
+    horaHasta: string | null,
+    usuario?: string
+  ): Promise<void> {
+    // Buscar la excepción activa que coincida con los campos
+    const query: any = {
+      profesionalCentroId,
+      fechaDesde: new Date(fechaDesde),
+      fecha_baja: IsNull(),
+    };
+
+    if (fechaHasta) {
+      query.fechaHasta = new Date(fechaHasta);
+    } else {
+      query.fechaHasta = IsNull();
+    }
+
+    if (horaDesde !== undefined && horaDesde !== null) {
+      query.horaDesde = horaDesde;
+    } else {
+      query.horaDesde = IsNull();
+    }
+
+    if (horaHasta !== undefined && horaHasta !== null) {
+      query.horaHasta = horaHasta;
+    } else {
+      query.horaHasta = IsNull();
+    }
+
+    const excepcion = await this.repository.findOne({ where: query });
+
+    if (!excepcion) {
+      throw new NotFoundException(
+        `No se encontró una excepción activa para profesional-centro ${profesionalCentroId}, fechas ${fechaDesde} a ${fechaHasta || fechaDesde}`
+      );
+    }
+
+    // Soft delete
+    excepcion.fecha_baja = new Date();
+    excepcion.usuario_baja = usuario || 'demo';
+    await this.repository.save(excepcion);
+  }
 }
