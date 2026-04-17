@@ -469,41 +469,59 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     await this.repository.save(registro);
   }
 
-  // ============================================================
+// ============================================================
 // NUEVO MÉTODO: Activar/Desactivar múltiples bloques por IDs
 // ============================================================
 async activarDesactivarBloques(ids: number[], activar: boolean, usuario?: string): Promise<void> {
-  if (!ids || ids.length === 0) {
-    throw new BadRequestException('No se recibieron IDs para procesar');
+  // Validaciones estrictas
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    throw new BadRequestException('No se recibieron IDs válidos para procesar');
   }
-
+  
+  // Filtrar y validar cada ID
+  const idsValidos = ids.filter(id => {
+    const idNum = Number(id);
+    return !isNaN(idNum) && isFinite(idNum) && idNum > 0;
+  });
+  
+  if (idsValidos.length === 0) {
+    throw new BadRequestException('No hay IDs válidos en la lista. IDs recibidos: ' + JSON.stringify(ids));
+  }
+  
   const ahora = new Date();
   const usuarioActual = usuario || 'demo';
-
+  
   if (activar) {
     // Activar: poner fecha_baja en null
-    await this.repository.update(
-      { id: In(ids) },
-      {
+    await this.repository
+      .createQueryBuilder()
+      .update(AgendaDisponibilidad)
+      .set({ 
         fecha_baja: null as any,
         usuario_baja: null as any,
         usuario_modificacion: usuarioActual,
-        fecha_modificacion: ahora,
-      }
-    );
+        fecha_modificacion: ahora
+      })
+      .where('id IN (:...ids)', { ids: idsValidos })
+      .execute();
   } else {
     // Desactivar: poner fecha_baja con la fecha actual
-    await this.repository.update(
-      { id: In(ids) },
-      {
+    await this.repository
+      .createQueryBuilder()
+      .update(AgendaDisponibilidad)
+      .set({ 
         fecha_baja: ahora,
         usuario_baja: usuarioActual,
         usuario_modificacion: usuarioActual,
-        fecha_modificacion: ahora,
-      }
-    );
+        fecha_modificacion: ahora
+      })
+      .where('id IN (:...ids)', { ids: idsValidos })
+      .execute();
   }
+  
+  console.log(`✅ ${activar ? 'Activados' : 'Desactivados'} ${idsValidos.length} bloques:`, idsValidos);
 }
+  
   async debugStructure(): Promise<any> {
     return this.repository.query(`
       SELECT column_name, data_type, is_nullable
