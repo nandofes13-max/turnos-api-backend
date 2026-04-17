@@ -29,9 +29,9 @@ export class ExcepcionesFechasController {
     return this.agregarUltimoMovimiento(registro);
   }
 
-  @Get('por-agenda/:agendaDisponibilidadId')
-  async findByAgenda(@Param('agendaDisponibilidadId') agendaDisponibilidadId: string): Promise<any[]> {
-    const registros = await this.service.findByAgenda(Number(agendaDisponibilidadId));
+  @Get('por-profesional-centro/:profesionalCentroId')
+  async findByProfesionalCentro(@Param('profesionalCentroId') profesionalCentroId: string): Promise<any[]> {
+    const registros = await this.service.findByProfesionalCentro(Number(profesionalCentroId));
     return registros.map(r => this.agregarUltimoMovimiento(r));
   }
 
@@ -53,6 +53,28 @@ export class ExcepcionesFechasController {
   @Delete(':id')
   softDelete(@Param('id') id: string): Promise<void> {
     return this.service.softDelete(Number(id), 'demo');
+  }
+
+  // ============================================================
+  // NUEVO ENDPOINT: Habilitar por campos (similar a recurrentes)
+  // ============================================================
+  @Post('habilitar')
+  async habilitar(@Body() body: {
+    profesionalCentroId: number;
+    fechaDesde: string;
+    fechaHasta?: string | null;
+    horaDesde?: string | null;
+    horaHasta?: string | null;
+  }) {
+    await this.service.habilitar(
+      body.profesionalCentroId,
+      body.fechaDesde,
+      body.fechaHasta || null,
+      body.horaDesde || null,
+      body.horaHasta || null,
+      'demo'
+    );
+    return { message: 'Excepción habilitada correctamente' };
   }
 
   private agregarUltimoMovimiento(registro: ExcepcionFecha): any {
