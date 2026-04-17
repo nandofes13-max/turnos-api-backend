@@ -1,7 +1,7 @@
 // src/agenda-disponibilidad/agenda-disponibilidad.service.ts
 import { Injectable, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, Not, LessThanOrEqual } from 'typeorm';
+import { Repository, IsNull, Not, LessThanOrEqual, In } from 'typeorm';
 import { AgendaDisponibilidad } from './entities/agenda-disponibilidad.entity';
 import { CreateAgendaDisponibilidadDto } from './dto/create-agenda-disponibilidad.dto';
 import { UpdateAgendaDisponibilidadDto } from './dto/update-agenda-disponibilidad.dto';
@@ -467,6 +467,27 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     registro.usuario_baja = usuario || 'demo';
 
     await this.repository.save(registro);
+  }
+
+  // ============================================================
+  // NUEVO MÉTODO: Activar/Desactivar múltiples bloques por IDs
+  // ============================================================
+  async activarDesactivarBloques(ids: number[], activar: boolean, usuario?: string): Promise<void> {
+    if (!ids || ids.length === 0) {
+      throw new BadRequestException('No se recibieron IDs para procesar');
+    }
+
+    const fecha_baja = activar ? null : new Date();
+
+    await this.repository.update(
+      { id: In(ids) },
+      {
+        fecha_baja: fecha_baja,
+        usuario_baja: fecha_baja ? usuario || 'demo' : null,
+        usuario_modificacion: usuario || 'demo',
+        fecha_modificacion: new Date(),
+      }
+    );
   }
 
   async debugStructure(): Promise<any> {
