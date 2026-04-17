@@ -1,9 +1,10 @@
+// src/excepciones-fechas/dto/create-excepcion-fecha.dto.ts
 import { IsNotEmpty, IsOptional, IsDateString, IsString, MaxLength, IsIn, IsNumber } from 'class-validator';
 
 export class CreateExcepcionFechaDto {
-  @IsNotEmpty({ message: 'El agendaDisponibilidadId es obligatorio' })
-  @IsNumber({}, { message: 'agendaDisponibilidadId debe ser un número' })
-  agendaDisponibilidadId: number;
+  @IsNotEmpty({ message: 'El profesionalCentroId es obligatorio' })
+  @IsNumber({}, { message: 'profesionalCentroId debe ser un número' })
+  profesionalCentroId: number;
 
   @IsNotEmpty({ message: 'La fecha desde es obligatoria' })
   @IsDateString({}, { message: 'fechaDesde debe ser una fecha válida (YYYY-MM-DD)' })
