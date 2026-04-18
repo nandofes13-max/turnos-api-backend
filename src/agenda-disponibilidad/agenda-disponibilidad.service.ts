@@ -308,15 +308,11 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     return registro;
   }
 
-  // ============================================================
-  // MÉTODO MODIFICADO: Trae TODOS los bloques (activos e inactivos)
-  // ============================================================
   async findByProfesionalCentro(profesionalCentroId: number): Promise<AgendaDisponibilidad[]> {
     console.log('[Service] findByProfesionalCentro - ID recibido:', profesionalCentroId);
     console.log('[Service] findByProfesionalCentro - Tipo:', typeof profesionalCentroId);
     console.log('[Service] findByProfesionalCentro - Es NaN?', isNaN(profesionalCentroId));
     
-    // 👇 ELIMINAMOS la condición fecha_baja: IsNull() para traer TODOS
     const result = await this.repository.find({
       where: { profesionalCentroId },
       relations: ['profesionalCentro'],
@@ -492,9 +488,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     await this.repository.save(registro);
   }
 
-  // ============================================================
-  // NUEVO MÉTODO: Activar/Desactivar múltiples bloques por IDs
-  // ============================================================
   async activarDesactivarBloques(ids: number[], activar: boolean, usuario?: string): Promise<void> {
     console.log('[Service] activarDesactivarBloques - INICIO');
     console.log('[Service] IDs recibidos:', ids);
@@ -559,6 +552,161 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     }
     
     console.log(`[Service] ✅ ${activar ? 'Activados' : 'Desactivados'} ${idsValidos.length} bloques correctamente`);
+  }
+
+  // ============================================================
+  // NUEVO MÉTODO: Sincronizar bloque (actualizar días y excepciones)
+  // ============================================================
+  async sincronizarBloque(
+    profesionalCentroId: number,
+    horaDesde: string,
+    horaHasta: string,
+    duracionTurno: number,
+    fechaDesde: string,
+    fechaHasta: string | null,
+    diasHabilitados: number[], // array de días (0-6, donde 0=LUN, 6=DOM)
+    excepcionesHorarios: { diaSemana: number; horaDesde: string; horaHasta: string }[],
+    usuario?: string
+  ): Promise<void> {
+    console.log('[Service] sincronizarBloque - INICIO');
+    console.log('[Service] profesionalCentroId:', profesionalCentroId);
+    console.log('[Service] horaDesde:', horaDesde, 'horaHasta:', horaHasta, 'duracionTurno:', duracionTurno);
+    console.log('[Service] diasHabilitados:', diasHabilitados);
+    console.log('[Service] excepcionesHorarios:', excepcionesHorarios);
+
+    // 1. Buscar el bloque lógico activo
+    const bloqueActivo = await this.repository.findOne({
+      where: {
+        profesionalCentroId,
+        horaDesde,
+        horaHasta,
+        duracionTurno,
+        fecha_baja: IsNull(),
+      },
+    });
+
+    if (!bloqueActivo) {
+      // No existe bloque activo, crear uno nuevo con los días habilitados
+      console.log('[Service] No existe bloque activo, creando nuevo...');
+      for (const diaSemana of diasHabilitados) {
+        const nuevoBloque = this.repository.create({
+          profesionalCentroId,
+          diaSemana,
+          horaDesde,
+          horaHasta,
+          duracionTurno,
+          bufferMinutos: 0,
+          fechaDesde: new Date(fechaDesde),
+          fechaHasta: fechaHasta ? new Date(fechaHasta) : null,
+          usuario_alta: usuario || 'demo',
+        });
+        await this.repository.save(nuevoBloque);
+      }
+    } else {
+      // Existe bloque activo, actualizar días y excepciones
+      console.log('[Service] Bloque activo encontrado ID:', bloqueActivo.id);
+      
+      // 2. Obtener los días actuales del bloque lógico
+      const bloquesActuales = await this.repository.find({
+        where: {
+          profesionalCentroId,
+          horaDesde,
+          horaHasta,
+          duracionTurno,
+          fecha_baja: IsNull(),
+        },
+      });
+      
+      const diasActuales = bloquesActuales.map(b => b.diaSemana);
+      console.log('[Service] Días actuales:', diasActuales);
+      
+      // 3. Días a agregar (están en la nueva lista pero no en la actual)
+      const diasAAgregar = diasHabilitados.filter(d => !diasActuales.includes(d));
+      // 4. Días a eliminar (están en la actual pero no en la nueva)
+      const diasAEliminar = diasActuales.filter(d => !diasHabilitados.includes(d));
+      
+      console.log('[Service] Días a agregar:', diasAAgregar);
+      console.log('[Service] Días a eliminar:', diasAEliminar);
+      
+      // 5. Agregar nuevos días
+      for (const diaSemana of diasAAgregar) {
+        const nuevoBloque = this.repository.create({
+          profesionalCentroId,
+          diaSemana,
+          horaDesde,
+          horaHasta,
+          duracionTurno,
+          bufferMinutos: 0,
+          fechaDesde: new Date(fechaDesde),
+          fechaHasta: fechaHasta ? new Date(fechaHasta) : null,
+          usuario_alta: usuario || 'demo',
+        });
+        await this.repository.save(nuevoBloque);
+        console.log(`[Service] Día ${diaSemana} agregado`);
+      }
+      
+      // 6. Eliminar días (soft delete)
+      for (const diaSemana of diasAEliminar) {
+        const bloqueAEliminar = bloquesActuales.find(b => b.diaSemana === diaSemana);
+        if (bloqueAEliminar) {
+          bloqueAEliminar.fecha_baja = new Date();
+          bloqueAEliminar.usuario_baja = usuario || 'demo';
+          await this.repository.save(bloqueAEliminar);
+          console.log(`[Service] Día ${diaSemana} eliminado`);
+        }
+      }
+      
+      // 7. Sincronizar excepciones recurrentes
+      // Obtener excepciones actuales
+      const excepcionesActuales = await this.excepcionesRecurrentesRepository.find({
+        where: {
+          agendaDisponibilidadId: In(bloquesActuales.map(b => b.id)),
+          fecha_baja: IsNull(),
+        },
+      });
+      
+      console.log('[Service] Excepciones actuales:', excepcionesActuales.length);
+      
+      // Crear un set para comparación rápida
+      const excepcionesActualesKey = new Set(
+        excepcionesActuales.map(e => `${e.diaSemana}|${e.horaDesde}|${e.horaHasta}`)
+      );
+      
+      const nuevasExcepcionesKey = new Set(
+        excepcionesHorarios.map(e => `${e.diaSemana}|${e.horaDesde}|${e.horaHasta}`)
+      );
+      
+      // 8. Eliminar excepciones que ya no están
+      for (const excepcion of excepcionesActuales) {
+        const key = `${excepcion.diaSemana}|${excepcion.horaDesde}|${excepcion.horaHasta}`;
+        if (!nuevasExcepcionesKey.has(key)) {
+          await this.excepcionesRecurrentesRepository.softDelete(excepcion.id);
+          console.log(`[Service] Excepción eliminada: ${key}`);
+        }
+      }
+      
+      // 9. Agregar nuevas excepciones
+      for (const excepcion of excepcionesHorarios) {
+        const key = `${excepcion.diaSemana}|${excepcion.horaDesde}|${excepcion.horaHasta}`;
+        if (!excepcionesActualesKey.has(key)) {
+          const agendaId = bloquesActuales.find(b => b.diaSemana === excepcion.diaSemana)?.id;
+          if (agendaId) {
+            const nuevaExcepcion = this.excepcionesRecurrentesRepository.create({
+              agendaDisponibilidadId: agendaId,
+              diaSemana: excepcion.diaSemana,
+              horaDesde: excepcion.horaDesde,
+              horaHasta: excepcion.horaHasta,
+              tipo: 'deshabilitado',
+              usuario_alta: usuario || 'demo',
+            });
+            await this.excepcionesRecurrentesRepository.save(nuevaExcepcion);
+            console.log(`[Service] Excepción agregada: ${key}`);
+          }
+        }
+      }
+    }
+    
+    console.log('[Service] sincronizarBloque - FINALIZADO');
   }
   
   async debugStructure(): Promise<any> {
