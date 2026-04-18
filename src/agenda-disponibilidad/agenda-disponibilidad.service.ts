@@ -31,9 +31,9 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     return hora;
   }
 
-  async onModuleInit() {
-    await this.crearConstraintExclusion();
-  }
+ async onModuleInit() {
+  // await this.crearConstraintExclusion();  // Constraint eliminada, validación en backend
+}
 
   private async crearConstraintExclusion() {
     try {
