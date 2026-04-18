@@ -16,6 +16,17 @@ export class ExcepcionesRecurrentesService {
     private readonly agendaRepository: Repository<AgendaDisponibilidad>,
   ) {}
 
+  // ============================================================
+  // FUNCIÓN AUXILIAR: Normalizar hora (eliminar segundos)
+  // ============================================================
+  private normalizarHora(hora: string): string {
+    if (!hora) return hora;
+    if (hora.length > 5) {
+      return hora.slice(0, 5);
+    }
+    return hora;
+  }
+
   private async verificarAgendaActiva(id: number): Promise<void> {
     const agenda = await this.agendaRepository.findOne({
       where: { id, fecha_baja: IsNull() },
@@ -87,6 +98,10 @@ export class ExcepcionesRecurrentesService {
   }
 
   async create(createDto: CreateExcepcionRecurrenteDto, usuario?: string): Promise<ExcepcionRecurrente> {
+    // Normalizar horas
+    createDto.horaDesde = this.normalizarHora(createDto.horaDesde);
+    createDto.horaHasta = this.normalizarHora(createDto.horaHasta);
+    
     await this.verificarAgendaActiva(createDto.agendaDisponibilidadId);
     this.validarDiaSemana(createDto.diaSemana);
     await this.verificarHorarioValido(createDto.horaDesde, createDto.horaHasta);
@@ -118,8 +133,13 @@ export class ExcepcionesRecurrentesService {
 
     const horaDesde = updateDto.horaDesde ?? registro.horaDesde;
     const horaHasta = updateDto.horaHasta ?? registro.horaHasta;
+    
+    // Normalizar horas si vienen en updateDto
+    const horaDesdeNorm = horaDesde ? this.normalizarHora(horaDesde) : horaDesde;
+    const horaHastaNorm = horaHasta ? this.normalizarHora(horaHasta) : horaHasta;
+    
     if (updateDto.horaDesde !== undefined || updateDto.horaHasta !== undefined) {
-      await this.verificarHorarioValido(horaDesde, horaHasta);
+      await this.verificarHorarioValido(horaDesdeNorm, horaHastaNorm);
     }
 
     const agendaId = updateDto.agendaDisponibilidadId ?? registro.agendaDisponibilidadId;
@@ -128,12 +148,14 @@ export class ExcepcionesRecurrentesService {
     await this.verificarDuplicado(
       agendaId,
       diaSemana,
-      horaDesde,
-      horaHasta,
+      horaDesdeNorm,
+      horaHastaNorm,
       id,
     );
 
     Object.assign(registro, updateDto);
+    if (updateDto.horaDesde !== undefined) registro.horaDesde = horaDesdeNorm;
+    if (updateDto.horaHasta !== undefined) registro.horaHasta = horaHastaNorm;
     registro.usuario_modificacion = usuario || 'demo';
 
     return this.repository.save(registro);
@@ -162,20 +184,24 @@ export class ExcepcionesRecurrentesService {
     horaHasta: string,
     usuario?: string
   ): Promise<void> {
+    // Normalizar horas
+    const horaDesdeNorm = this.normalizarHora(horaDesde);
+    const horaHastaNorm = this.normalizarHora(horaHasta);
+    
     // Buscar la excepción activa
     const excepcion = await this.repository.findOne({
       where: {
         agendaDisponibilidadId,
         diaSemana,
-        horaDesde,
-        horaHasta,
+        horaDesde: horaDesdeNorm,
+        horaHasta: horaHastaNorm,
         fecha_baja: IsNull()
       }
     });
 
     if (!excepcion) {
       throw new NotFoundException(
-        `No se encontró una excepción activa para la agenda ${agendaDisponibilidadId}, día ${diaSemana}, horario ${horaDesde} a ${horaHasta}`
+        `No se encontró una excepción activa para la agenda ${agendaDisponibilidadId}, día ${diaSemana}, horario ${horaDesdeNorm} a ${horaHastaNorm}`
       );
     }
 
