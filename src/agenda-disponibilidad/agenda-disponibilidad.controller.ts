@@ -52,6 +52,37 @@ export class AgendaDisponibilidadController {
     return { message: `${body.ids.length} bloque(s) ${accion} correctamente` };
   }
 
+  // ============================================================
+  // NUEVO ENDPOINT: Sincronizar bloque completo
+  // ============================================================
+  @Put('sincronizar')
+  async sincronizarBloque(
+    @Body() body: {
+      profesionalCentroId: number;
+      horaDesde: string;
+      horaHasta: string;
+      duracionTurno: number;
+      fechaDesde: string;
+      fechaHasta: string | null;
+      diasHabilitados: number[];
+      excepcionesHorarios: { diaSemana: number; horaDesde: string; horaHasta: string }[];
+    }
+  ) {
+    console.log('[Controller] sincronizarBloque - Body recibido');
+    await this.service.sincronizarBloque(
+      body.profesionalCentroId,
+      body.horaDesde,
+      body.horaHasta,
+      body.duracionTurno,
+      body.fechaDesde,
+      body.fechaHasta,
+      body.diasHabilitados,
+      body.excepcionesHorarios,
+      'demo'
+    );
+    return { message: 'Bloque sincronizado correctamente' };
+  }
+
   @Get('debug/structure')
   debugStructure() {
     console.log('[Controller] debugStructure');
