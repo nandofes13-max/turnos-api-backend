@@ -21,6 +21,17 @@ export class AgendaDisponibilidadController {
   constructor(private readonly service: AgendaDisponibilidadService) {}
 
   // ============================================================
+  // FUNCIÓN AUXILIAR: Normalizar hora (eliminar segundos)
+  // ============================================================
+  private normalizarHora(hora: string): string {
+    if (!hora) return hora;
+    if (hora.length > 5) {
+      return hora.slice(0, 5);
+    }
+    return hora;
+  }
+
+  // ============================================================
   // PRIMERO: RUTAS FIJAS (sin parámetros dinámicos)
   // ============================================================
 
@@ -69,15 +80,26 @@ export class AgendaDisponibilidadController {
     }
   ) {
     console.log('[Controller] sincronizarBloque - Body recibido');
+    
+    // Normalizar horas antes de enviar al servicio
+    const horaDesdeNorm = this.normalizarHora(body.horaDesde);
+    const horaHastaNorm = this.normalizarHora(body.horaHasta);
+    
+    const excepcionesHorariosNorm = body.excepcionesHorarios.map(exc => ({
+      ...exc,
+      horaDesde: this.normalizarHora(exc.horaDesde),
+      horaHasta: this.normalizarHora(exc.horaHasta),
+    }));
+    
     await this.service.sincronizarBloque(
       body.profesionalCentroId,
-      body.horaDesde,
-      body.horaHasta,
+      horaDesdeNorm,
+      horaHastaNorm,
       body.duracionTurno,
       body.fechaDesde,
       body.fechaHasta,
       body.diasHabilitados,
-      body.excepcionesHorarios,
+      excepcionesHorariosNorm,
       'demo'
     );
     return { message: 'Bloque sincronizado correctamente' };
