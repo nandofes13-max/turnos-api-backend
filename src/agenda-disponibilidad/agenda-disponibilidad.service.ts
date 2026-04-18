@@ -614,6 +614,18 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         },
       });
       
+ // 👇 AGREGAR ESTOS LOGS
+  console.log(`[Service] Buscando bloques existentes para día ${diaSemana}...`);
+  console.log(`[Service] Bloques encontrados para día ${diaSemana}:`, bloquesExistentes.map(b => ({
+    id: b.id,
+    horaDesde: b.horaDesde,
+    horaHasta: b.horaHasta,
+    duracionTurno: b.duracionTurno,
+    fechaDesde: b.fechaDesde,
+    fechaHasta: b.fechaHasta
+  })));
+      
+      
       for (const bloqueExistente of bloquesExistentes) {
         // Excluir el propio bloque si estamos actualizando
         // (comparar por horario y duración para identificar el mismo bloque lógico)
