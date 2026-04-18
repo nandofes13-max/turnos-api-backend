@@ -19,6 +19,18 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     private readonly excepcionesRecurrentesRepository: Repository<ExcepcionRecurrente>,
   ) {}
 
+  // ============================================================
+  // FUNCIÓN AUXILIAR: Normalizar hora (eliminar segundos)
+  // ============================================================
+  private normalizarHora(hora: string): string {
+    if (!hora) return hora;
+    // Si la hora tiene segundos (HH:MM:SS), los elimina
+    if (hora.length > 5) {
+      return hora.slice(0, 5);
+    }
+    return hora;
+  }
+
   async onModuleInit() {
     await this.crearConstraintExclusion();
   }
@@ -323,6 +335,11 @@ export class AgendaDisponibilidadService implements OnModuleInit {
 
   async create(createDto: CreateAgendaDisponibilidadDto, usuario?: string): Promise<AgendaDisponibilidad> {
     console.log('[Service] create - Inicio');
+    
+    // Normalizar horas
+    createDto.horaDesde = this.normalizarHora(createDto.horaDesde);
+    createDto.horaHasta = this.normalizarHora(createDto.horaHasta);
+    
     await this.verificarProfesionalCentroActivo(createDto.profesionalCentroId);
     await this.verificarDiaSemanaValido(createDto.diaSemana);
     await this.verificarHorarioValido(createDto.horaDesde, createDto.horaHasta);
@@ -564,36 +581,47 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     duracionTurno: number,
     fechaDesde: string,
     fechaHasta: string | null,
-    diasHabilitados: number[], // array de días (0-6, donde 0=LUN, 6=DOM)
+    diasHabilitados: number[],
     excepcionesHorarios: { diaSemana: number; horaDesde: string; horaHasta: string }[],
     usuario?: string
   ): Promise<void> {
     console.log('[Service] sincronizarBloque - INICIO');
+    
+    // Normalizar horas
+    const horaDesdeNorm = this.normalizarHora(horaDesde);
+    const horaHastaNorm = this.normalizarHora(horaHasta);
+    
+    // Normalizar horas en excepciones
+    const excepcionesNorm = excepcionesHorarios.map(exc => ({
+      ...exc,
+      horaDesde: this.normalizarHora(exc.horaDesde),
+      horaHasta: this.normalizarHora(exc.horaHasta),
+    }));
+    
     console.log('[Service] profesionalCentroId:', profesionalCentroId);
-    console.log('[Service] horaDesde:', horaDesde, 'horaHasta:', horaHasta, 'duracionTurno:', duracionTurno);
+    console.log('[Service] horaDesde:', horaDesdeNorm, 'horaHasta:', horaHastaNorm, 'duracionTurno:', duracionTurno);
     console.log('[Service] diasHabilitados:', diasHabilitados);
-    console.log('[Service] excepcionesHorarios:', excepcionesHorarios);
+    console.log('[Service] excepcionesHorarios:', excepcionesNorm);
 
     // 1. Buscar el bloque lógico activo
     const bloqueActivo = await this.repository.findOne({
       where: {
         profesionalCentroId,
-        horaDesde,
-        horaHasta,
+        horaDesde: horaDesdeNorm,
+        horaHasta: horaHastaNorm,
         duracionTurno,
         fecha_baja: IsNull(),
       },
     });
 
     if (!bloqueActivo) {
-      // No existe bloque activo, crear uno nuevo con los días habilitados
       console.log('[Service] No existe bloque activo, creando nuevo...');
       for (const diaSemana of diasHabilitados) {
         const nuevoBloque = this.repository.create({
           profesionalCentroId,
           diaSemana,
-          horaDesde,
-          horaHasta,
+          horaDesde: horaDesdeNorm,
+          horaHasta: horaHastaNorm,
           duracionTurno,
           bufferMinutos: 0,
           fechaDesde: new Date(fechaDesde),
@@ -603,15 +631,13 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         await this.repository.save(nuevoBloque);
       }
     } else {
-      // Existe bloque activo, actualizar días y excepciones
       console.log('[Service] Bloque activo encontrado ID:', bloqueActivo.id);
       
-      // 2. Obtener los días actuales del bloque lógico
       const bloquesActuales = await this.repository.find({
         where: {
           profesionalCentroId,
-          horaDesde,
-          horaHasta,
+          horaDesde: horaDesdeNorm,
+          horaHasta: horaHastaNorm,
           duracionTurno,
           fecha_baja: IsNull(),
         },
@@ -620,21 +646,18 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       const diasActuales = bloquesActuales.map(b => b.diaSemana);
       console.log('[Service] Días actuales:', diasActuales);
       
-      // 3. Días a agregar (están en la nueva lista pero no en la actual)
       const diasAAgregar = diasHabilitados.filter(d => !diasActuales.includes(d));
-      // 4. Días a eliminar (están en la actual pero no en la nueva)
       const diasAEliminar = diasActuales.filter(d => !diasHabilitados.includes(d));
       
       console.log('[Service] Días a agregar:', diasAAgregar);
       console.log('[Service] Días a eliminar:', diasAEliminar);
       
-      // 5. Agregar nuevos días
       for (const diaSemana of diasAAgregar) {
         const nuevoBloque = this.repository.create({
           profesionalCentroId,
           diaSemana,
-          horaDesde,
-          horaHasta,
+          horaDesde: horaDesdeNorm,
+          horaHasta: horaHastaNorm,
           duracionTurno,
           bufferMinutos: 0,
           fechaDesde: new Date(fechaDesde),
@@ -645,7 +668,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         console.log(`[Service] Día ${diaSemana} agregado`);
       }
       
-      // 6. Eliminar días (soft delete)
       for (const diaSemana of diasAEliminar) {
         const bloqueAEliminar = bloquesActuales.find(b => b.diaSemana === diaSemana);
         if (bloqueAEliminar) {
@@ -656,8 +678,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         }
       }
       
-      // 7. Sincronizar excepciones recurrentes
-      // Obtener excepciones actuales
       const excepcionesActuales = await this.excepcionesRecurrentesRepository.find({
         where: {
           agendaDisponibilidadId: In(bloquesActuales.map(b => b.id)),
@@ -667,16 +687,14 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       
       console.log('[Service] Excepciones actuales:', excepcionesActuales.length);
       
-      // Crear un set para comparación rápida
       const excepcionesActualesKey = new Set(
         excepcionesActuales.map(e => `${e.diaSemana}|${e.horaDesde}|${e.horaHasta}`)
       );
       
       const nuevasExcepcionesKey = new Set(
-        excepcionesHorarios.map(e => `${e.diaSemana}|${e.horaDesde}|${e.horaHasta}`)
+        excepcionesNorm.map(e => `${e.diaSemana}|${e.horaDesde}|${e.horaHasta}`)
       );
       
-      // 8. Eliminar excepciones que ya no están
       for (const excepcion of excepcionesActuales) {
         const key = `${excepcion.diaSemana}|${excepcion.horaDesde}|${excepcion.horaHasta}`;
         if (!nuevasExcepcionesKey.has(key)) {
@@ -685,8 +703,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         }
       }
       
-      // 9. Agregar nuevas excepciones
-      for (const excepcion of excepcionesHorarios) {
+      for (const excepcion of excepcionesNorm) {
         const key = `${excepcion.diaSemana}|${excepcion.horaDesde}|${excepcion.horaHasta}`;
         if (!excepcionesActualesKey.has(key)) {
           const agendaId = bloquesActuales.find(b => b.diaSemana === excepcion.diaSemana)?.id;
