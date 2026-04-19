@@ -63,9 +63,9 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       
       if (existeSolapamiento) {
         throw new BadRequestException(
-          `El horario ${horaDesde} a ${horaHasta} solapa con el bloque existente ` +
-          `del día ${diaSemana} con horario ${horaDesdeExistente} a ${horaHastaExistente}.`
-        );
+  `Bloque ID ${bloqueExistente.id} (${horaDesdeExistente} a ${horaHastaExistente}) solapa con el bloque ` +
+  `que intenta activar. Por favor verifique.`
+);
       }
     }
   }
