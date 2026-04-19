@@ -531,6 +531,78 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       throw new BadRequestException('No hay IDs válidos en la lista. IDs recibidos: ' + JSON.stringify(ids));
     }
     
+    // ============================================================
+    // SI ES ACTIVACIÓN, VALIDAR SOLAPAMIENTO ANTES DE ACTIVAR
+    // ============================================================
+    if (activar) {
+      console.log('[Service] Modo: ACTIVAR - Validando solapamiento antes de activar...');
+      
+      // Obtener el primer bloque para conocer sus datos
+      const primerId = idsValidos[0];
+      const bloqueAActivar = await this.findOne(primerId);
+      
+      if (!bloqueAActivar) {
+        throw new BadRequestException(`No se encontró el bloque con ID ${primerId}`);
+      }
+      
+      // Obtener todos los bloques del mismo bloque lógico (mismo horario y duración)
+      const bloquesDelMismoBloque = await this.repository.find({
+        where: {
+          profesionalCentroId: bloqueAActivar.profesionalCentroId,
+          horaDesde: bloqueAActivar.horaDesde,
+          horaHasta: bloqueAActivar.horaHasta,
+          duracionTurno: bloqueAActivar.duracionTurno,
+        },
+      });
+      
+      // Verificar solapamiento con otros bloques activos (que no sean de este mismo bloque lógico)
+      for (const bloque of bloquesDelMismoBloque) {
+        const otrosBloquesActivos = await this.repository.find({
+          where: {
+            profesionalCentroId: bloque.profesionalCentroId,
+            diaSemana: bloque.diaSemana,
+            fecha_baja: IsNull(),
+          },
+        });
+        
+        for (const otroBloque of otrosBloquesActivos) {
+          // Si es el mismo ID o parte del mismo bloque lógico, saltar
+          const esMismoBloqueLogico = (
+            otroBloque.horaDesde === bloque.horaDesde &&
+            otroBloque.horaHasta === bloque.horaHasta &&
+            otroBloque.duracionTurno === bloque.duracionTurno
+          );
+          
+          if (esMismoBloqueLogico) continue;
+          
+          // Verificar solapamiento de horarios
+          const existeSolapamiento = (
+            (bloque.horaDesde < otroBloque.horaHasta && bloque.horaHasta > otroBloque.horaDesde)
+          );
+          
+          if (existeSolapamiento) {
+            // Verificar solapamiento de fechas
+            const bloqueFechaHasta = bloque.fechaHasta || new Date('9999-12-31');
+            const otroBloqueFechaHasta = otroBloque.fechaHasta || new Date('9999-12-31');
+            
+            const fechasSolapan = (
+              bloque.fechaDesde <= otroBloqueFechaHasta &&
+              bloqueFechaHasta >= otroBloque.fechaDesde
+            );
+            
+            if (fechasSolapan) {
+              throw new BadRequestException(
+                `No se puede activar el bloque porque solapa con otro bloque activo ` +
+                `del día ${otroBloque.diaSemana} con horario ${otroBloque.horaDesde} a ${otroBloque.horaHasta}.`
+              );
+            }
+          }
+        }
+      }
+      
+      console.log('[Service] Validación de solapamiento superada, procediendo a activar...');
+    }
+    
     const ahora = new Date();
     const usuarioActual = usuario || 'demo';
     
@@ -614,17 +686,15 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         },
       });
       
- // 👇 AGREGAR ESTOS LOGS
-  console.log(`[Service] Buscando bloques existentes para día ${diaSemana}...`);
-  console.log(`[Service] Bloques encontrados para día ${diaSemana}:`, bloquesExistentes.map(b => ({
-    id: b.id,
-    horaDesde: b.horaDesde,
-    horaHasta: b.horaHasta,
-    duracionTurno: b.duracionTurno,
-    fechaDesde: b.fechaDesde,
-    fechaHasta: b.fechaHasta
-  })));
-      
+      console.log(`[Service] Buscando bloques existentes para día ${diaSemana}...`);
+      console.log(`[Service] Bloques encontrados para día ${diaSemana}:`, bloquesExistentes.map(b => ({
+        id: b.id,
+        horaDesde: b.horaDesde,
+        horaHasta: b.horaHasta,
+        duracionTurno: b.duracionTurno,
+        fechaDesde: b.fechaDesde,
+        fechaHasta: b.fechaHasta
+      })));
       
       for (const bloqueExistente of bloquesExistentes) {
         // Excluir el propio bloque si estamos actualizando
@@ -644,6 +714,8 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         const existeSolapamiento = (
           (horaDesdeNorm < bloqueExistente.horaHasta && horaHastaNorm > bloqueExistente.horaDesde)
         );
+        
+        console.log(`[Service] Día ${diaSemana}: Comparando con bloque ID ${bloqueExistente.id}: ${horaDesdeNorm}-${horaHastaNorm} vs ${bloqueExistente.horaDesde}-${bloqueExistente.horaHasta} -> solapa? ${existeSolapamiento}`);
         
         if (existeSolapamiento) {
           const fechaDesdeObj = new Date(fechaDesde);
