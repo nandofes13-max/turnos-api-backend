@@ -30,6 +30,46 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     return hora;
   }
 
+  // ============================================================
+  // FUNCIÓN AUXILIAR: Validar solapamiento con CUALQUIER bloque (activo o inactivo)
+  // ============================================================
+  private async validarSolapamientoConCualquierBloque(
+    profesionalCentroId: number,
+    diaSemana: number,
+    horaDesde: string,
+    horaHasta: string,
+    bloqueIdAActivar?: number  // opcional, para excluir el propio bloque
+  ): Promise<void> {
+    // Buscar TODOS los bloques para este profesional-centro y día (sin filtrar por fecha_baja)
+    const bloquesExistentes = await this.repository.find({
+      where: {
+        profesionalCentroId,
+        diaSemana,
+      },
+    });
+    
+    for (const bloqueExistente of bloquesExistentes) {
+      // Si es el mismo bloque que estamos activando/creando, saltar
+      if (bloqueIdAActivar && bloqueExistente.id === bloqueIdAActivar) continue;
+      
+      // Normalizar horas del bloque existente
+      const horaDesdeExistente = this.normalizarHora(bloqueExistente.horaDesde);
+      const horaHastaExistente = this.normalizarHora(bloqueExistente.horaHasta);
+      
+      // Verificar solapamiento de horarios
+      const existeSolapamiento = (
+        (horaDesde < horaHastaExistente && horaHasta > horaDesdeExistente)
+      );
+      
+      if (existeSolapamiento) {
+        throw new BadRequestException(
+          `El horario ${horaDesde} a ${horaHasta} solapa con el bloque existente ` +
+          `del día ${diaSemana} con horario ${horaDesdeExistente} a ${horaHastaExistente}.`
+        );
+      }
+    }
+  }
+
   async onModuleInit() {
     // await this.crearConstraintExclusion();  // Constraint eliminada, validación en backend
   }
@@ -189,38 +229,8 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     fechaHasta: Date | null,
     id?: number,
   ): Promise<void> {
-    const agendasExistentes = await this.repository.find({
-      where: {
-        profesionalCentroId,
-        diaSemana,
-        fecha_baja: IsNull(),
-      },
-    });
-
-    for (const agenda of agendasExistentes) {
-      if (id && agenda.id === id) continue;
-
-      const existeSolapamiento = (
-        (horaDesde < agenda.horaHasta && horaHasta > agenda.horaDesde)
-      );
-
-      if (!existeSolapamiento) continue;
-
-      const agendaFechaHasta = agenda.fechaHasta || new Date('9999-12-31');
-      const nuevaFechaHasta = fechaHasta || new Date('9999-12-31');
-      
-      const fechasSolapan = (
-        fechaDesde <= agendaFechaHasta &&
-        nuevaFechaHasta >= agenda.fechaDesde
-      );
-
-      if (fechasSolapan) {
-        throw new BadRequestException(
-          `Ya existe una agenda para este profesional-centro en el día ${diaSemana} ` +
-          `con horario ${agenda.horaDesde} a ${agenda.horaHasta} que solapa con el rango de fechas`
-        );
-      }
-    }
+    // Este método se mantiene por compatibilidad, pero la nueva validación está en validarSolapamientoConCualquierBloque
+    await this.validarSolapamientoConCualquierBloque(profesionalCentroId, diaSemana, horaDesde, horaHasta, id);
   }
 
   async generarSlots(
@@ -545,60 +555,17 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         throw new BadRequestException(`No se encontró el bloque con ID ${primerId}`);
       }
       
-      // Obtener todos los bloques del mismo bloque lógico (mismo horario y duración)
-      const bloquesDelMismoBloque = await this.repository.find({
-        where: {
-          profesionalCentroId: bloqueAActivar.profesionalCentroId,
-          horaDesde: bloqueAActivar.horaDesde,
-          horaHasta: bloqueAActivar.horaHasta,
-          duracionTurno: bloqueAActivar.duracionTurno,
-        },
-      });
+      const horaDesdeNorm = this.normalizarHora(bloqueAActivar.horaDesde);
+      const horaHastaNorm = this.normalizarHora(bloqueAActivar.horaHasta);
       
-      // Verificar solapamiento con otros bloques activos (que no sean de este mismo bloque lógico)
-      for (const bloque of bloquesDelMismoBloque) {
-        const otrosBloquesActivos = await this.repository.find({
-          where: {
-            profesionalCentroId: bloque.profesionalCentroId,
-            diaSemana: bloque.diaSemana,
-            fecha_baja: IsNull(),
-          },
-        });
-        
-        for (const otroBloque of otrosBloquesActivos) {
-          // Si es el mismo ID o parte del mismo bloque lógico, saltar
-          const esMismoBloqueLogico = (
-            otroBloque.horaDesde === bloque.horaDesde &&
-            otroBloque.horaHasta === bloque.horaHasta &&
-            otroBloque.duracionTurno === bloque.duracionTurno
-          );
-          
-          if (esMismoBloqueLogico) continue;
-          
-          // Verificar solapamiento de horarios
-          const existeSolapamiento = (
-            (bloque.horaDesde < otroBloque.horaHasta && bloque.horaHasta > otroBloque.horaDesde)
-          );
-          
-          if (existeSolapamiento) {
-            // Verificar solapamiento de fechas
-            const bloqueFechaHasta = bloque.fechaHasta || new Date('9999-12-31');
-            const otroBloqueFechaHasta = otroBloque.fechaHasta || new Date('9999-12-31');
-            
-            const fechasSolapan = (
-              bloque.fechaDesde <= otroBloqueFechaHasta &&
-              bloqueFechaHasta >= otroBloque.fechaDesde
-            );
-            
-            if (fechasSolapan) {
-              throw new BadRequestException(
-                `No se puede activar el bloque porque solapa con otro bloque activo ` +
-                `del día ${otroBloque.diaSemana} con horario ${otroBloque.horaDesde} a ${otroBloque.horaHasta}.`
-              );
-            }
-          }
-        }
-      }
+      // Validar solapamiento para el día de este bloque
+      await this.validarSolapamientoConCualquierBloque(
+        bloqueAActivar.profesionalCentroId,
+        bloqueAActivar.diaSemana,
+        horaDesdeNorm,
+        horaHastaNorm,
+        primerId  // excluir el propio bloque
+      );
       
       console.log('[Service] Validación de solapamiento superada, procediendo a activar...');
     }
@@ -677,65 +644,12 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     console.log('[Service] Validando solapamiento para los días habilitados...');
     
     for (const diaSemana of diasHabilitados) {
-      // Buscar bloques existentes que puedan solapar con este horario
-      const bloquesExistentes = await this.repository.find({
-        where: {
-          profesionalCentroId,
-          diaSemana,
-          fecha_baja: IsNull(),
-        },
-      });
-      
-      console.log(`[Service] Buscando bloques existentes para día ${diaSemana}...`);
-      console.log(`[Service] Bloques encontrados para día ${diaSemana}:`, bloquesExistentes.map(b => ({
-        id: b.id,
-        horaDesde: b.horaDesde,
-        horaHasta: b.horaHasta,
-        duracionTurno: b.duracionTurno,
-        fechaDesde: b.fechaDesde,
-        fechaHasta: b.fechaHasta
-      })));
-      
-      for (const bloqueExistente of bloquesExistentes) {
-        // Excluir el propio bloque si estamos actualizando
-        // (comparar por horario y duración para identificar el mismo bloque lógico)
-        const esMismoBloqueLogico = (
-          bloqueExistente.horaDesde === horaDesdeNorm &&
-          bloqueExistente.horaHasta === horaHastaNorm &&
-          bloqueExistente.duracionTurno === duracionTurno
-        );
-        
-        if (esMismoBloqueLogico) {
-          console.log(`[Service] Día ${diaSemana}: el bloque existente ID ${bloqueExistente.id} es el mismo bloque lógico (actualización), se omite validación`);
-          continue;
-        }
-        
-        // Verificar solapamiento de horarios
-        const existeSolapamiento = (
-          (horaDesdeNorm < bloqueExistente.horaHasta && horaHastaNorm > bloqueExistente.horaDesde)
-        );
-        
-        console.log(`[Service] Día ${diaSemana}: Comparando con bloque ID ${bloqueExistente.id}: ${horaDesdeNorm}-${horaHastaNorm} vs ${bloqueExistente.horaDesde}-${bloqueExistente.horaHasta} -> solapa? ${existeSolapamiento}`);
-        
-        if (existeSolapamiento) {
-          const fechaDesdeObj = new Date(fechaDesde);
-          const fechaHastaObj = fechaHasta ? new Date(fechaHasta) : null;
-          const bloqueFechaHasta = bloqueExistente.fechaHasta || new Date('9999-12-31');
-          
-          const fechasSolapan = (
-            fechaDesdeObj <= bloqueFechaHasta &&
-            (fechaHastaObj || new Date('9999-12-31')) >= bloqueExistente.fechaDesde
-          );
-          
-          if (fechasSolapan) {
-            throw new BadRequestException(
-              `El horario ${horaDesdeNorm} a ${horaHastaNorm} solapa con el bloque existente ` +
-              `del día ${diaSemana} con horario ${bloqueExistente.horaDesde} a ${bloqueExistente.horaHasta}. ` +
-              `No se puede guardar la agenda.`
-            );
-          }
-        }
-      }
+      await this.validarSolapamientoConCualquierBloque(
+        profesionalCentroId,
+        diaSemana,
+        horaDesdeNorm,
+        horaHastaNorm
+      );
     }
     
     console.log('[Service] Validación de solapamiento superada, continuando...');
