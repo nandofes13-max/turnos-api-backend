@@ -69,6 +69,7 @@ export class AgendaDisponibilidadController {
   @Put('sincronizar')
   async sincronizarBloque(
     @Body() body: {
+      agendaDisponibilidadId: number;  // 👈 CAMPO AGREGADO
       profesionalCentroId: number;
       horaDesde: string;
       horaHasta: string;
@@ -85,8 +86,10 @@ export class AgendaDisponibilidadController {
     const horaDesdeNorm = this.normalizarHora(body.horaDesde);
     const horaHastaNorm = this.normalizarHora(body.horaHasta);
     
+    // 👇 AGREGAR agendaDisponibilidadId a cada excepción
     const excepcionesHorariosNorm = body.excepcionesHorarios.map(exc => ({
-      ...exc,
+      agendaDisponibilidadId: body.agendaDisponibilidadId,
+      diaSemana: exc.diaSemana,
       horaDesde: this.normalizarHora(exc.horaDesde),
       horaHasta: this.normalizarHora(exc.horaHasta),
     }));
