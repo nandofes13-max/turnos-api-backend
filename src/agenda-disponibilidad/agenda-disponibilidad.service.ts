@@ -31,45 +31,75 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 
   // ============================================================
-  // FUNCIÓN AUXILIAR: Validar solapamiento con CUALQUIER bloque (activo o inactivo)
-  // ============================================================
-  private async validarSolapamientoConCualquierBloque(
-    profesionalCentroId: number,
-    diaSemana: number,
-    horaDesde: string,
-    horaHasta: string,
-    bloqueIdAActivar?: number  // opcional, para excluir el propio bloque
-  ): Promise<void> {
-    // Buscar TODOS los bloques para este profesional-centro y día (sin filtrar por fecha_baja)
-    const bloquesExistentes = await this.repository.find({
-      where: {
-        profesionalCentroId,
-        diaSemana,
-      },
-    });
+// FUNCIÓN AUXILIAR: Validar solapamiento con CUALQUIER bloque (activo o inactivo)
+// ============================================================
+private async validarSolapamientoConCualquierBloque(
+  profesionalCentroId: number,
+  diaSemana: number,
+  horaDesde: string,
+  horaHasta: string,
+  duracionTurno: number,
+  bloqueIdAActivar?: number  // opcional, para excluir el propio bloque
+): Promise<void> {
+  // Buscar TODOS los bloques para este profesional-centro y día (sin filtrar por fecha_baja)
+  const bloquesExistentes = await this.repository.find({
+    where: {
+      profesionalCentroId,
+      diaSemana,
+    },
+  });
+  
+  // 👇 LOGS AGREGADOS
+  console.log(`[Service] validarSolapamiento - Día ${diaSemana}, horario ${horaDesde} a ${horaHasta}, duración ${duracionTurno}`);
+  console.log(`[Service] Bloques existentes en BD:`, bloquesExistentes.map(b => ({
+    id: b.id,
+    horaDesde: b.horaDesde,
+    horaHasta: b.horaHasta,
+    duracionTurno: b.duracionTurno,
+    fecha_baja: b.fecha_baja
+  })));
+  
+  for (const bloqueExistente of bloquesExistentes) {
+    // Si es el mismo bloque que estamos activando/creando, saltar
+    if (bloqueIdAActivar && bloqueExistente.id === bloqueIdAActivar) continue;
     
-    for (const bloqueExistente of bloquesExistentes) {
-      // Si es el mismo bloque que estamos activando/creando, saltar
-      if (bloqueIdAActivar && bloqueExistente.id === bloqueIdAActivar) continue;
-      
-      // Normalizar horas del bloque existente
-      const horaDesdeExistente = this.normalizarHora(bloqueExistente.horaDesde);
-      const horaHastaExistente = this.normalizarHora(bloqueExistente.horaHasta);
-      
-      // Verificar solapamiento de horarios
-      const existeSolapamiento = (
-        (horaDesde < horaHastaExistente && horaHasta > horaDesdeExistente)
+    // Normalizar horas del bloque existente
+    const horaDesdeExistente = this.normalizarHora(bloqueExistente.horaDesde);
+    const horaHastaExistente = this.normalizarHora(bloqueExistente.horaHasta);
+    const duracionExistente = bloqueExistente.duracionTurno;
+    
+    // 👇 LOG DE COMPARACIÓN
+    console.log(`[Service] Comparando con bloque ID ${bloqueExistente.id}: ${horaDesdeExistente}-${horaHastaExistente} (dur ${duracionExistente})`);
+    
+    // Si es el MISMO bloque lógico (mismo horario y duración), NO validar solapamiento
+    const esMismoBloqueLogico = (
+      horaDesdeExistente === horaDesde &&
+      horaHastaExistente === horaHasta &&
+      duracionExistente === duracionTurno
+    );
+    
+    if (esMismoBloqueLogico) {
+      console.log(`[Service] Bloque ID ${bloqueExistente.id} es el mismo bloque lógico, se omite validación`);
+      continue;
+    }
+    
+    // Verificar solapamiento de horarios
+    const existeSolapamiento = (
+      (horaDesde < horaHastaExistente && horaHasta > horaDesdeExistente)
+    );
+    
+    console.log(`[Service] ¿Solapa? ${existeSolapamiento}`);
+    
+    if (existeSolapamiento) {
+      throw new BadRequestException(
+        `Bloque ID ${bloqueExistente.id} (${horaDesdeExistente} a ${horaHastaExistente}) solapa con el bloque ` +
+        `que intenta guardar (${horaDesde} a ${horaHasta}). Por favor verifique.`
       );
-      
-      if (existeSolapamiento) {
-        throw new BadRequestException(
-  `Bloque ID ${bloqueExistente.id} (${horaDesdeExistente} a ${horaHastaExistente}) solapa con el bloque ` +
-  `que intenta activar. Por favor verifique.`
-);
-      }
     }
   }
-
+  
+  console.log(`[Service] Validación de solapamiento superada para día ${diaSemana}`);
+}
   async onModuleInit() {
     // await this.crearConstraintExclusion();  // Constraint eliminada, validación en backend
   }
