@@ -8,7 +8,7 @@ import { ProfesionalCentro } from '../profesional-centro/entities/profesional-ce
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ExcepcionFecha, ProfesionalCentro]), // 👈 Agregar ProfesionalCentro aquí
+    TypeOrmModule.forFeature([ExcepcionFecha, ProfesionalCentro])
   ],
   controllers: [ExcepcionesFechasController],
   providers: [ExcepcionesFechasService],
