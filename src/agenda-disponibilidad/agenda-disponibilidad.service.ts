@@ -6,7 +6,7 @@ import { AgendaDisponibilidad } from './entities/agenda-disponibilidad.entity';
 import { CreateAgendaDisponibilidadDto } from './dto/create-agenda-disponibilidad.dto';
 import { UpdateAgendaDisponibilidadDto } from './dto/update-agenda-disponibilidad.dto';
 import { ProfesionalCentro } from '../profesional-centro/entities/profesional-centro.entity';
-import { ExcepcionRecurrente } from '../excepciones-recurrentes/entities/excepcion-recurrente.entity';
+import { ExcepcionFecha } from '../excepciones-fechas/entities/excepcion-fecha.entity';
 
 @Injectable()
 export class AgendaDisponibilidadService implements OnModuleInit {
@@ -15,8 +15,8 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     private readonly repository: Repository<AgendaDisponibilidad>,
     @InjectRepository(ProfesionalCentro)
     private readonly profesionalCentroRepository: Repository<ProfesionalCentro>,
-    @InjectRepository(ExcepcionRecurrente)
-    private readonly excepcionesRecurrentesRepository: Repository<ExcepcionRecurrente>,
+    @InjectRepository(ExcepcionFecha)
+    private readonly excepcionesFechasRepository: Repository<ExcepcionFecha>,
   ) {}
 
   private normalizarHora(hora: string): string {
@@ -25,67 +25,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       return hora.slice(0, 5);
     }
     return hora;
-  }
-
-  private async validarSolapamientoConCualquierBloque(
-    profesionalCentroId: number,
-    diaSemana: number,
-    horaDesde: string,
-    horaHasta: string,
-    duracionTurno: number,
-    bloqueIdAActivar?: number
-  ): Promise<void> {
-    const bloquesExistentes = await this.repository.find({
-      where: {
-        profesionalCentroId,
-        diaSemana,
-      },
-    });
-    
-    console.log(`[Service] validarSolapamiento - Día ${diaSemana}, horario ${horaDesde} a ${horaHasta}, duración ${duracionTurno}`);
-    console.log(`[Service] Bloques existentes en BD:`, bloquesExistentes.map(b => ({
-      id: b.id,
-      horaDesde: b.horaDesde,
-      horaHasta: b.horaHasta,
-      duracionTurno: b.duracionTurno,
-      fecha_baja: b.fecha_baja
-    })));
-    
-    for (const bloqueExistente of bloquesExistentes) {
-      if (bloqueIdAActivar && bloqueExistente.id === bloqueIdAActivar) continue;
-      
-      const horaDesdeExistente = this.normalizarHora(bloqueExistente.horaDesde);
-      const horaHastaExistente = this.normalizarHora(bloqueExistente.horaHasta);
-      const duracionExistente = bloqueExistente.duracionTurno;
-      
-      console.log(`[Service] Comparando con bloque ID ${bloqueExistente.id}: ${horaDesdeExistente}-${horaHastaExistente} (dur ${duracionExistente})`);
-      
-      const esMismoBloqueLogico = (
-        horaDesdeExistente === horaDesde &&
-        horaHastaExistente === horaHasta &&
-        duracionExistente === duracionTurno
-      );
-      
-      if (esMismoBloqueLogico) {
-        console.log(`[Service] Bloque ID ${bloqueExistente.id} es el mismo bloque lógico, se omite validación`);
-        continue;
-      }
-      
-      const existeSolapamiento = (
-        (horaDesde < horaHastaExistente && horaHasta > horaDesdeExistente)
-      );
-      
-      console.log(`[Service] ¿Solapa? ${existeSolapamiento}`);
-      
-      if (existeSolapamiento) {
-        throw new BadRequestException(
-          `Bloque ID ${bloqueExistente.id} (${horaDesdeExistente} a ${horaHastaExistente}) solapa con el bloque ` +
-          `que intenta guardar (${horaDesde} a ${horaHasta}). Por favor verifique.`
-        );
-      }
-    }
-    
-    console.log(`[Service] Validación de solapamiento superada para día ${diaSemana}`);
   }
 
   async onModuleInit() {
@@ -102,7 +41,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       `);
       
       if (result.length > 0) {
-        console.log('✅ Constraint ex_agenda_no_solapada ya existe');
         return;
       }
       
@@ -121,10 +59,8 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         )
         WHERE (fecha_baja IS NULL);
       `);
-      
-      console.log('✅ Constraint ex_agenda_no_solapada creada exitosamente');
     } catch (error) {
-      console.error('❌ Error creando constraint ex_agenda_no_solapada:', error.message);
+      // silent
     }
   }
 
@@ -247,28 +183,47 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     fechaHasta: Date | null,
     id?: number,
   ): Promise<void> {
-    await this.validarSolapamientoConCualquierBloque(
-      profesionalCentroId,
-      diaSemana,
-      horaDesde,
-      horaHasta,
-      id ? await this.getDuracionTurnoById(id) : 0,
-      id
-    );
-  }
+    const agendasExistentes = await this.repository.find({
+      where: {
+        profesionalCentroId,
+        diaSemana,
+        fecha_baja: IsNull(),
+      },
+    });
 
-  private async getDuracionTurnoById(id: number): Promise<number> {
-    const bloque = await this.repository.findOne({ where: { id } });
-    return bloque?.duracionTurno || 0;
+    for (const agenda of agendasExistentes) {
+      if (id && agenda.id === id) continue;
+
+      const existeSolapamiento = (
+        (horaDesde < agenda.horaHasta && horaHasta > agenda.horaDesde)
+      );
+
+      if (!existeSolapamiento) continue;
+
+      const agendaFechaHasta = agenda.fechaHasta || new Date('9999-12-31');
+      const nuevaFechaHasta = fechaHasta || new Date('9999-12-31');
+      
+      const fechasSolapan = (
+        fechaDesde <= agendaFechaHasta &&
+        nuevaFechaHasta >= agenda.fechaDesde
+      );
+
+      if (fechasSolapan) {
+        throw new BadRequestException(
+          `Ya existe una agenda para este profesional-centro en el día ${diaSemana} ` +
+          `con horario ${agenda.horaDesde} a ${agenda.horaHasta} que solapa con el rango de fechas`
+        );
+      }
+    }
   }
 
   async generarSlots(
     profesionalCentroId: number,
     fecha: string,
   ): Promise<{ disponible: boolean; hora: string; bloqueado: boolean }[]> {
-    console.log('[Service] generarSlots - profesionalCentroId:', profesionalCentroId, 'fecha:', fecha);
     const fechaObj = new Date(fecha);
     const diaSemana = fechaObj.getDay();
+    const fechaStr = fechaObj.toISOString().split('T')[0];
     
     const agenda = await this.repository.findOne({
       where: {
@@ -281,11 +236,9 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     });
     
     if (!agenda) {
-      console.log('[Service] generarSlots - No se encontró agenda');
       return [];
     }
     
-    console.log('[Service] generarSlots - Agenda encontrada ID:', agenda.id);
     const slots: { hora: string; bloqueado: boolean }[] = [];
     let horaActual = agenda.horaDesde;
     const horaFin = agenda.horaHasta;
@@ -302,18 +255,25 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       horaActual = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
     }
     
-    const excepcionesRecurrentes = await this.excepcionesRecurrentesRepository.find({
+    const excepcionesFechas = await this.excepcionesFechasRepository.find({
       where: {
-        agendaDisponibilidadId: agenda.id,
-        diaSemana: diaSemana,
+        profesionalCentroId: profesionalCentroId,
         fecha_baja: IsNull(),
       },
     });
     
-    console.log('[Service] generarSlots - Excepciones recurrentes encontradas:', excepcionesRecurrentes.length);
+    const excepcionesFechasAplican = excepcionesFechas.filter(exc => {
+      const fechaDesde = new Date(exc.fechaDesde);
+      const fechaHasta = exc.fechaHasta ? new Date(exc.fechaHasta) : fechaDesde;
+      return fechaObj >= fechaDesde && fechaObj <= fechaHasta;
+    });
     
-    for (const excepcion of excepcionesRecurrentes) {
-      if (excepcion.horaDesde && excepcion.horaHasta) {
+    for (const excepcion of excepcionesFechasAplican) {
+      if (!excepcion.horaDesde && !excepcion.horaHasta) {
+        for (let i = 0; i < slots.length; i++) {
+          slots[i].bloqueado = true;
+        }
+      } else if (excepcion.horaDesde && excepcion.horaHasta) {
         for (let i = 0; i < slots.length; i++) {
           const slotHora = slots[i].hora;
           if (slotHora >= excepcion.horaDesde && slotHora < excepcion.horaHasta) {
@@ -330,53 +290,33 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 
   async findAll(): Promise<AgendaDisponibilidad[]> {
-    console.log('[Service] findAll - Inicio');
-    const result = await this.repository.find({
+    return this.repository.find({
       relations: ['profesionalCentro', 'profesionalCentro.profesional', 'profesionalCentro.especialidad', 'profesionalCentro.centro'],
       where: { fecha_baja: IsNull() },
     });
-    console.log('[Service] findAll - Encontrados:', result.length);
-    return result;
   }
 
   async findOne(id: number): Promise<AgendaDisponibilidad> {
-    console.log('[Service] findOne - ID recibido:', id);
-    console.log('[Service] findOne - Tipo:', typeof id);
-    console.log('[Service] findOne - Es NaN?', isNaN(id));
-    
     const registro = await this.repository.findOne({
       where: { id },
       relations: ['profesionalCentro', 'profesionalCentro.profesional', 'profesionalCentro.especialidad', 'profesionalCentro.centro'],
     });
 
     if (!registro) {
-      console.log('[Service] findOne - No encontrado para ID:', id);
       throw new NotFoundException(`Agenda con id ${id} no encontrada`);
     }
 
-    console.log('[Service] findOne - Encontrado ID:', registro.id);
     return registro;
   }
 
   async findByProfesionalCentro(profesionalCentroId: number): Promise<AgendaDisponibilidad[]> {
-    console.log('[Service] findByProfesionalCentro - ID recibido:', profesionalCentroId);
-    console.log('[Service] findByProfesionalCentro - Tipo:', typeof profesionalCentroId);
-    console.log('[Service] findByProfesionalCentro - Es NaN?', isNaN(profesionalCentroId));
-    
-    const result = await this.repository.find({
+    return this.repository.find({
       where: { profesionalCentroId },
       relations: ['profesionalCentro'],
     });
-    console.log('[Service] findByProfesionalCentro - Resultados encontrados (activos + inactivos):', result.length);
-    return result;
   }
 
   async create(createDto: CreateAgendaDisponibilidadDto, usuario?: string): Promise<AgendaDisponibilidad> {
-    console.log('[Service] create - Inicio');
-    
-    createDto.horaDesde = this.normalizarHora(createDto.horaDesde);
-    createDto.horaHasta = this.normalizarHora(createDto.horaHasta);
-    
     await this.verificarProfesionalCentroActivo(createDto.profesionalCentroId);
     await this.verificarDiaSemanaValido(createDto.diaSemana);
     await this.verificarHorarioValido(createDto.horaDesde, createDto.horaHasta);
@@ -474,7 +414,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 
   async update(id: number, updateDto: UpdateAgendaDisponibilidadDto, usuario?: string): Promise<AgendaDisponibilidad> {
-    console.log('[Service] update - ID:', id);
     const registro = await this.findOne(id);
 
     if (updateDto.profesionalCentroId && updateDto.profesionalCentroId !== registro.profesionalCentroId) {
@@ -529,7 +468,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 
   async softDelete(id: number, usuario?: string): Promise<void> {
-    console.log('[Service] softDelete - ID:', id);
     const registro = await this.findOne(id);
     
     if (registro.fecha_baja) {
@@ -543,36 +481,20 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 
   async activarDesactivarBloques(ids: number[], activar: boolean, usuario?: string): Promise<void> {
-    console.log('[Service] activarDesactivarBloques - INICIO');
-    console.log('[Service] IDs recibidos:', ids);
-    console.log('[Service] Tipo de ids:', typeof ids);
-    console.log('[Service] Es array?', Array.isArray(ids));
-    console.log('[Service] Activar:', activar);
-    
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      console.log('[Service] ERROR: No se recibieron IDs válidos');
       throw new BadRequestException('No se recibieron IDs válidos para procesar');
     }
     
     const idsValidos = ids.filter(id => {
       const idNum = Number(id);
-      const esValido = !isNaN(idNum) && isFinite(idNum) && idNum > 0;
-      if (!esValido) {
-        console.log('[Service] ID inválido detectado:', id, 'convertido a:', idNum);
-      }
-      return esValido;
+      return !isNaN(idNum) && isFinite(idNum) && idNum > 0;
     });
     
-    console.log('[Service] IDs válidos después del filtro:', idsValidos);
-    
     if (idsValidos.length === 0) {
-      console.log('[Service] ERROR: No hay IDs válidos en la lista');
-      throw new BadRequestException('No hay IDs válidos en la lista. IDs recibidos: ' + JSON.stringify(ids));
+      throw new BadRequestException('No hay IDs válidos en la lista');
     }
     
     if (activar) {
-      console.log('[Service] Modo: ACTIVAR - Validando solapamiento antes de activar...');
-      
       const primerId = idsValidos[0];
       const bloqueAActivar = await this.findOne(primerId);
       
@@ -583,26 +505,35 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       const horaDesdeNorm = this.normalizarHora(bloqueAActivar.horaDesde);
       const horaHastaNorm = this.normalizarHora(bloqueAActivar.horaHasta);
       
-      await this.validarSolapamientoConCualquierBloque(
-        bloqueAActivar.profesionalCentroId,
-        bloqueAActivar.diaSemana,
-        horaDesdeNorm,
-        horaHastaNorm,
-        bloqueAActivar.duracionTurno,
-        primerId
-      );
+      const bloquesExistentes = await this.repository.find({
+        where: {
+          profesionalCentroId: bloqueAActivar.profesionalCentroId,
+          diaSemana: bloqueAActivar.diaSemana,
+          fecha_baja: IsNull(),
+        },
+      });
       
-      console.log('[Service] Validación de solapamiento superada, procediendo a activar...');
+      for (const bloqueExistente of bloquesExistentes) {
+        if (bloqueExistente.id === primerId) continue;
+        
+        const existeSolapamiento = (
+          (horaDesdeNorm < bloqueExistente.horaHasta && horaHastaNorm > bloqueExistente.horaDesde)
+        );
+        
+        if (existeSolapamiento) {
+          throw new BadRequestException(
+            `No se puede activar el bloque porque solapa con otro bloque activo ` +
+            `del día ${bloqueExistente.diaSemana} con horario ${bloqueExistente.horaDesde} a ${bloqueExistente.horaHasta}.`
+          );
+        }
+      }
     }
     
     const ahora = new Date();
     const usuarioActual = usuario || 'demo';
     
-    console.log('[Service] Ejecutando update para', idsValidos.length, 'IDs');
-    
     if (activar) {
-      console.log('[Service] Modo: ACTIVAR (fecha_baja = null)');
-      const result = await this.repository
+      await this.repository
         .createQueryBuilder()
         .update(AgendaDisponibilidad)
         .set({ 
@@ -613,10 +544,8 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         })
         .where('id IN (:...ids)', { ids: idsValidos })
         .execute();
-      console.log('[Service] Resultado de update:', result);
     } else {
-      console.log('[Service] Modo: DESACTIVAR (fecha_baja = ahora)');
-      const result = await this.repository
+      await this.repository
         .createQueryBuilder()
         .update(AgendaDisponibilidad)
         .set({ 
@@ -627,15 +556,9 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         })
         .where('id IN (:...ids)', { ids: idsValidos })
         .execute();
-      console.log('[Service] Resultado de update:', result);
     }
-    
-    console.log(`[Service] ✅ ${activar ? 'Activados' : 'Desactivados'} ${idsValidos.length} bloques correctamente`);
   }
 
-  // ============================================================
-  // MÉTODO: Sincronizar bloque (actualizar días y excepciones)
-  // ============================================================
   async sincronizarBloque(
     profesionalCentroId: number,
     horaDesde: string,
@@ -647,9 +570,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     excepcionesHorarios: { agendaDisponibilidadId: number; diaSemana: number; horaDesde: string; horaHasta: string }[],
     usuario?: string
   ): Promise<void> {
-    console.log(`[Service] sincronizarBloque - LLAMADO PARA BLOQUE ${horaDesde} a ${horaHasta}`);
-    console.log(`[Service] excepcionesHorarios RAW:`, JSON.stringify(excepcionesHorarios, null, 2));
-    
     const horaDesdeNorm = this.normalizarHora(horaDesde);
     const horaHastaNorm = this.normalizarHora(horaHasta);
     
@@ -658,27 +578,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       horaDesde: this.normalizarHora(exc.horaDesde),
       horaHasta: this.normalizarHora(exc.horaHasta),
     }));
-    
-    console.log(`[Service] excepcionesNorm a procesar:`, JSON.stringify(excepcionesNorm, null, 2));
-    
-    console.log('[Service] profesionalCentroId:', profesionalCentroId);
-    console.log('[Service] horaDesde:', horaDesdeNorm, 'horaHasta:', horaHastaNorm, 'duracionTurno:', duracionTurno);
-    console.log('[Service] diasHabilitados:', diasHabilitados);
-
-    // VALIDAR SOLAPAMIENTO
-    console.log('[Service] Validando solapamiento para los días habilitados...');
-    
-    for (const diaSemana of diasHabilitados) {
-      await this.validarSolapamientoConCualquierBloque(
-        profesionalCentroId,
-        diaSemana,
-        horaDesdeNorm,
-        horaHastaNorm,
-        duracionTurno
-      );
-    }
-    
-    console.log('[Service] Validación de solapamiento superada, continuando...');
 
     const bloqueActivo = await this.repository.findOne({
       where: {
@@ -691,7 +590,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     });
 
     if (!bloqueActivo) {
-      console.log('[Service] No existe bloque activo, creando nuevo...');
       for (const diaSemana of diasHabilitados) {
         const nuevoBloque = this.repository.create({
           profesionalCentroId,
@@ -707,8 +605,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         await this.repository.save(nuevoBloque);
       }
     } else {
-      console.log('[Service] Bloque activo encontrado ID:', bloqueActivo.id);
-      
       const bloquesActuales = await this.repository.find({
         where: {
           profesionalCentroId,
@@ -720,13 +616,9 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       });
       
       const diasActuales = bloquesActuales.map(b => b.diaSemana);
-      console.log('[Service] Días actuales:', diasActuales);
       
       const diasAAgregar = diasHabilitados.filter(d => !diasActuales.includes(d));
       const diasAEliminar = diasActuales.filter(d => !diasHabilitados.includes(d));
-      
-      console.log('[Service] Días a agregar:', diasAAgregar);
-      console.log('[Service] Días a eliminar:', diasAEliminar);
       
       for (const diaSemana of diasAAgregar) {
         const nuevoBloque = this.repository.create({
@@ -741,7 +633,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
           usuario_alta: usuario || 'demo',
         });
         await this.repository.save(nuevoBloque);
-        console.log(`[Service] Día ${diaSemana} agregado`);
       }
       
       for (const diaSemana of diasAEliminar) {
@@ -750,77 +641,61 @@ export class AgendaDisponibilidadService implements OnModuleInit {
           bloqueAEliminar.fecha_baja = new Date();
           bloqueAEliminar.usuario_baja = usuario || 'demo';
           await this.repository.save(bloqueAEliminar);
-          console.log(`[Service] Día ${diaSemana} eliminado`);
         }
       }
       
-      // ============================================================
-      // SINCRONIZACIÓN DE EXCEPCIONES (FLUJO DEL USUARIO)
-      // ============================================================
-      
-      // 1. Desactivar TODAS las excepciones de esta agenda (soft delete)
-      const excepcionesActuales = await this.excepcionesRecurrentesRepository.find({
+      // Sincronizar excepciones con excepciones_fechas
+      const excepcionesActuales = await this.excepcionesFechasRepository.find({
         where: {
-          agendaDisponibilidadId: In(bloquesActuales.map(b => b.id)),
+          profesionalCentroId: profesionalCentroId,
         },
       });
-
-      console.log('[Service] Desactivando todas las excepciones existentes:', excepcionesActuales.length);
       
-      for (const excepcion of excepcionesActuales) {
-        await this.excepcionesRecurrentesRepository.update(excepcion.id, {
-          fecha_baja: new Date(),
-          usuario_baja: usuario || 'demo',
-        });
-        console.log(`[Service] Excepción ID ${excepcion.id} desactivada (soft delete)`);
-      }
-
-      // 2. Reactivar o crear según lo que llegue del frontend
-      console.log('[Service] Procesando excepciones del frontend:', excepcionesNorm.length);
+      // Crear un Map con las excepciones actuales
+      const excepcionesActualesMap = new Map(
+        excepcionesActuales.map(e => [
+          `${e.profesionalCentroId}|${e.fechaDesde.toISOString().split('T')[0]}|${e.horaDesde || ''}|${e.horaHasta || ''}`,
+          e
+        ])
+      );
       
+      // Procesar las nuevas excepciones
       for (const excepcion of excepcionesNorm) {
-        const agendaId = bloquesActuales.find(b => b.diaSemana === excepcion.diaSemana)?.id;
-        if (!agendaId) {
-          console.log(`[Service] No se encontró agendaId para día ${excepcion.diaSemana}`);
-          continue;
-        }
-        
-        // Buscar si ya existe un registro (incluso eliminado)
-        const existente = await this.excepcionesRecurrentesRepository.findOne({
-          where: {
-            agendaDisponibilidadId: agendaId,
-            diaSemana: excepcion.diaSemana,
-            horaDesde: excepcion.horaDesde,
-            horaHasta: excepcion.horaHasta,
-          },
-        });
+        const key = `${profesionalCentroId}|${excepcion.fechaDesde}|${excepcion.horaDesde}|${excepcion.horaHasta}`;
+        const existente = excepcionesActualesMap.get(key);
         
         if (existente) {
-          // Reactivar
-          await this.excepcionesRecurrentesRepository.update(existente.id, {
-            fecha_baja: undefined as any,
-usuario_baja: undefined as any,
-            usuario_modificacion: usuario || 'demo',
-            fecha_modificacion: new Date(),
-          });
-          console.log(`[Service] Excepción reactivada (ID: ${existente.id}): ${excepcion.diaSemana}|${excepcion.horaDesde}|${excepcion.horaHasta}`);
+          if (existente.fecha_baja !== null) {
+            await this.excepcionesFechasRepository.update(existente.id, {
+              fecha_baja: null,
+              usuario_baja: null,
+              usuario_modificacion: usuario || 'demo',
+              fecha_modificacion: new Date(),
+            });
+          }
+          excepcionesActualesMap.delete(key);
         } else {
-          // Crear nuevo
-          const nuevaExcepcion = this.excepcionesRecurrentesRepository.create({
-            agendaDisponibilidadId: agendaId,
-            diaSemana: excepcion.diaSemana,
+          const nuevaExcepcion = this.excepcionesFechasRepository.create({
+            profesionalCentroId: profesionalCentroId,
+            fechaDesde: new Date(excepcion.fechaDesde),
+            fechaHasta: excepcion.fechaHasta ? new Date(excepcion.fechaHasta) : null,
             horaDesde: excepcion.horaDesde,
             horaHasta: excepcion.horaHasta,
             tipo: 'deshabilitado',
             usuario_alta: usuario || 'demo',
           });
-          await this.excepcionesRecurrentesRepository.save(nuevaExcepcion);
-          console.log(`[Service] Excepción creada: ${excepcion.diaSemana}|${excepcion.horaDesde}|${excepcion.horaHasta}`);
+          await this.excepcionesFechasRepository.save(nuevaExcepcion);
         }
       }
+      
+      // Eliminar las que ya no están
+      for (const [key, excepcionExistente] of excepcionesActualesMap.entries()) {
+        await this.excepcionesFechasRepository.update(excepcionExistente.id, {
+          fecha_baja: new Date(),
+          usuario_baja: usuario || 'demo',
+        });
+      }
     }
-    
-    console.log('[Service] sincronizarBloque - FINALIZADO');
   }
   
   async debugStructure(): Promise<any> {
