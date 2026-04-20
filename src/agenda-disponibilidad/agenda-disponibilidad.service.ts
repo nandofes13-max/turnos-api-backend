@@ -756,6 +756,9 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         }
       }
       
+      // ============================================================
+      // SINCRONIZACIÓN DE EXCEPCIONES (REACTIVAR en lugar de crear nuevos IDs)
+      // ============================================================
       const excepcionesActuales = await this.excepcionesRecurrentesRepository.find({
         where: {
           agendaDisponibilidadId: In(bloquesActuales.map(b => b.id)),
@@ -764,30 +767,56 @@ export class AgendaDisponibilidadService implements OnModuleInit {
 
       console.log('[Service] Excepciones actuales en BD:', excepcionesActuales.length);
 
-      // 1. Eliminar (soft delete) TODAS las excepciones actuales
-      for (const excepcion of excepcionesActuales) {
-        await this.excepcionesRecurrentesRepository.update(excepcion.id, {
+      // Crear un Map de excepciones actuales para búsqueda rápida
+      const excepcionesActualesMap = new Map(
+        excepcionesActuales.map(e => [`${e.diaSemana}|${e.horaDesde}|${e.horaHasta}`, e])
+      );
+
+      // Procesar cada excepción del frontend
+      for (const excepcion of excepcionesNorm) {
+        const key = `${excepcion.diaSemana}|${excepcion.horaDesde}|${excepcion.horaHasta}`;
+        const excepcionExistente = excepcionesActualesMap.get(key);
+        
+        if (excepcionExistente) {
+          // Ya existe → reactivar si estaba eliminada
+          if (excepcionExistente.fecha_baja !== null) {
+            await this.excepcionesRecurrentesRepository.update(excepcionExistente.id, {
+              fecha_baja: null,
+              usuario_baja: null,
+              usuario_modificacion: usuario || 'demo',
+              fecha_modificacion: new Date(),
+            });
+            console.log(`[Service] Excepción reactivada: ${key}`);
+          } else {
+            console.log(`[Service] Excepción ya existe y está activa: ${key}`);
+          }
+          // Eliminar del map para saber cuáles sobran
+          excepcionesActualesMap.delete(key);
+        } else {
+          // No existe → crear nueva
+          const agendaId = bloquesActuales.find(b => b.diaSemana === excepcion.diaSemana)?.id;
+          if (agendaId) {
+            const nuevaExcepcion = this.excepcionesRecurrentesRepository.create({
+              agendaDisponibilidadId: agendaId,
+              diaSemana: excepcion.diaSemana,
+              horaDesde: excepcion.horaDesde,
+              horaHasta: excepcion.horaHasta,
+              tipo: 'deshabilitado',
+              usuario_alta: usuario || 'demo',
+            });
+            await this.excepcionesRecurrentesRepository.save(nuevaExcepcion);
+            console.log(`[Service] Excepción creada: ${key}`);
+          }
+        }
+      }
+
+      // Eliminar (soft delete) las excepciones que ya no están en el frontend
+      for (const [key, excepcionExistente] of excepcionesActualesMap.entries()) {
+        await this.excepcionesRecurrentesRepository.update(excepcionExistente.id, {
           fecha_baja: new Date(),
           usuario_baja: usuario || 'demo',
         });
-        console.log(`[Service] Excepción ID ${excepcion.id} eliminada (soft delete)`);
-      }
-
-      // 2. Crear TODAS las nuevas excepciones
-      for (const excepcion of excepcionesNorm) {
-        const agendaId = bloquesActuales.find(b => b.diaSemana === excepcion.diaSemana)?.id;
-        if (agendaId) {
-          const nuevaExcepcion = this.excepcionesRecurrentesRepository.create({
-            agendaDisponibilidadId: agendaId,
-            diaSemana: excepcion.diaSemana,
-            horaDesde: excepcion.horaDesde,
-            horaHasta: excepcion.horaHasta,
-            tipo: 'deshabilitado',
-            usuario_alta: usuario || 'demo',
-          });
-          await this.excepcionesRecurrentesRepository.save(nuevaExcepcion);
-          console.log(`[Service] Excepción creada: ${excepcion.diaSemana}|${excepcion.horaDesde}|${excepcion.horaHasta}`);
-        }
+        console.log(`[Service] Excepción eliminada (soft delete): ${key}`);
       }
     }
     
