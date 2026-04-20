@@ -757,79 +757,38 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       }
       
       const excepcionesActuales = await this.excepcionesRecurrentesRepository.find({
-        where: {
-          agendaDisponibilidadId: In(bloquesActuales.map(b => b.id)),
-          fecha_baja: IsNull(),
-        },
-      });
-
-      console.log('[Service] Excepciones actuales en BD:', excepcionesActuales.length);
-
-      // Crear maps para comparación eficiente
-      const excepcionesActualesMap = new Map(
-        excepcionesActuales.map(e => [
-          `${e.diaSemana}|${e.horaDesde}|${e.horaHasta}`, 
-          e
-        ])
-      );
-
-      const nuevasExcepcionesMap = new Map(
-        excepcionesNorm.map(e => [
-          `${e.diaSemana}|${e.horaDesde}|${e.horaHasta}`,
-          e
-        ])
-      );
-
-      // 1. ACTUALIZAR o CREAR excepciones
-      for (const [key, excepcionNueva] of nuevasExcepcionesMap.entries()) {
-        const excepcionExistente = excepcionesActualesMap.get(key);
-        
-        if (excepcionExistente) {
-          // Ya existe → actualizar (asegurar que esté activa)
-          if (excepcionExistente.fecha_baja !== null) {
-            // Si estaba eliminada, reactivar (soft delete)
-await this.excepcionesRecurrentesRepository.update(excepcionExistente.id, {
-  fecha_baja: undefined as any,
-  usuario_baja: undefined as any,
-  usuario_modificacion: usuario || 'demo',
-  fecha_modificacion: new Date(),
+  where: {
+    agendaDisponibilidadId: In(bloquesActuales.map(b => b.id)),
+  },
 });
-            console.log(`[Service] Excepción reactivada: ${key}`);
-          } else {
-            console.log(`[Service] Excepción ya existe y está activa: ${key}`);
-          }
-          // Eliminar del map de actuales para saber cuáles sobran
-          excepcionesActualesMap.delete(key);
-        } else {
-          // No existe → crear nueva
-          const agendaId = bloquesActuales.find(b => b.diaSemana === excepcionNueva.diaSemana)?.id;
-          if (agendaId) {
-            const nuevaExcepcion = this.excepcionesRecurrentesRepository.create({
-              agendaDisponibilidadId: agendaId,
-              diaSemana: excepcionNueva.diaSemana,
-              horaDesde: excepcionNueva.horaDesde,
-              horaHasta: excepcionNueva.horaHasta,
-              tipo: 'deshabilitado',
-              usuario_alta: usuario || 'demo',
-            });
-            await this.excepcionesRecurrentesRepository.save(nuevaExcepcion);
-            console.log(`[Service] Excepción creada: ${key}`);
-          }
-        }
-      }
 
-      // 2. ELIMINAR (soft delete) las excepciones que ya no están en el frontend
-      for (const [key, excepcionExistente] of excepcionesActualesMap.entries()) {
-        await this.excepcionesRecurrentesRepository.update(excepcionExistente.id, {
-          fecha_baja: new Date(),
-          usuario_baja: usuario || 'demo',
-        });
-        console.log(`[Service] Excepción eliminada (soft delete): ${key}`);
-      }
-    }
-    
-    console.log('[Service] sincronizarBloque - FINALIZADO');
+console.log('[Service] Excepciones actuales en BD:', excepcionesActuales.length);
+
+// 1. Eliminar (soft delete) TODAS las excepciones actuales
+for (const excepcion of excepcionesActuales) {
+  await this.excepcionesRecurrentesRepository.update(excepcion.id, {
+    fecha_baja: new Date(),
+    usuario_baja: usuario || 'demo',
+  });
+  console.log(`[Service] Excepción ID ${excepcion.id} eliminada (soft delete)`);
+}
+
+// 2. Crear TODAS las nuevas excepciones
+for (const excepcion of excepcionesNorm) {
+  const agendaId = bloquesActuales.find(b => b.diaSemana === excepcion.diaSemana)?.id;
+  if (agendaId) {
+    const nuevaExcepcion = this.excepcionesRecurrentesRepository.create({
+      agendaDisponibilidadId: agendaId,
+      diaSemana: excepcion.diaSemana,
+      horaDesde: excepcion.horaDesde,
+      horaHasta: excepcion.horaHasta,
+      tipo: 'deshabilitado',
+      usuario_alta: usuario || 'demo',
+    });
+    await this.excepcionesRecurrentesRepository.save(nuevaExcepcion);
+    console.log(`[Service] Excepción creada: ${excepcion.diaSemana}|${excepcion.horaDesde}|${excepcion.horaHasta}`);
   }
+}
   
   async debugStructure(): Promise<any> {
     return this.repository.query(`
