@@ -567,17 +567,11 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     fechaDesde: string,
     fechaHasta: string | null,
     diasHabilitados: number[],
-    excepcionesHorarios: { agendaDisponibilidadId: number; diaSemana: number; horaDesde: string; horaHasta: string }[],
+    excepcionesHorarios: any[],
     usuario?: string
   ): Promise<void> {
     const horaDesdeNorm = this.normalizarHora(horaDesde);
     const horaHastaNorm = this.normalizarHora(horaHasta);
-    
-    const excepcionesNorm = excepcionesHorarios.map(exc => ({
-      ...exc,
-      horaDesde: this.normalizarHora(exc.horaDesde),
-      horaHasta: this.normalizarHora(exc.horaHasta),
-    }));
 
     const bloqueActivo = await this.repository.findOne({
       where: {
@@ -642,58 +636,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
           bloqueAEliminar.usuario_baja = usuario || 'demo';
           await this.repository.save(bloqueAEliminar);
         }
-      }
-      
-      // Sincronizar excepciones con excepciones_fechas
-      const excepcionesActuales = await this.excepcionesFechasRepository.find({
-        where: {
-          profesionalCentroId: profesionalCentroId,
-        },
-      });
-      
-      // Crear un Map con las excepciones actuales
-      const excepcionesActualesMap = new Map(
-        excepcionesActuales.map(e => [
-          `${e.profesionalCentroId}|${e.fechaDesde.toISOString().split('T')[0]}|${e.horaDesde || ''}|${e.horaHasta || ''}`,
-          e
-        ])
-      );
-      
-      // Procesar las nuevas excepciones
-      for (const excepcion of excepcionesNorm) {
-        const key = `${profesionalCentroId}|${excepcion.fechaDesde}|${excepcion.horaDesde}|${excepcion.horaHasta}`;
-        const existente = excepcionesActualesMap.get(key);
-        
-        if (existente) {
-          if (existente.fecha_baja !== null) {
-            await this.excepcionesFechasRepository.update(existente.id, {
-              fecha_baja: null,
-              usuario_baja: null,
-              usuario_modificacion: usuario || 'demo',
-              fecha_modificacion: new Date(),
-            });
-          }
-          excepcionesActualesMap.delete(key);
-        } else {
-          const nuevaExcepcion = this.excepcionesFechasRepository.create({
-            profesionalCentroId: profesionalCentroId,
-            fechaDesde: new Date(excepcion.fechaDesde),
-            fechaHasta: excepcion.fechaHasta ? new Date(excepcion.fechaHasta) : null,
-            horaDesde: excepcion.horaDesde,
-            horaHasta: excepcion.horaHasta,
-            tipo: 'deshabilitado',
-            usuario_alta: usuario || 'demo',
-          });
-          await this.excepcionesFechasRepository.save(nuevaExcepcion);
-        }
-      }
-      
-      // Eliminar las que ya no están
-      for (const [key, excepcionExistente] of excepcionesActualesMap.entries()) {
-        await this.excepcionesFechasRepository.update(excepcionExistente.id, {
-          fecha_baja: new Date(),
-          usuario_baja: usuario || 'demo',
-        });
       }
     }
   }
