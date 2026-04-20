@@ -781,8 +781,8 @@ export class AgendaDisponibilidadService implements OnModuleInit {
           // Ya existe → reactivar si estaba eliminada
           if (excepcionExistente.fecha_baja !== null) {
             await this.excepcionesRecurrentesRepository.update(excepcionExistente.id, {
-              fecha_baja: null,
-              usuario_baja: null,
+              fecha_baja: undefined as any,
+usuario_baja: undefined as any,
               usuario_modificacion: usuario || 'demo',
               fecha_modificacion: new Date(),
             });
