@@ -166,9 +166,6 @@ export class ExcepcionesFechasService {
     await this.repository.save(registro);
   }
 
-  // ============================================================
-  // NUEVO MÉTODO: Habilitar por campos (soft delete por datos)
-  // ============================================================
   async habilitar(
     profesionalCentroId: number,
     fechaDesde: string,
@@ -177,7 +174,6 @@ export class ExcepcionesFechasService {
     horaHasta: string | null,
     usuario?: string
   ): Promise<void> {
-    // Buscar la excepción activa que coincida con los campos
     const query: any = {
       profesionalCentroId,
       fechaDesde: new Date(fechaDesde),
@@ -210,7 +206,6 @@ export class ExcepcionesFechasService {
       );
     }
 
-    // Soft delete
     excepcion.fecha_baja = new Date();
     excepcion.usuario_baja = usuario || 'demo';
     await this.repository.save(excepcion);
