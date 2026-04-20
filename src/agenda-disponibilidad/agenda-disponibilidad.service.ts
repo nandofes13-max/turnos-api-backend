@@ -798,8 +798,8 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         if (existente) {
           // Reactivar
           await this.excepcionesRecurrentesRepository.update(existente.id, {
-            fecha_baja: null,
-            usuario_baja: null,
+            fecha_baja: undefined as any,
+usuario_baja: undefined as any,
             usuario_modificacion: usuario || 'demo',
             fecha_modificacion: new Date(),
           });
