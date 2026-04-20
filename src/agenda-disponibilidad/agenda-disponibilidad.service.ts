@@ -776,7 +776,10 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       for (const excepcion of excepcionesActuales) {
         const key = `${excepcion.diaSemana}|${excepcion.horaDesde}|${excepcion.horaHasta}`;
         if (!nuevasExcepcionesKey.has(key)) {
-          await this.excepcionesRecurrentesRepository.softDelete(excepcion.id);
+          await this.excepcionesRecurrentesRepository.update(excepcion.id, {
+  fecha_baja: new Date(),
+  usuario_baja: usuario || 'demo'
+});
           console.log(`[Service] Excepción eliminada: ${key}`);
         }
       }
