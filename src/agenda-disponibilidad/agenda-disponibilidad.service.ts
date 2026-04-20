@@ -19,9 +19,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     private readonly excepcionesRecurrentesRepository: Repository<ExcepcionRecurrente>,
   ) {}
 
-  // ============================================================
-  // FUNCIÓN AUXILIAR: Normalizar hora (eliminar segundos)
-  // ============================================================
   private normalizarHora(hora: string): string {
     if (!hora) return hora;
     if (hora.length > 5) {
@@ -31,77 +28,72 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 
   // ============================================================
-// FUNCIÓN AUXILIAR: Validar solapamiento con CUALQUIER bloque (activo o inactivo)
-// ============================================================
-private async validarSolapamientoConCualquierBloque(
-  profesionalCentroId: number,
-  diaSemana: number,
-  horaDesde: string,
-  horaHasta: string,
-  duracionTurno: number,
-  bloqueIdAActivar?: number  // opcional, para excluir el propio bloque
-): Promise<void> {
-  // Buscar TODOS los bloques para este profesional-centro y día (sin filtrar por fecha_baja)
-  const bloquesExistentes = await this.repository.find({
-    where: {
-      profesionalCentroId,
-      diaSemana,
-    },
-  });
-  
-  // 👇 LOGS AGREGADOS
-  console.log(`[Service] validarSolapamiento - Día ${diaSemana}, horario ${horaDesde} a ${horaHasta}, duración ${duracionTurno}`);
-  console.log(`[Service] Bloques existentes en BD:`, bloquesExistentes.map(b => ({
-    id: b.id,
-    horaDesde: b.horaDesde,
-    horaHasta: b.horaHasta,
-    duracionTurno: b.duracionTurno,
-    fecha_baja: b.fecha_baja
-  })));
-  
-  for (const bloqueExistente of bloquesExistentes) {
-    // Si es el mismo bloque que estamos activando/creando, saltar
-    if (bloqueIdAActivar && bloqueExistente.id === bloqueIdAActivar) continue;
+  // FUNCIÓN AUXILIAR: Validar solapamiento con CUALQUIER bloque (activo o inactivo)
+  // ============================================================
+  private async validarSolapamientoConCualquierBloque(
+    profesionalCentroId: number,
+    diaSemana: number,
+    horaDesde: string,
+    horaHasta: string,
+    duracionTurno: number,
+    bloqueIdAActivar?: number
+  ): Promise<void> {
+    const bloquesExistentes = await this.repository.find({
+      where: {
+        profesionalCentroId,
+        diaSemana,
+      },
+    });
     
-    // Normalizar horas del bloque existente
-    const horaDesdeExistente = this.normalizarHora(bloqueExistente.horaDesde);
-    const horaHastaExistente = this.normalizarHora(bloqueExistente.horaHasta);
-    const duracionExistente = bloqueExistente.duracionTurno;
+    console.log(`[Service] validarSolapamiento - Día ${diaSemana}, horario ${horaDesde} a ${horaHasta}, duración ${duracionTurno}`);
+    console.log(`[Service] Bloques existentes en BD:`, bloquesExistentes.map(b => ({
+      id: b.id,
+      horaDesde: b.horaDesde,
+      horaHasta: b.horaHasta,
+      duracionTurno: b.duracionTurno,
+      fecha_baja: b.fecha_baja
+    })));
     
-    // 👇 LOG DE COMPARACIÓN
-    console.log(`[Service] Comparando con bloque ID ${bloqueExistente.id}: ${horaDesdeExistente}-${horaHastaExistente} (dur ${duracionExistente})`);
-    
-    // Si es el MISMO bloque lógico (mismo horario y duración), NO validar solapamiento
-    const esMismoBloqueLogico = (
-      horaDesdeExistente === horaDesde &&
-      horaHastaExistente === horaHasta &&
-      duracionExistente === duracionTurno
-    );
-    
-    if (esMismoBloqueLogico) {
-      console.log(`[Service] Bloque ID ${bloqueExistente.id} es el mismo bloque lógico, se omite validación`);
-      continue;
-    }
-    
-    // Verificar solapamiento de horarios
-    const existeSolapamiento = (
-      (horaDesde < horaHastaExistente && horaHasta > horaDesdeExistente)
-    );
-    
-    console.log(`[Service] ¿Solapa? ${existeSolapamiento}`);
-    
-    if (existeSolapamiento) {
-      throw new BadRequestException(
-        `Bloque ID ${bloqueExistente.id} (${horaDesdeExistente} a ${horaHastaExistente}) solapa con el bloque ` +
-        `que intenta guardar (${horaDesde} a ${horaHasta}). Por favor verifique.`
+    for (const bloqueExistente of bloquesExistentes) {
+      if (bloqueIdAActivar && bloqueExistente.id === bloqueIdAActivar) continue;
+      
+      const horaDesdeExistente = this.normalizarHora(bloqueExistente.horaDesde);
+      const horaHastaExistente = this.normalizarHora(bloqueExistente.horaHasta);
+      const duracionExistente = bloqueExistente.duracionTurno;
+      
+      console.log(`[Service] Comparando con bloque ID ${bloqueExistente.id}: ${horaDesdeExistente}-${horaHastaExistente} (dur ${duracionExistente})`);
+      
+      // Excluir el mismo bloque lógico (mismo horario y duración)
+      const esMismoBloqueLogico = (
+        horaDesdeExistente === horaDesde &&
+        horaHastaExistente === horaHasta &&
+        duracionExistente === duracionTurno
       );
+      
+      if (esMismoBloqueLogico) {
+        console.log(`[Service] Bloque ID ${bloqueExistente.id} es el mismo bloque lógico, se omite validación`);
+        continue;
+      }
+      
+      const existeSolapamiento = (
+        (horaDesde < horaHastaExistente && horaHasta > horaDesdeExistente)
+      );
+      
+      console.log(`[Service] ¿Solapa? ${existeSolapamiento}`);
+      
+      if (existeSolapamiento) {
+        throw new BadRequestException(
+          `Bloque ID ${bloqueExistente.id} (${horaDesdeExistente} a ${horaHastaExistente}) solapa con el bloque ` +
+          `que intenta guardar (${horaDesde} a ${horaHasta}). Por favor verifique.`
+        );
+      }
     }
+    
+    console.log(`[Service] Validación de solapamiento superada para día ${diaSemana}`);
   }
-  
-  console.log(`[Service] Validación de solapamiento superada para día ${diaSemana}`);
-}
+
   async onModuleInit() {
-    // await this.crearConstraintExclusion();  // Constraint eliminada, validación en backend
+    // await this.crearConstraintExclusion();
   }
 
   private async crearConstraintExclusion() {
@@ -259,8 +251,19 @@ private async validarSolapamientoConCualquierBloque(
     fechaHasta: Date | null,
     id?: number,
   ): Promise<void> {
-    // Este método se mantiene por compatibilidad, pero la nueva validación está en validarSolapamientoConCualquierBloque
-    await this.validarSolapamientoConCualquierBloque(profesionalCentroId, diaSemana, horaDesde, horaHasta, id);
+    await this.validarSolapamientoConCualquierBloque(
+      profesionalCentroId,
+      diaSemana,
+      horaDesde,
+      horaHasta,
+      id ? await this.getDuracionTurnoById(id) : 0,
+      id
+    );
+  }
+
+  private async getDuracionTurnoById(id: number): Promise<number> {
+    const bloque = await this.repository.findOne({ where: { id } });
+    return bloque?.duracionTurno || 0;
   }
 
   async generarSlots(
@@ -571,13 +574,9 @@ private async validarSolapamientoConCualquierBloque(
       throw new BadRequestException('No hay IDs válidos en la lista. IDs recibidos: ' + JSON.stringify(ids));
     }
     
-    // ============================================================
-    // SI ES ACTIVACIÓN, VALIDAR SOLAPAMIENTO ANTES DE ACTIVAR
-    // ============================================================
     if (activar) {
       console.log('[Service] Modo: ACTIVAR - Validando solapamiento antes de activar...');
       
-      // Obtener el primer bloque para conocer sus datos
       const primerId = idsValidos[0];
       const bloqueAActivar = await this.findOne(primerId);
       
@@ -588,13 +587,13 @@ private async validarSolapamientoConCualquierBloque(
       const horaDesdeNorm = this.normalizarHora(bloqueAActivar.horaDesde);
       const horaHastaNorm = this.normalizarHora(bloqueAActivar.horaHasta);
       
-      // Validar solapamiento para el día de este bloque
       await this.validarSolapamientoConCualquierBloque(
         bloqueAActivar.profesionalCentroId,
         bloqueAActivar.diaSemana,
         horaDesdeNorm,
         horaHastaNorm,
-        primerId  // excluir el propio bloque
+        bloqueAActivar.duracionTurno,
+        primerId
       );
       
       console.log('[Service] Validación de solapamiento superada, procediendo a activar...');
@@ -639,7 +638,7 @@ private async validarSolapamientoConCualquierBloque(
   }
 
   // ============================================================
-  // MÉTODO: Sincronizar bloque (actualizar días y excepciones) CON VALIDACIÓN DE SOLAPAMIENTO
+  // MÉTODO: Sincronizar bloque (actualizar días y excepciones)
   // ============================================================
   async sincronizarBloque(
     profesionalCentroId: number,
@@ -668,9 +667,7 @@ private async validarSolapamientoConCualquierBloque(
     console.log('[Service] diasHabilitados:', diasHabilitados);
     console.log('[Service] excepcionesHorarios:', excepcionesNorm);
 
-    // ============================================================
-    // VALIDACIÓN DE SOLAPAMIENTO (antes de cualquier operación)
-    // ============================================================
+    // VALIDAR SOLAPAMIENTO
     console.log('[Service] Validando solapamiento para los días habilitados...');
     
     for (const diaSemana of diasHabilitados) {
@@ -678,13 +675,13 @@ private async validarSolapamientoConCualquierBloque(
         profesionalCentroId,
         diaSemana,
         horaDesdeNorm,
-        horaHastaNorm
+        horaHastaNorm,
+        duracionTurno
       );
     }
     
     console.log('[Service] Validación de solapamiento superada, continuando...');
 
-    // 1. Buscar el bloque lógico activo
     const bloqueActivo = await this.repository.findOne({
       where: {
         profesionalCentroId,
