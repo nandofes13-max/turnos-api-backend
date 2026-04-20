@@ -27,9 +27,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     return hora;
   }
 
-  // ============================================================
-  // FUNCIÓN AUXILIAR: Validar solapamiento con CUALQUIER bloque (activo o inactivo)
-  // ============================================================
   private async validarSolapamientoConCualquierBloque(
     profesionalCentroId: number,
     diaSemana: number,
@@ -63,7 +60,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       
       console.log(`[Service] Comparando con bloque ID ${bloqueExistente.id}: ${horaDesdeExistente}-${horaHastaExistente} (dur ${duracionExistente})`);
       
-      // Excluir el mismo bloque lógico (mismo horario y duración)
       const esMismoBloqueLogico = (
         horaDesdeExistente === horaDesde &&
         horaHastaExistente === horaHasta &&
@@ -651,7 +647,8 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     excepcionesHorarios: { diaSemana: number; horaDesde: string; horaHasta: string }[],
     usuario?: string
   ): Promise<void> {
-    console.log('[Service] sincronizarBloque - INICIO');
+    console.log(`[Service] sincronizarBloque - LLAMADO PARA BLOQUE ${horaDesde} a ${horaHasta}`);
+    console.log(`[Service] excepcionesHorarios RAW:`, JSON.stringify(excepcionesHorarios, null, 2));
     
     const horaDesdeNorm = this.normalizarHora(horaDesde);
     const horaHastaNorm = this.normalizarHora(horaHasta);
@@ -662,10 +659,11 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       horaHasta: this.normalizarHora(exc.horaHasta),
     }));
     
+    console.log(`[Service] excepcionesNorm a procesar:`, JSON.stringify(excepcionesNorm, null, 2));
+    
     console.log('[Service] profesionalCentroId:', profesionalCentroId);
     console.log('[Service] horaDesde:', horaDesdeNorm, 'horaHasta:', horaHastaNorm, 'duracionTurno:', duracionTurno);
     console.log('[Service] diasHabilitados:', diasHabilitados);
-    console.log('[Service] excepcionesHorarios:', excepcionesNorm);
 
     // VALIDAR SOLAPAMIENTO
     console.log('[Service] Validando solapamiento para los días habilitados...');
@@ -756,9 +754,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         }
       }
       
-      // ============================================================
-      // SINCRONIZACIÓN DE EXCEPCIONES (REACTIVAR en lugar de crear nuevos IDs)
-      // ============================================================
       const excepcionesActuales = await this.excepcionesRecurrentesRepository.find({
         where: {
           agendaDisponibilidadId: In(bloquesActuales.map(b => b.id)),
@@ -767,22 +762,19 @@ export class AgendaDisponibilidadService implements OnModuleInit {
 
       console.log('[Service] Excepciones actuales en BD:', excepcionesActuales.length);
 
-      // Crear un Map de excepciones actuales para búsqueda rápida
       const excepcionesActualesMap = new Map(
         excepcionesActuales.map(e => [`${e.diaSemana}|${e.horaDesde}|${e.horaHasta}`, e])
       );
 
-      // Procesar cada excepción del frontend
       for (const excepcion of excepcionesNorm) {
         const key = `${excepcion.diaSemana}|${excepcion.horaDesde}|${excepcion.horaHasta}`;
         const excepcionExistente = excepcionesActualesMap.get(key);
         
         if (excepcionExistente) {
-          // Ya existe → reactivar si estaba eliminada
           if (excepcionExistente.fecha_baja !== null) {
             await this.excepcionesRecurrentesRepository.update(excepcionExistente.id, {
               fecha_baja: undefined as any,
-usuario_baja: undefined as any,
+              usuario_baja: undefined as any,
               usuario_modificacion: usuario || 'demo',
               fecha_modificacion: new Date(),
             });
@@ -790,10 +782,8 @@ usuario_baja: undefined as any,
           } else {
             console.log(`[Service] Excepción ya existe y está activa: ${key}`);
           }
-          // Eliminar del map para saber cuáles sobran
           excepcionesActualesMap.delete(key);
         } else {
-          // No existe → crear nueva
           const agendaId = bloquesActuales.find(b => b.diaSemana === excepcion.diaSemana)?.id;
           if (agendaId) {
             const nuevaExcepcion = this.excepcionesRecurrentesRepository.create({
@@ -810,7 +800,6 @@ usuario_baja: undefined as any,
         }
       }
 
-      // Eliminar (soft delete) las excepciones que ya no están en el frontend
       for (const [key, excepcionExistente] of excepcionesActualesMap.entries()) {
         await this.excepcionesRecurrentesRepository.update(excepcionExistente.id, {
           fecha_baja: new Date(),
