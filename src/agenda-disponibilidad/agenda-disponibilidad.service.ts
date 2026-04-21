@@ -481,30 +481,37 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 
   async activarDesactivarBloques(ids: number[], activar: boolean, usuario?: string): Promise<void> {
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      throw new BadRequestException('No se recibieron IDs válidos para procesar');
-    }
-    
-    const idsValidos = ids.filter(id => {
-      const idNum = Number(id);
-      return !isNaN(idNum) && isFinite(idNum) && idNum > 0;
-    });
-    
-    if (idsValidos.length === 0) {
-      throw new BadRequestException('No hay IDs válidos en la lista');
-    }
-    
-    if (activar) {
-      const primerId = idsValidos[0];
-      const bloqueAActivar = await this.findOne(primerId);
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    throw new BadRequestException('No se recibieron IDs válidos para procesar');
+  }
+  
+  const idsValidos = ids.filter(id => {
+    const idNum = Number(id);
+    return !isNaN(idNum) && isFinite(idNum) && idNum > 0;
+  });
+  
+  if (idsValidos.length === 0) {
+    throw new BadRequestException('No hay IDs válidos en la lista');
+  }
+  
+  if (activar) {
+    // Validar cada bloque antes de activarlo
+    for (const id of idsValidos) {
+      const bloqueAActivar = await this.findOne(id);
       
       if (!bloqueAActivar) {
-        throw new BadRequestException(`No se encontró el bloque con ID ${primerId}`);
+        throw new BadRequestException(`No se encontró el bloque con ID ${id}`);
+      }
+      
+      // Si ya está activo, no validar (solo para inactivos)
+      if (!bloqueAActivar.fecha_baja) {
+        continue;
       }
       
       const horaDesdeNorm = this.normalizarHora(bloqueAActivar.horaDesde);
       const horaHastaNorm = this.normalizarHora(bloqueAActivar.horaHasta);
       
+      // Buscar bloques ACTIVOS que solapen (excluyendo el que estamos activando)
       const bloquesExistentes = await this.repository.find({
         where: {
           profesionalCentroId: bloqueAActivar.profesionalCentroId,
@@ -514,7 +521,8 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       });
       
       for (const bloqueExistente of bloquesExistentes) {
-        if (bloqueExistente.id === primerId) continue;
+        // Excluir el bloque que estamos activando (puede tener fecha_baja pero queremos reactivarlo)
+        if (bloqueExistente.id === id) continue;
         
         const existeSolapamiento = (
           (horaDesdeNorm < bloqueExistente.horaHasta && horaHastaNorm > bloqueExistente.horaDesde)
@@ -528,37 +536,37 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         }
       }
     }
-    
-    const ahora = new Date();
-    const usuarioActual = usuario || 'demo';
-    
-    if (activar) {
-      await this.repository
-        .createQueryBuilder()
-        .update(AgendaDisponibilidad)
-        .set({ 
-          fecha_baja: null as any,
-          usuario_baja: null as any,
-          usuario_modificacion: usuarioActual,
-          fecha_modificacion: ahora
-        })
-        .where('id IN (:...ids)', { ids: idsValidos })
-        .execute();
-    } else {
-      await this.repository
-        .createQueryBuilder()
-        .update(AgendaDisponibilidad)
-        .set({ 
-          fecha_baja: ahora,
-          usuario_baja: usuarioActual,
-          usuario_modificacion: usuarioActual,
-          fecha_modificacion: ahora
-        })
-        .where('id IN (:...ids)', { ids: idsValidos })
-        .execute();
-    }
   }
-
+  
+  const ahora = new Date();
+  const usuarioActual = usuario || 'demo';
+  
+  if (activar) {
+    await this.repository
+      .createQueryBuilder()
+      .update(AgendaDisponibilidad)
+      .set({ 
+        fecha_baja: null as any,
+        usuario_baja: null as any,
+        usuario_modificacion: usuarioActual,
+        fecha_modificacion: ahora
+      })
+      .where('id IN (:...ids)', { ids: idsValidos })
+      .execute();
+  } else {
+    await this.repository
+      .createQueryBuilder()
+      .update(AgendaDisponibilidad)
+      .set({ 
+        fecha_baja: ahora,
+        usuario_baja: usuarioActual,
+        usuario_modificacion: usuarioActual,
+        fecha_modificacion: ahora
+      })
+      .where('id IN (:...ids)', { ids: idsValidos })
+      .execute();
+  }
+}
   async sincronizarBloque(
     profesionalCentroId: number,
     horaDesde: string,
