@@ -175,48 +175,50 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 
   private async verificarSolapamiento(
-    profesionalCentroId: number,
-    diaSemana: number,
-    horaDesde: string,
-    horaHasta: string,
-    fechaDesde: Date,
-    fechaHasta: Date | null,
-    id?: number,
-  ): Promise<void> {
-    const agendasExistentes = await this.repository.find({
-      where: {
-        profesionalCentroId,
-        diaSemana,
-        fecha_baja: IsNull(),
-      },
-    });
+  profesionalCentroId: number,
+  diaSemana: number,
+  horaDesde: string,
+  horaHasta: string,
+  fechaDesde: Date,
+  fechaHasta: Date | null,
+  id?: number,
+): Promise<void> {
+  const agendasExistentes = await this.repository.find({
+    where: {
+      profesionalCentroId,
+      diaSemana,
+      fecha_baja: IsNull(),
+    },
+  });
 
-    for (const agenda of agendasExistentes) {
-      if (id && agenda.id === id) continue;
+  for (const agenda of agendasExistentes) {
+    if (id && agenda.id === id) continue;
 
-      const existeSolapamiento = (
-        (horaDesde < agenda.horaHasta && horaHasta > agenda.horaDesde)
+    // Verificar solapamiento de horarios (IGNORANDO duración)
+    const haySolapamientoHorario = (
+      (horaDesde < agenda.horaHasta && horaHasta > agenda.horaDesde)
+    );
+
+    if (!haySolapamientoHorario) continue;
+
+    const agendaFechaHasta = agenda.fechaHasta || new Date('9999-12-31');
+    const nuevaFechaHasta = fechaHasta || new Date('9999-12-31');
+    
+    const haySolapamientoFechas = (
+      fechaDesde <= agendaFechaHasta &&
+      nuevaFechaHasta >= agenda.fechaDesde
+    );
+
+    if (haySolapamientoFechas) {
+      throw new BadRequestException(
+        `Ya existe una agenda para este profesional-centro en el día ${diaSemana} ` +
+        `con horario ${agenda.horaDesde} a ${agenda.horaHasta} ` +
+        `(duración ${agenda.duracionTurno} min) que solapa con el rango de fechas. ` +
+        `No se permiten solapamientos aunque la duración sea diferente.`
       );
-
-      if (!existeSolapamiento) continue;
-
-      const agendaFechaHasta = agenda.fechaHasta || new Date('9999-12-31');
-      const nuevaFechaHasta = fechaHasta || new Date('9999-12-31');
-      
-      const fechasSolapan = (
-        fechaDesde <= agendaFechaHasta &&
-        nuevaFechaHasta >= agenda.fechaDesde
-      );
-
-      if (fechasSolapan) {
-        throw new BadRequestException(
-          `Ya existe una agenda para este profesional-centro en el día ${diaSemana} ` +
-          `con horario ${agenda.horaDesde} a ${agenda.horaHasta} que solapa con el rango de fechas`
-        );
-      }
     }
   }
-
+}
   async generarSlots(
     profesionalCentroId: number,
     fecha: string,
