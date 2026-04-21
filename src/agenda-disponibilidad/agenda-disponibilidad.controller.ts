@@ -46,10 +46,10 @@ export class AgendaDisponibilidadController {
   @Get('generar-slots/:profesionalCentroId')
   async generarSlots(
     @Param('profesionalCentroId') profesionalCentroId: string,
-    @Query('fecha') fecha: string,
+    @Query('diaSemana') diaSemana: string,  // Ahora recibe diaSemana en lugar de fecha
   ): Promise<any[]> {
-    console.log('[Controller] generarSlots - ID:', profesionalCentroId, 'Fecha:', fecha);
-    const slots = await this.service.generarSlots(Number(profesionalCentroId), fecha);
+    console.log(`[Controller] generarSlots - ID: ${profesionalCentroId}, diaSemana: ${diaSemana}`);
+    const slots = await this.service.generarSlots(Number(profesionalCentroId), Number(diaSemana));
     return slots;
   }
 
@@ -63,13 +63,10 @@ export class AgendaDisponibilidadController {
     return { message: `${body.ids.length} bloque(s) ${accion} correctamente` };
   }
 
-  // ============================================================
-  // NUEVO ENDPOINT: Sincronizar bloque completo
-  // ============================================================
   @Put('sincronizar')
   async sincronizarBloque(
     @Body() body: {
-      agendaDisponibilidadId: number;  // 👈 CAMPO AGREGADO
+      agendaDisponibilidadId: number;
       profesionalCentroId: number;
       horaDesde: string;
       horaHasta: string;
@@ -82,11 +79,9 @@ export class AgendaDisponibilidadController {
   ) {
     console.log('[Controller] sincronizarBloque - Body recibido');
     
-    // Normalizar horas antes de enviar al servicio
     const horaDesdeNorm = this.normalizarHora(body.horaDesde);
     const horaHastaNorm = this.normalizarHora(body.horaHasta);
     
-    // 👇 AGREGAR agendaDisponibilidadId a cada excepción
     const excepcionesHorariosNorm = body.excepcionesHorarios.map(exc => ({
       agendaDisponibilidadId: body.agendaDisponibilidadId,
       diaSemana: exc.diaSemana,
