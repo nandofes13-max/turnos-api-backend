@@ -175,106 +175,128 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 
   private async verificarSolapamiento(
-  profesionalCentroId: number,
-  diaSemana: number,
-  horaDesde: string,
-  horaHasta: string,
-  fechaDesde: Date,
-  fechaHasta: Date | null,
-  id?: number,
-): Promise<void> {
-  const agendasExistentes = await this.repository.find({
-    where: {
-      profesionalCentroId,
-      diaSemana,
-      fecha_baja: IsNull(),
-    },
-  });
+    profesionalCentroId: number,
+    diaSemana: number,
+    horaDesde: string,
+    horaHasta: string,
+    fechaDesde: Date,
+    fechaHasta: Date | null,
+    id?: number,
+  ): Promise<void> {
+    const agendasExistentes = await this.repository.find({
+      where: {
+        profesionalCentroId,
+        diaSemana,
+        fecha_baja: IsNull(),
+      },
+    });
 
-  for (const agenda of agendasExistentes) {
-    if (id && agenda.id === id) continue;
+    for (const agenda of agendasExistentes) {
+      if (id && agenda.id === id) continue;
 
-    // Verificar solapamiento de horarios (IGNORANDO duración)
-    const haySolapamientoHorario = (
-      (horaDesde < agenda.horaHasta && horaHasta > agenda.horaDesde)
-    );
-
-    if (!haySolapamientoHorario) continue;
-
-    const agendaFechaHasta = agenda.fechaHasta || new Date('9999-12-31');
-    const nuevaFechaHasta = fechaHasta || new Date('9999-12-31');
-    
-    const haySolapamientoFechas = (
-      fechaDesde <= agendaFechaHasta &&
-      nuevaFechaHasta >= agenda.fechaDesde
-    );
-
-    if (haySolapamientoFechas) {
-      throw new BadRequestException(
-        `Ya existe una agenda para este profesional-centro en el día ${diaSemana} ` +
-        `con horario ${agenda.horaDesde} a ${agenda.horaHasta} ` +
-        `(duración ${agenda.duracionTurno} min) que solapa con el rango de fechas. ` +
-        `No se permiten solapamientos aunque la duración sea diferente.`
+      const haySolapamientoHorario = (
+        (horaDesde < agenda.horaHasta && horaHasta > agenda.horaDesde)
       );
+
+      if (!haySolapamientoHorario) continue;
+
+      const agendaFechaHasta = agenda.fechaHasta || new Date('9999-12-31');
+      const nuevaFechaHasta = fechaHasta || new Date('9999-12-31');
+      
+      const haySolapamientoFechas = (
+        fechaDesde <= agendaFechaHasta &&
+        nuevaFechaHasta >= agenda.fechaDesde
+      );
+
+      if (haySolapamientoFechas) {
+        throw new BadRequestException(
+          `Ya existe una agenda para este profesional-centro en el día ${diaSemana} ` +
+          `con horario ${agenda.horaDesde} a ${agenda.horaHasta} que solapa con el rango de fechas`
+        );
+      }
     }
   }
-}
+
+  // ============================================================
+  // MÉTODO GENERAR SLOTS - MODIFICADO (recibe diaSemana, no fecha)
+  // ============================================================
   async generarSlots(
-  profesionalCentroId: number,
-  fecha: string,
-): Promise<{ disponible: boolean; hora: string; bloqueado: boolean }[]> {
-  const fechaObj = new Date(fecha);
-  const diaSemana = fechaObj.getDay();
-  
-  console.log(`[SLOTS] Buscando agenda - profesionalCentroId: ${profesionalCentroId}, diaSemana: ${diaSemana}, fecha: ${fecha}`);
-  
-  const agenda = await this.repository.findOne({
-    where: {
-      profesionalCentroId,
-      diaSemana,
-      fecha_baja: IsNull(),
-      fechaDesde: LessThanOrEqual(fechaObj),
-    },
-    relations: ['profesionalCentro'],
-  });
-  
-  if (!agenda) {
-    console.log(`[SLOTS] No se encontró agenda`);
-    return [];
-  }
-  
-  console.log(`[SLOTS] Agenda encontrada - ID: ${agenda.id}, duracionTurno: ${agenda.duracionTurno} min, horaDesde: ${agenda.horaDesde}, horaHasta: ${agenda.horaHasta}`);
-  
-  const slots: { hora: string; bloqueado: boolean }[] = [];
-  let horaActual = agenda.horaDesde;
-  const horaFin = agenda.horaHasta;
-  let contador = 0;
-  
-  console.log(`[SLOTS] Generando slots desde ${horaActual} hasta ${horaFin} con duración ${agenda.duracionTurno} min`);
-  
-  while (horaActual < horaFin && contador < 50) {
-    slots.push({ hora: horaActual, bloqueado: false });
-    contador++;
+    profesionalCentroId: number,
+    diaSemana: number,  // Ahora recibe el día directamente
+  ): Promise<{ disponible: boolean; hora: string; bloqueado: boolean }[]> {
     
-    const [h, m] = horaActual.split(':').map(Number);
-    let minutos = m + agenda.duracionTurno;
-    let horas = h;
-    if (minutos >= 60) {
-      horas += Math.floor(minutos / 60);
-      minutos = minutos % 60;
+    console.log(`[SLOTS] Buscando agenda - profesionalCentroId: ${profesionalCentroId}, diaSemana: ${diaSemana}`);
+    
+    const agenda = await this.repository.findOne({
+      where: {
+        profesionalCentroId,
+        diaSemana,
+        fecha_baja: IsNull(),
+      },
+    });
+    
+    if (!agenda) {
+      console.log(`[SLOTS] No se encontró agenda para esos parámetros`);
+      return [];
     }
-    horaActual = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
+    
+    console.log(`[SLOTS] Agenda encontrada - ID: ${agenda.id}, duracionTurno: ${agenda.duracionTurno} min, horaDesde: ${agenda.horaDesde}, horaHasta: ${agenda.horaHasta}`);
+    
+    const slots: { hora: string; bloqueado: boolean }[] = [];
+    let horaActual = agenda.horaDesde;
+    const horaFin = agenda.horaHasta;
+    let contador = 0;
+    const maxIteraciones = 100;
+    
+    while (horaActual < horaFin && contador < maxIteraciones) {
+      slots.push({ hora: this.normalizarHora(horaActual), bloqueado: false });
+      contador++;
+      
+      const [h, m] = horaActual.split(':').map(Number);
+      let minutos = m + agenda.duracionTurno;
+      let horas = h;
+      if (minutos >= 60) {
+        horas += Math.floor(minutos / 60);
+        minutos = minutos % 60;
+      }
+      horaActual = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
+    }
+    
+    console.log(`[SLOTS] Generados ${slots.length} slots. Primeros 3: ${slots.slice(0, 3).map(s => s.hora).join(', ')}`);
+    
+    // Excepciones de fechas (por ahora se mantienen, pero idealmente también deberían modificarse)
+    const excepcionesFechas = await this.excepcionesFechasRepository.find({
+      where: {
+        profesionalCentroId: profesionalCentroId,
+        fecha_baja: IsNull(),
+      },
+    });
+    
+    // Para las excepciones, como no tenemos fecha, solo aplicamos las que no tienen fecha específica
+    // o las que aplican para todos los días. Esto se puede mejorar después.
+    for (const excepcion of excepcionesFechas) {
+      if (!excepcion.horaDesde && !excepcion.horaHasta) {
+        for (let i = 0; i < slots.length; i++) {
+          slots[i].bloqueado = true;
+        }
+      } else if (excepcion.horaDesde && excepcion.horaHasta) {
+        for (let i = 0; i < slots.length; i++) {
+          const slotHora = slots[i].hora;
+          const exHoraDesde = this.normalizarHora(excepcion.horaDesde);
+          const exHoraHasta = this.normalizarHora(excepcion.horaHasta);
+          if (slotHora >= exHoraDesde && slotHora < exHoraHasta) {
+            slots[i].bloqueado = true;
+          }
+        }
+      }
+    }
+    
+    return slots.map(slot => ({
+      ...slot,
+      disponible: !slot.bloqueado,
+    }));
   }
-  
-  console.log(`[SLOTS] Generados ${slots.length} slots. Primeros 3: ${slots.slice(0, 3).map(s => s.hora).join(', ')}`);
-  
-  // ... resto del código (excepciones, etc.)
-  
-  return slots.map(slot => ({
-    ...slot,
-    disponible: !slot.bloqueado,
-  }));
-}
+
   async findAll(): Promise<AgendaDisponibilidad[]> {
     return this.repository.find({
       relations: ['profesionalCentro', 'profesionalCentro.profesional', 'profesionalCentro.especialidad', 'profesionalCentro.centro'],
@@ -329,6 +351,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     const bloqueActivoExistente = await this.repository.findOne({
       where: {
         profesionalCentroId: createDto.profesionalCentroId,
+        diaSemana: createDto.diaSemana,
         horaDesde: createDto.horaDesde,
         horaHasta: createDto.horaHasta,
         duracionTurno: createDto.duracionTurno,
@@ -467,92 +490,89 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 
   async activarDesactivarBloques(ids: number[], activar: boolean, usuario?: string): Promise<void> {
-  if (!ids || !Array.isArray(ids) || ids.length === 0) {
-    throw new BadRequestException('No se recibieron IDs válidos para procesar');
-  }
-  
-  const idsValidos = ids.filter(id => {
-    const idNum = Number(id);
-    return !isNaN(idNum) && isFinite(idNum) && idNum > 0;
-  });
-  
-  if (idsValidos.length === 0) {
-    throw new BadRequestException('No hay IDs válidos en la lista');
-  }
-  
-  if (activar) {
-    // Validar cada bloque antes de activarlo
-    for (const id of idsValidos) {
-      const bloqueAActivar = await this.findOne(id);
-      
-      if (!bloqueAActivar) {
-        throw new BadRequestException(`No se encontró el bloque con ID ${id}`);
-      }
-      
-      // Si ya está activo, no validar (solo para inactivos)
-      if (!bloqueAActivar.fecha_baja) {
-        continue;
-      }
-      
-      const horaDesdeNorm = this.normalizarHora(bloqueAActivar.horaDesde);
-      const horaHastaNorm = this.normalizarHora(bloqueAActivar.horaHasta);
-      
-      // Buscar bloques ACTIVOS que solapen (excluyendo el que estamos activando)
-      const bloquesExistentes = await this.repository.find({
-        where: {
-          profesionalCentroId: bloqueAActivar.profesionalCentroId,
-          diaSemana: bloqueAActivar.diaSemana,
-          fecha_baja: IsNull(),
-        },
-      });
-      
-      for (const bloqueExistente of bloquesExistentes) {
-        // Excluir el bloque que estamos activando (puede tener fecha_baja pero queremos reactivarlo)
-        if (bloqueExistente.id === id) continue;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      throw new BadRequestException('No se recibieron IDs válidos para procesar');
+    }
+    
+    const idsValidos = ids.filter(id => {
+      const idNum = Number(id);
+      return !isNaN(idNum) && isFinite(idNum) && idNum > 0;
+    });
+    
+    if (idsValidos.length === 0) {
+      throw new BadRequestException('No hay IDs válidos en la lista');
+    }
+    
+    if (activar) {
+      for (const id of idsValidos) {
+        const bloqueAActivar = await this.findOne(id);
         
-        const existeSolapamiento = (
-          (horaDesdeNorm < bloqueExistente.horaHasta && horaHastaNorm > bloqueExistente.horaDesde)
-        );
+        if (!bloqueAActivar) {
+          throw new BadRequestException(`No se encontró el bloque con ID ${id}`);
+        }
         
-        if (existeSolapamiento) {
-          throw new BadRequestException(
-            `No se puede activar el bloque porque solapa con otro bloque activo ` +
-            `del día ${bloqueExistente.diaSemana} con horario ${bloqueExistente.horaDesde} a ${bloqueExistente.horaHasta}.`
+        if (!bloqueAActivar.fecha_baja) {
+          continue;
+        }
+        
+        const horaDesdeNorm = this.normalizarHora(bloqueAActivar.horaDesde);
+        const horaHastaNorm = this.normalizarHora(bloqueAActivar.horaHasta);
+        
+        const bloquesExistentes = await this.repository.find({
+          where: {
+            profesionalCentroId: bloqueAActivar.profesionalCentroId,
+            diaSemana: bloqueAActivar.diaSemana,
+            fecha_baja: IsNull(),
+          },
+        });
+        
+        for (const bloqueExistente of bloquesExistentes) {
+          if (bloqueExistente.id === id) continue;
+          
+          const existeSolapamiento = (
+            (horaDesdeNorm < bloqueExistente.horaHasta && horaHastaNorm > bloqueExistente.horaDesde)
           );
+          
+          if (existeSolapamiento) {
+            throw new BadRequestException(
+              `No se puede activar el bloque porque solapa con otro bloque activo ` +
+              `del día ${bloqueExistente.diaSemana} con horario ${bloqueExistente.horaDesde} a ${bloqueExistente.horaHasta}.`
+            );
+          }
         }
       }
     }
+    
+    const ahora = new Date();
+    const usuarioActual = usuario || 'demo';
+    
+    if (activar) {
+      await this.repository
+        .createQueryBuilder()
+        .update(AgendaDisponibilidad)
+        .set({ 
+          fecha_baja: null as any,
+          usuario_baja: null as any,
+          usuario_modificacion: usuarioActual,
+          fecha_modificacion: ahora
+        })
+        .where('id IN (:...ids)', { ids: idsValidos })
+        .execute();
+    } else {
+      await this.repository
+        .createQueryBuilder()
+        .update(AgendaDisponibilidad)
+        .set({ 
+          fecha_baja: ahora,
+          usuario_baja: usuarioActual,
+          usuario_modificacion: usuarioActual,
+          fecha_modificacion: ahora
+        })
+        .where('id IN (:...ids)', { ids: idsValidos })
+        .execute();
+    }
   }
-  
-  const ahora = new Date();
-  const usuarioActual = usuario || 'demo';
-  
-  if (activar) {
-    await this.repository
-      .createQueryBuilder()
-      .update(AgendaDisponibilidad)
-      .set({ 
-        fecha_baja: null as any,
-        usuario_baja: null as any,
-        usuario_modificacion: usuarioActual,
-        fecha_modificacion: ahora
-      })
-      .where('id IN (:...ids)', { ids: idsValidos })
-      .execute();
-  } else {
-    await this.repository
-      .createQueryBuilder()
-      .update(AgendaDisponibilidad)
-      .set({ 
-        fecha_baja: ahora,
-        usuario_baja: usuarioActual,
-        usuario_modificacion: usuarioActual,
-        fecha_modificacion: ahora
-      })
-      .where('id IN (:...ids)', { ids: idsValidos })
-      .execute();
-  }
-}
+
   async sincronizarBloque(
     profesionalCentroId: number,
     horaDesde: string,
