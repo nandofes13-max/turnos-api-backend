@@ -220,77 +220,61 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 }
   async generarSlots(
-    profesionalCentroId: number,
-    fecha: string,
-  ): Promise<{ disponible: boolean; hora: string; bloqueado: boolean }[]> {
-    const fechaObj = new Date(fecha);
-    const diaSemana = fechaObj.getDay();
-    const fechaStr = fechaObj.toISOString().split('T')[0];
-    
-    const agenda = await this.repository.findOne({
-      where: {
-        profesionalCentroId,
-        diaSemana,
-        fecha_baja: IsNull(),
-        fechaDesde: LessThanOrEqual(fechaObj),
-      },
-      relations: ['profesionalCentro'],
-    });
-    
-    if (!agenda) {
-      return [];
-    }
-    
-    const slots: { hora: string; bloqueado: boolean }[] = [];
-    let horaActual = agenda.horaDesde;
-    const horaFin = agenda.horaHasta;
-    
-    while (horaActual < horaFin) {
-      slots.push({ hora: horaActual, bloqueado: false });
-      const [h, m] = horaActual.split(':').map(Number);
-      let minutos = m + agenda.duracionTurno;
-      let horas = h;
-      if (minutos >= 60) {
-        horas += Math.floor(minutos / 60);
-        minutos = minutos % 60;
-      }
-      horaActual = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
-    }
-    
-    const excepcionesFechas = await this.excepcionesFechasRepository.find({
-      where: {
-        profesionalCentroId: profesionalCentroId,
-        fecha_baja: IsNull(),
-      },
-    });
-    
-    const excepcionesFechasAplican = excepcionesFechas.filter(exc => {
-      const fechaDesde = new Date(exc.fechaDesde);
-      const fechaHasta = exc.fechaHasta ? new Date(exc.fechaHasta) : fechaDesde;
-      return fechaObj >= fechaDesde && fechaObj <= fechaHasta;
-    });
-    
-    for (const excepcion of excepcionesFechasAplican) {
-      if (!excepcion.horaDesde && !excepcion.horaHasta) {
-        for (let i = 0; i < slots.length; i++) {
-          slots[i].bloqueado = true;
-        }
-      } else if (excepcion.horaDesde && excepcion.horaHasta) {
-        for (let i = 0; i < slots.length; i++) {
-          const slotHora = slots[i].hora;
-          if (slotHora >= excepcion.horaDesde && slotHora < excepcion.horaHasta) {
-            slots[i].bloqueado = true;
-          }
-        }
-      }
-    }
-    
-    return slots.map(slot => ({
-      ...slot,
-      disponible: !slot.bloqueado,
-    }));
+  profesionalCentroId: number,
+  fecha: string,
+): Promise<{ disponible: boolean; hora: string; bloqueado: boolean }[]> {
+  const fechaObj = new Date(fecha);
+  const diaSemana = fechaObj.getDay();
+  
+  console.log(`[SLOTS] Buscando agenda - profesionalCentroId: ${profesionalCentroId}, diaSemana: ${diaSemana}, fecha: ${fecha}`);
+  
+  const agenda = await this.repository.findOne({
+    where: {
+      profesionalCentroId,
+      diaSemana,
+      fecha_baja: IsNull(),
+      fechaDesde: LessThanOrEqual(fechaObj),
+    },
+    relations: ['profesionalCentro'],
+  });
+  
+  if (!agenda) {
+    console.log(`[SLOTS] No se encontró agenda`);
+    return [];
   }
-
+  
+  console.log(`[SLOTS] Agenda encontrada - ID: ${agenda.id}, duracionTurno: ${agenda.duracionTurno} min, horaDesde: ${agenda.horaDesde}, horaHasta: ${agenda.horaHasta}`);
+  
+  const slots: { hora: string; bloqueado: boolean }[] = [];
+  let horaActual = agenda.horaDesde;
+  const horaFin = agenda.horaHasta;
+  let contador = 0;
+  
+  console.log(`[SLOTS] Generando slots desde ${horaActual} hasta ${horaFin} con duración ${agenda.duracionTurno} min`);
+  
+  while (horaActual < horaFin && contador < 50) {
+    slots.push({ hora: horaActual, bloqueado: false });
+    contador++;
+    
+    const [h, m] = horaActual.split(':').map(Number);
+    let minutos = m + agenda.duracionTurno;
+    let horas = h;
+    if (minutos >= 60) {
+      horas += Math.floor(minutos / 60);
+      minutos = minutos % 60;
+    }
+    horaActual = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
+  }
+  
+  console.log(`[SLOTS] Generados ${slots.length} slots. Primeros 3: ${slots.slice(0, 3).map(s => s.hora).join(', ')}`);
+  
+  // ... resto del código (excepciones, etc.)
+  
+  return slots.map(slot => ({
+    ...slot,
+    disponible: !slot.bloqueado,
+  }));
+}
   async findAll(): Promise<AgendaDisponibilidad[]> {
     return this.repository.find({
       relations: ['profesionalCentro', 'profesionalCentro.profesional', 'profesionalCentro.especialidad', 'profesionalCentro.centro'],
