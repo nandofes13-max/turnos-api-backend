@@ -597,35 +597,24 @@ async generarSlotsPorId(
           continue;
         }
         
-       const horaDesdeNorm = this.normalizarHora(bloqueAActivar.horaDesde);
-const horaHastaNorm = this.normalizarHora(bloqueAActivar.horaHasta);
-
-const bloquesExistentes = await this.repository.find({
-  where: {
-    profesionalCentroId: bloqueAActivar.profesionalCentroId,
-    diaSemana: bloqueAActivar.diaSemana,
-    fecha_baja: IsNull(),
-  },
-});
-
-for (const bloqueExistente of bloquesExistentes) {
-  if (bloqueExistente.id === id) continue;
-  
-  // Normalizar también las horas del bloque existente
-  const horaDesdeExistente = this.normalizarHora(bloqueExistente.horaDesde);
-  const horaHastaExistente = this.normalizarHora(bloqueExistente.horaHasta);
-  
-  const existeSolapamiento = (
-    (horaDesdeNorm < horaHastaExistente && horaHastaNorm > horaDesdeExistente)
-  );
-  
-  if (existeSolapamiento) {
-    throw new BadRequestException(
-      `No se puede activar el bloque porque solapa con otro bloque activo ` +
-      `del día ${bloqueExistente.diaSemana} con horario ${horaDesdeExistente} a ${horaHastaExistente}.`
-    );
-  }
-}          
+        const horaDesdeNorm = this.normalizarHora(bloqueAActivar.horaDesde);
+        const horaHastaNorm = this.normalizarHora(bloqueAActivar.horaHasta);
+        
+        const bloquesExistentes = await this.repository.find({
+          where: {
+            profesionalCentroId: bloqueAActivar.profesionalCentroId,
+            diaSemana: bloqueAActivar.diaSemana,
+            fecha_baja: IsNull(),
+          },
+        });
+        
+        for (const bloqueExistente of bloquesExistentes) {
+          if (bloqueExistente.id === id) continue;
+          
+          const existeSolapamiento = (
+            (horaDesdeNorm < bloqueExistente.horaHasta && horaHastaNorm > bloqueExistente.horaDesde)
+          );
+          
           if (existeSolapamiento) {
             throw new BadRequestException(
               `No se puede activar el bloque porque solapa con otro bloque activo ` +
