@@ -183,6 +183,8 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   fechaHasta: Date | null,
   id?: number,
 ): Promise<void> {
+  console.log(`[VERIFICAR] profesionalCentroId: ${profesionalCentroId}, diaSemana: ${diaSemana}, horario: ${horaDesde}-${horaHasta}`);
+  
   const agendasExistentes = await this.repository.find({
     where: {
       profesionalCentroId,
@@ -191,13 +193,18 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     },
   });
 
+  console.log(`[VERIFICAR] Encontrados ${agendasExistentes.length} bloques activos para este día`);
+
   for (const agenda of agendasExistentes) {
     if (id && agenda.id === id) continue;
 
-    // Verificar solapamiento de horarios (INDEPENDIENTEMENTE de la duración)
+    console.log(`[VERIFICAR] Comparando con bloque ID ${agenda.id}, horario: ${agenda.horaDesde}-${agenda.horaHasta}, duración: ${agenda.duracionTurno}`);
+
     const haySolapamientoHorario = (
       (horaDesde < agenda.horaHasta && horaHasta > agenda.horaDesde)
     );
+
+    console.log(`[VERIFICAR] ¿Hay solapamiento horario? ${haySolapamientoHorario}`);
 
     if (!haySolapamientoHorario) continue;
 
@@ -209,7 +216,10 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       nuevaFechaHasta >= agenda.fechaDesde
     );
 
+    console.log(`[VERIFICAR] ¿Hay solapamiento de fechas? ${haySolapamientoFechas}`);
+
     if (haySolapamientoFechas) {
+      console.log(`[VERIFICAR] CONFLICTO DETECTADO con bloque ID ${agenda.id}`);
       throw new BadRequestException(
         `Ya existe una agenda para este profesional-centro en el día ${diaSemana} ` +
         `con horario ${agenda.horaDesde} a ${agenda.horaHasta} ` +
@@ -218,8 +228,9 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       );
     }
   }
+  
+  console.log(`[VERIFICAR] No se detectaron conflictos`);
 }
-
   // ============================================================
   // MÉTODO GENERAR SLOTS - MODIFICADO (recibe diaSemana, no fecha)
   // ============================================================
