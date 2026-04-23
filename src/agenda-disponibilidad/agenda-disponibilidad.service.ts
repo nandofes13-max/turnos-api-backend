@@ -174,63 +174,52 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     }
   }
 
+  // ============================================================
+  // VERIFICAR SOLAPAMIENTO - SIMPLIFICADO (sin fechas)
+  // ============================================================
   private async verificarSolapamiento(
-  profesionalCentroId: number,
-  diaSemana: number,
-  horaDesde: string,
-  horaHasta: string,
-  fechaDesde: Date,
-  fechaHasta: Date | null,
-  id?: number,
-): Promise<void> {
-  console.log(`[VERIFICAR] profesionalCentroId: ${profesionalCentroId}, diaSemana: ${diaSemana}, horario: ${horaDesde}-${horaHasta}`);
-  
-  const agendasExistentes = await this.repository.find({
-    where: {
-      profesionalCentroId,
-      diaSemana,
-      fecha_baja: IsNull(),
-    },
-  });
-
-  console.log(`[VERIFICAR] Encontrados ${agendasExistentes.length} bloques activos para este día`);
-
-  for (const agenda of agendasExistentes) {
-    if (id && agenda.id === id) continue;
-
-    console.log(`[VERIFICAR] Comparando con bloque ID ${agenda.id}, horario: ${agenda.horaDesde}-${agenda.horaHasta}, duración: ${agenda.duracionTurno}`);
-
-    const haySolapamientoHorario = (
-      (horaDesde < agenda.horaHasta && horaHasta > agenda.horaDesde)
-    );
-
-    console.log(`[VERIFICAR] ¿Hay solapamiento horario? ${haySolapamientoHorario}`);
-
-    if (!haySolapamientoHorario) continue;
-
-    const agendaFechaHasta = agenda.fechaHasta || new Date('9999-12-31');
-    const nuevaFechaHasta = fechaHasta || new Date('9999-12-31');
+    profesionalCentroId: number,
+    diaSemana: number,
+    horaDesde: string,
+    horaHasta: string,
+    id?: number,
+  ): Promise<void> {
+    console.log(`[VERIFICAR] profesionalCentroId: ${profesionalCentroId}, diaSemana: ${diaSemana}, horario: ${horaDesde}-${horaHasta}`);
     
-    const haySolapamientoFechas = (
-      fechaDesde <= agendaFechaHasta &&
-      nuevaFechaHasta >= agenda.fechaDesde
-    );
+    const agendasExistentes = await this.repository.find({
+      where: {
+        profesionalCentroId,
+        diaSemana,
+        fecha_baja: IsNull(),
+      },
+    });
 
-    console.log(`[VERIFICAR] ¿Hay solapamiento de fechas? ${haySolapamientoFechas}`);
+    console.log(`[VERIFICAR] Encontrados ${agendasExistentes.length} bloques activos para este día`);
 
-    if (haySolapamientoFechas) {
-      console.log(`[VERIFICAR] CONFLICTO DETECTADO con bloque ID ${agenda.id}`);
-      throw new BadRequestException(
-        `Ya existe una agenda para este profesional-centro en el día ${diaSemana} ` +
-        `con horario ${agenda.horaDesde} a ${agenda.horaHasta} ` +
-        `(duración ${agenda.duracionTurno} min) que solapa con el rango de fechas. ` +
-        `No se permiten solapamientos aunque la duración sea diferente.`
+    for (const agenda of agendasExistentes) {
+      if (id && agenda.id === id) continue;
+
+      console.log(`[VERIFICAR] Comparando con bloque ID ${agenda.id}, horario: ${agenda.horaDesde}-${agenda.horaHasta}, duración: ${agenda.duracionTurno}`);
+
+      const haySolapamientoHorario = (
+        (horaDesde < agenda.horaHasta && horaHasta > agenda.horaDesde)
       );
+
+      console.log(`[VERIFICAR] ¿Hay solapamiento horario? ${haySolapamientoHorario}`);
+
+      if (haySolapamientoHorario) {
+        console.log(`[VERIFICAR] CONFLICTO DETECTADO con bloque ID ${agenda.id}`);
+        throw new BadRequestException(
+          `No se permite solapamiento de horarios. Ya existe un bloque ACTIVO ` +
+          `para este día con horario ${agenda.horaDesde} a ${agenda.horaHasta} ` +
+          `(duración ${agenda.duracionTurno} min).`
+        );
+      }
     }
+    
+    console.log(`[VERIFICAR] No se detectaron conflictos`);
   }
-  
-  console.log(`[VERIFICAR] No se detectaron conflictos`);
-}
+
   // ============================================================
   // MÉTODO GENERAR SLOTS - MODIFICADO (recibe diaSemana, no fecha)
   // ============================================================
@@ -312,83 +301,81 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 
   // ============================================================
-// NUEVO MÉTODO: Generar slots por ID de agenda (preciso)
-// ============================================================
-async generarSlotsPorId(
-  profesionalCentroId: number,
-  agendaId: number,
-): Promise<{ disponible: boolean; hora: string; bloqueado: boolean }[]> {
-  
-  console.log(`[SLOTS] Buscando agenda por ID: ${agendaId}, profesionalCentroId: ${profesionalCentroId}`);
-  
-  // Buscar el bloque específico por su ID y verificar que pertenezca al profesionalCentroId
-  const agenda = await this.repository.findOne({
-    where: {
-      id: agendaId,
-      profesionalCentroId,
-      fecha_baja: IsNull(),
-    },
-  });
-  
-  if (!agenda) {
-    console.log(`[SLOTS] No se encontró agenda para ID ${agendaId} y profesionalCentroId ${profesionalCentroId}`);
-    return [];
-  }
-  
-  console.log(`[SLOTS] Agenda encontrada - ID: ${agenda.id}, duracionTurno: ${agenda.duracionTurno} min, horaDesde: ${agenda.horaDesde}, horaHasta: ${agenda.horaHasta}`);
-  
-  const slots: { hora: string; bloqueado: boolean }[] = [];
-  let horaActual = this.normalizarHora(agenda.horaDesde);
-  const horaFin = this.normalizarHora(agenda.horaHasta);
-  let contador = 0;
-  const maxIteraciones = 100;
-  
-  while (horaActual < horaFin && contador < maxIteraciones) {
-    slots.push({ hora: horaActual, bloqueado: false });
-    contador++;
+  // NUEVO MÉTODO: Generar slots por ID de agenda (preciso)
+  // ============================================================
+  async generarSlotsPorId(
+    profesionalCentroId: number,
+    agendaId: number,
+  ): Promise<{ disponible: boolean; hora: string; bloqueado: boolean }[]> {
     
-    const [h, m] = horaActual.split(':').map(Number);
-    let minutos = m + agenda.duracionTurno;
-    let horas = h;
-    if (minutos >= 60) {
-      horas += Math.floor(minutos / 60);
-      minutos = minutos % 60;
+    console.log(`[SLOTS] Buscando agenda por ID: ${agendaId}, profesionalCentroId: ${profesionalCentroId}`);
+    
+    const agenda = await this.repository.findOne({
+      where: {
+        id: agendaId,
+        profesionalCentroId,
+        fecha_baja: IsNull(),
+      },
+    });
+    
+    if (!agenda) {
+      console.log(`[SLOTS] No se encontró agenda para ID ${agendaId} y profesionalCentroId ${profesionalCentroId}`);
+      return [];
     }
-    horaActual = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
-  }
-  
-  console.log(`[SLOTS] Generados ${slots.length} slots para agenda ID ${agenda.id}. Primeros 3: ${slots.slice(0, 3).map(s => s.hora).join(', ')}`);
-  
-  // Excepciones de fechas - por ahora se mantienen pero se pueden optimizar después
-  const excepcionesFechas = await this.excepcionesFechasRepository.find({
-    where: {
-      profesionalCentroId: profesionalCentroId,
-      fecha_baja: IsNull(),
-    },
-  });
-  
-  for (const excepcion of excepcionesFechas) {
-    if (!excepcion.horaDesde && !excepcion.horaHasta) {
-      for (let i = 0; i < slots.length; i++) {
-        slots[i].bloqueado = true;
+    
+    console.log(`[SLOTS] Agenda encontrada - ID: ${agenda.id}, duracionTurno: ${agenda.duracionTurno} min, horaDesde: ${agenda.horaDesde}, horaHasta: ${agenda.horaHasta}`);
+    
+    const slots: { hora: string; bloqueado: boolean }[] = [];
+    let horaActual = this.normalizarHora(agenda.horaDesde);
+    const horaFin = this.normalizarHora(agenda.horaHasta);
+    let contador = 0;
+    const maxIteraciones = 100;
+    
+    while (horaActual < horaFin && contador < maxIteraciones) {
+      slots.push({ hora: horaActual, bloqueado: false });
+      contador++;
+      
+      const [h, m] = horaActual.split(':').map(Number);
+      let minutos = m + agenda.duracionTurno;
+      let horas = h;
+      if (minutos >= 60) {
+        horas += Math.floor(minutos / 60);
+        minutos = minutos % 60;
       }
-    } else if (excepcion.horaDesde && excepcion.horaHasta) {
-      for (let i = 0; i < slots.length; i++) {
-        const slotHora = slots[i].hora;
-        const exHoraDesde = this.normalizarHora(excepcion.horaDesde);
-        const exHoraHasta = this.normalizarHora(excepcion.horaHasta);
-        if (slotHora >= exHoraDesde && slotHora < exHoraHasta) {
+      horaActual = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
+    }
+    
+    console.log(`[SLOTS] Generados ${slots.length} slots para agenda ID ${agenda.id}. Primeros 3: ${slots.slice(0, 3).map(s => s.hora).join(', ')}`);
+    
+    const excepcionesFechas = await this.excepcionesFechasRepository.find({
+      where: {
+        profesionalCentroId: profesionalCentroId,
+        fecha_baja: IsNull(),
+      },
+    });
+    
+    for (const excepcion of excepcionesFechas) {
+      if (!excepcion.horaDesde && !excepcion.horaHasta) {
+        for (let i = 0; i < slots.length; i++) {
           slots[i].bloqueado = true;
+        }
+      } else if (excepcion.horaDesde && excepcion.horaHasta) {
+        for (let i = 0; i < slots.length; i++) {
+          const slotHora = slots[i].hora;
+          const exHoraDesde = this.normalizarHora(excepcion.horaDesde);
+          const exHoraHasta = this.normalizarHora(excepcion.horaHasta);
+          if (slotHora >= exHoraDesde && slotHora < exHoraHasta) {
+            slots[i].bloqueado = true;
+          }
         }
       }
     }
+    
+    return slots.map(slot => ({
+      ...slot,
+      disponible: !slot.bloqueado,
+    }));
   }
-  
-  return slots.map(slot => ({
-    ...slot,
-    disponible: !slot.bloqueado,
-  }));
-}
 
   async findAll(): Promise<AgendaDisponibilidad[]> {
     return this.repository.find({
@@ -432,15 +419,16 @@ async generarSlotsPorId(
       createDto.bufferMinutos || 0,
     );
     await this.verificarFechasValidas(createDto.fechaDesde, createDto.fechaHasta || null);
+    
+    // Validar solapamiento (sin fechas)
     await this.verificarSolapamiento(
       createDto.profesionalCentroId,
       createDto.diaSemana,
       createDto.horaDesde,
       createDto.horaHasta,
-      createDto.fechaDesde,
-      createDto.fechaHasta || null,
     );
 
+    // Buscar bloque ACTIVO con misma duración (para rechazar)
     const bloqueActivoExistente = await this.repository.findOne({
       where: {
         profesionalCentroId: createDto.profesionalCentroId,
@@ -456,6 +444,7 @@ async generarSlotsPorId(
       throw new BadRequestException('Ya existe un bloque activo con el mismo horario y duración');
     }
 
+    // Buscar bloque EXISTENTE ACTIVO (mismos 5 campos clave, sin fechas)
     const existenteActivo = await this.repository.findOne({
       where: {
         profesionalCentroId: createDto.profesionalCentroId,
@@ -463,8 +452,6 @@ async generarSlotsPorId(
         horaDesde: createDto.horaDesde,
         horaHasta: createDto.horaHasta,
         duracionTurno: createDto.duracionTurno,
-        fechaDesde: createDto.fechaDesde,
-        fechaHasta: createDto.fechaHasta || IsNull(),
         fecha_baja: IsNull(),
       },
     });
@@ -477,6 +464,7 @@ async generarSlotsPorId(
       return this.repository.save(existenteActivo);
     }
     
+    // Buscar bloque EXISTENTE ELIMINADO (inactivo) con misma duración
     const existenteEliminado = await this.repository.findOne({
       where: {
         profesionalCentroId: createDto.profesionalCentroId,
@@ -484,8 +472,6 @@ async generarSlotsPorId(
         horaDesde: createDto.horaDesde,
         horaHasta: createDto.horaHasta,
         duracionTurno: createDto.duracionTurno,
-        fechaDesde: createDto.fechaDesde,
-        fechaHasta: createDto.fechaHasta || IsNull(),
         fecha_baja: Not(IsNull()),
       },
     });
@@ -544,13 +530,12 @@ async generarSlotsPorId(
 
     const profesionalCentroId = updateDto.profesionalCentroId ?? registro.profesionalCentroId;
     
+    // Validar solapamiento (sin fechas)
     await this.verificarSolapamiento(
       profesionalCentroId,
       diaSemana,
       horaDesde,
       horaHasta,
-      fechaDesde,
-      fechaHasta,
       id,
     );
 
@@ -583,91 +568,92 @@ async generarSlotsPorId(
   }
 
   async activarDesactivarBloques(ids: number[], activar: boolean, usuario?: string): Promise<void> {
-  if (!ids || !Array.isArray(ids) || ids.length === 0) {
-    throw new BadRequestException('No se recibieron IDs válidos para procesar');
-  }
-  
-  const idsValidos = ids.filter(id => {
-    const idNum = Number(id);
-    return !isNaN(idNum) && isFinite(idNum) && idNum > 0;
-  });
-  
-  if (idsValidos.length === 0) {
-    throw new BadRequestException('No hay IDs válidos en la lista');
-  }
-  
-  if (activar) {
-    for (const id of idsValidos) {
-      const bloqueAActivar = await this.findOne(id);
-      
-      if (!bloqueAActivar) {
-        throw new BadRequestException(`No se encontró el bloque con ID ${id}`);
-      }
-      
-      if (!bloqueAActivar.fecha_baja) {
-        continue;
-      }
-      
-      const horaDesdeNorm = this.normalizarHora(bloqueAActivar.horaDesde);
-      const horaHastaNorm = this.normalizarHora(bloqueAActivar.horaHasta);
-      
-      const bloquesExistentes = await this.repository.find({
-        where: {
-          profesionalCentroId: bloqueAActivar.profesionalCentroId,
-          diaSemana: bloqueAActivar.diaSemana,
-          fecha_baja: IsNull(),
-        },
-      });
-      
-      for (const bloqueExistente of bloquesExistentes) {
-        if (bloqueExistente.id === id) continue;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      throw new BadRequestException('No se recibieron IDs válidos para procesar');
+    }
+    
+    const idsValidos = ids.filter(id => {
+      const idNum = Number(id);
+      return !isNaN(idNum) && isFinite(idNum) && idNum > 0;
+    });
+    
+    if (idsValidos.length === 0) {
+      throw new BadRequestException('No hay IDs válidos en la lista');
+    }
+    
+    if (activar) {
+      for (const id of idsValidos) {
+        const bloqueAActivar = await this.findOne(id);
         
-        const horaDesdeExistente = this.normalizarHora(bloqueExistente.horaDesde);
-        const horaHastaExistente = this.normalizarHora(bloqueExistente.horaHasta);
+        if (!bloqueAActivar) {
+          throw new BadRequestException(`No se encontró el bloque con ID ${id}`);
+        }
         
-        const existeSolapamiento = (
-          (horaDesdeNorm < horaHastaExistente && horaHastaNorm > horaDesdeExistente)
-        );
+        if (!bloqueAActivar.fecha_baja) {
+          continue;
+        }
         
-        if (existeSolapamiento) {
-          throw new BadRequestException(
-            `No se puede activar el bloque porque solapa con otro bloque activo ` +
-            `del día ${bloqueExistente.diaSemana} con horario ${horaDesdeExistente} a ${horaHastaExistente}.`
+        const horaDesdeNorm = this.normalizarHora(bloqueAActivar.horaDesde);
+        const horaHastaNorm = this.normalizarHora(bloqueAActivar.horaHasta);
+        
+        const bloquesExistentes = await this.repository.find({
+          where: {
+            profesionalCentroId: bloqueAActivar.profesionalCentroId,
+            diaSemana: bloqueAActivar.diaSemana,
+            fecha_baja: IsNull(),
+          },
+        });
+        
+        for (const bloqueExistente of bloquesExistentes) {
+          if (bloqueExistente.id === id) continue;
+          
+          const horaDesdeExistente = this.normalizarHora(bloqueExistente.horaDesde);
+          const horaHastaExistente = this.normalizarHora(bloqueExistente.horaHasta);
+          
+          const existeSolapamiento = (
+            (horaDesdeNorm < horaHastaExistente && horaHastaNorm > horaDesdeExistente)
           );
+          
+          if (existeSolapamiento) {
+            throw new BadRequestException(
+              `No se puede activar el bloque porque solapa con otro bloque activo ` +
+              `del día ${bloqueExistente.diaSemana} con horario ${horaDesdeExistente} a ${horaHastaExistente}.`
+            );
+          }
         }
       }
     }
+    
+    const ahora = new Date();
+    const usuarioActual = usuario || 'demo';
+    
+    if (activar) {
+      await this.repository
+        .createQueryBuilder()
+        .update(AgendaDisponibilidad)
+        .set({ 
+          fecha_baja: null as any,
+          usuario_baja: null as any,
+          usuario_modificacion: usuarioActual,
+          fecha_modificacion: ahora
+        })
+        .where('id IN (:...ids)', { ids: idsValidos })
+        .execute();
+    } else {
+      await this.repository
+        .createQueryBuilder()
+        .update(AgendaDisponibilidad)
+        .set({ 
+          fecha_baja: ahora,
+          usuario_baja: usuarioActual,
+          usuario_modificacion: usuarioActual,
+          fecha_modificacion: ahora
+        })
+        .where('id IN (:...ids)', { ids: idsValidos })
+        .execute();
+    }
   }
-  
-  const ahora = new Date();
-  const usuarioActual = usuario || 'demo';
-  
-  if (activar) {
-    await this.repository
-      .createQueryBuilder()
-      .update(AgendaDisponibilidad)
-      .set({ 
-        fecha_baja: null as any,
-        usuario_baja: null as any,
-        usuario_modificacion: usuarioActual,
-        fecha_modificacion: ahora
-      })
-      .where('id IN (:...ids)', { ids: idsValidos })
-      .execute();
-  } else {
-    await this.repository
-      .createQueryBuilder()
-      .update(AgendaDisponibilidad)
-      .set({ 
-        fecha_baja: ahora,
-        usuario_baja: usuarioActual,
-        usuario_modificacion: usuarioActual,
-        fecha_modificacion: ahora
-      })
-      .where('id IN (:...ids)', { ids: idsValidos })
-      .execute();
-  }
-}
+
   async sincronizarBloque(
     profesionalCentroId: number,
     horaDesde: string,
