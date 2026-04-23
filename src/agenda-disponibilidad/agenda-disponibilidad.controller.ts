@@ -43,13 +43,19 @@ export class AgendaDisponibilidadController {
     return registros.map(r => this.agregarUltimoMovimiento(r));
   }
 
-  @Get('generar-slots/:profesionalCentroId')
-  async generarSlots(
-    @Param('profesionalCentroId') profesionalCentroId: string,
-    @Query('diaSemana') diaSemana: string,  // Ahora recibe diaSemana en lugar de fecha
+  // ============================================================
+  // NUEVO ENDPOINT: Generar slots por ID de agenda (preciso)
+  // ============================================================
+  @Get('generar-slots-por-id')
+  async generarSlotsPorId(
+    @Query('profesionalCentroId') profesionalCentroId: string,
+    @Query('agendaId') agendaId: string,
   ): Promise<any[]> {
-    console.log(`[Controller] generarSlots - ID: ${profesionalCentroId}, diaSemana: ${diaSemana}`);
-    const slots = await this.service.generarSlots(Number(profesionalCentroId), Number(diaSemana));
+    console.log(`[Controller] generarSlotsPorId - profesionalCentroId: ${profesionalCentroId}, agendaId: ${agendaId}`);
+    const slots = await this.service.generarSlotsPorId(
+      Number(profesionalCentroId),
+      Number(agendaId),
+    );
     return slots;
   }
 
