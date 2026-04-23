@@ -297,6 +297,85 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     }));
   }
 
+  // ============================================================
+// NUEVO MÉTODO: Generar slots por ID de agenda (preciso)
+// ============================================================
+async generarSlotsPorId(
+  profesionalCentroId: number,
+  agendaId: number,
+): Promise<{ disponible: boolean; hora: string; bloqueado: boolean }[]> {
+  
+  console.log(`[SLOTS] Buscando agenda por ID: ${agendaId}, profesionalCentroId: ${profesionalCentroId}`);
+  
+  // Buscar el bloque específico por su ID y verificar que pertenezca al profesionalCentroId
+  const agenda = await this.repository.findOne({
+    where: {
+      id: agendaId,
+      profesionalCentroId,
+      fecha_baja: IsNull(),
+    },
+  });
+  
+  if (!agenda) {
+    console.log(`[SLOTS] No se encontró agenda para ID ${agendaId} y profesionalCentroId ${profesionalCentroId}`);
+    return [];
+  }
+  
+  console.log(`[SLOTS] Agenda encontrada - ID: ${agenda.id}, duracionTurno: ${agenda.duracionTurno} min, horaDesde: ${agenda.horaDesde}, horaHasta: ${agenda.horaHasta}`);
+  
+  const slots: { hora: string; bloqueado: boolean }[] = [];
+  let horaActual = this.normalizarHora(agenda.horaDesde);
+  const horaFin = this.normalizarHora(agenda.horaHasta);
+  let contador = 0;
+  const maxIteraciones = 100;
+  
+  while (horaActual < horaFin && contador < maxIteraciones) {
+    slots.push({ hora: horaActual, bloqueado: false });
+    contador++;
+    
+    const [h, m] = horaActual.split(':').map(Number);
+    let minutos = m + agenda.duracionTurno;
+    let horas = h;
+    if (minutos >= 60) {
+      horas += Math.floor(minutos / 60);
+      minutos = minutos % 60;
+    }
+    horaActual = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
+  }
+  
+  console.log(`[SLOTS] Generados ${slots.length} slots para agenda ID ${agenda.id}. Primeros 3: ${slots.slice(0, 3).map(s => s.hora).join(', ')}`);
+  
+  // Excepciones de fechas - por ahora se mantienen pero se pueden optimizar después
+  const excepcionesFechas = await this.excepcionesFechasRepository.find({
+    where: {
+      profesionalCentroId: profesionalCentroId,
+      fecha_baja: IsNull(),
+    },
+  });
+  
+  for (const excepcion of excepcionesFechas) {
+    if (!excepcion.horaDesde && !excepcion.horaHasta) {
+      for (let i = 0; i < slots.length; i++) {
+        slots[i].bloqueado = true;
+      }
+    } else if (excepcion.horaDesde && excepcion.horaHasta) {
+      for (let i = 0; i < slots.length; i++) {
+        const slotHora = slots[i].hora;
+        const exHoraDesde = this.normalizarHora(excepcion.horaDesde);
+        const exHoraHasta = this.normalizarHora(excepcion.horaHasta);
+        if (slotHora >= exHoraDesde && slotHora < exHoraHasta) {
+          slots[i].bloqueado = true;
+        }
+      }
+    }
+  }
+  
+  return slots.map(slot => ({
+    ...slot,
+    disponible: !slot.bloqueado,
+  }));
+}
+
   async findAll(): Promise<AgendaDisponibilidad[]> {
     return this.repository.find({
       relations: ['profesionalCentro', 'profesionalCentro.profesional', 'profesionalCentro.especialidad', 'profesionalCentro.centro'],
