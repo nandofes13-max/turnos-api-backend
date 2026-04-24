@@ -742,4 +742,195 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       WHERE table_name = 'agenda_disponibilidad';
     `);
   }
+  // ============================================================
+// NUEVO MÉTODO: Guardar lote completo de bloques (transaccional)
+// ============================================================
+async guardarLote(bloques: any[], usuario: string): Promise<void> {
+  // Iniciar transacción
+  const queryRunner = this.repository.manager.connection.createQueryRunner();
+  await queryRunner.connect();
+  await queryRunner.startTransaction();
+  
+  try {
+    // Separar bloques por tipo
+    const inactivos = bloques.filter(b => b.id && b.fecha_baja);
+    const activos = bloques.filter(b => b.id && !b.fecha_baja);
+    const nuevos = bloques.filter(b => !b.id);
+    
+    console.log(`[guardarLote] Inactivos: ${inactivos.length}, Activos: ${activos.length}, Nuevos: ${nuevos.length}`);
+    
+    // ============================================================
+    // PASO 1: Actualizar INACTIVOS (sin validaciones)
+    // ============================================================
+    for (const bloque of inactivos) {
+      const existing = await queryRunner.manager.findOne(AgendaDisponibilidad, {
+        where: { id: bloque.id }
+      });
+      
+      if (existing) {
+        // Actualizar todos los campos del bloque inactivo
+        existing.horaDesde = this.normalizarHora(bloque.horaDesde);
+        existing.horaHasta = this.normalizarHora(bloque.horaHasta);
+        existing.duracionTurno = bloque.duracionTurno;
+        existing.fechaDesde = new Date(bloque.fechaDesde);
+        existing.fechaHasta = bloque.fechaHasta ? new Date(bloque.fechaHasta) : null;
+        existing.fecha_baja = bloque.fecha_baja ? new Date(bloque.fecha_baja) : null;
+        existing.usuario_modificacion = usuario;
+        existing.fecha_modificacion = new Date();
+        
+        await queryRunner.manager.save(existing);
+        console.log(`[guardarLote] Actualizado bloque INACTIVO ID ${bloque.id}`);
+      }
+    }
+    
+    // ============================================================
+    // PASO 2: Validar y actualizar ACTIVOS (con validaciones)
+    // ============================================================
+    for (const bloque of activos) {
+      // Validar duplicado exacto (contra todos, excluyendo su ID)
+      const duplicado = await queryRunner.manager.findOne(AgendaDisponibilidad, {
+        where: {
+          profesionalCentroId: bloque.profesionalCentroId,
+          diaSemana: bloque.diaSemana,
+          horaDesde: this.normalizarHora(bloque.horaDesde),
+          horaHasta: this.normalizarHora(bloque.horaHasta),
+          duracionTurno: bloque.duracionTurno,
+          id: Not(bloque.id),
+        },
+      });
+      
+      if (duplicado) {
+        throw new BadRequestException(
+          `Ya existe un registro con los mismos datos (profesional, día, horario y duración) para el bloque ID ${bloque.id}.`
+        );
+      }
+      
+      // Validar solapamiento contra otros ACTIVOS
+      const solapamiento = await queryRunner.manager.findOne(AgendaDisponibilidad, {
+        where: {
+          profesionalCentroId: bloque.profesionalCentroId,
+          diaSemana: bloque.diaSemana,
+          fecha_baja: IsNull(),
+          id: Not(bloque.id),
+        },
+      });
+      
+      if (solapamiento) {
+        const horaDesdeNorm = this.normalizarHora(bloque.horaDesde);
+        const horaHastaNorm = this.normalizarHora(bloque.horaHasta);
+        const solapa = (
+          (horaDesdeNorm < solapamiento.horaHasta && horaHastaNorm > solapamiento.horaDesde)
+        );
+        
+        if (solapa) {
+          throw new BadRequestException(
+            `No se permite solapamiento de horarios. Ya existe un bloque ACTIVO para este día con horario ${solapamiento.horaDesde} a ${solapamiento.horaHasta}.`
+          );
+        }
+      }
+      
+      // Actualizar bloque ACTIVO
+      const existing = await queryRunner.manager.findOne(AgendaDisponibilidad, {
+        where: { id: bloque.id }
+      });
+      
+      if (existing) {
+        existing.horaDesde = this.normalizarHora(bloque.horaDesde);
+        existing.horaHasta = this.normalizarHora(bloque.horaHasta);
+        existing.duracionTurno = bloque.duracionTurno;
+        existing.fechaDesde = new Date(bloque.fechaDesde);
+        existing.fechaHasta = bloque.fechaHasta ? new Date(bloque.fechaHasta) : null;
+        existing.fecha_baja = null;
+        existing.usuario_modificacion = usuario;
+        existing.fecha_modificacion = new Date();
+        
+        await queryRunner.manager.save(existing);
+        console.log(`[guardarLote] Actualizado bloque ACTIVO ID ${bloque.id}`);
+      }
+    }
+    
+    // ============================================================
+    // PASO 3: Validar y crear NUEVOS bloques (con validaciones)
+    // ============================================================
+    for (const bloque of nuevos) {
+      // Validar duplicado exacto (contra todos)
+      const duplicado = await queryRunner.manager.findOne(AgendaDisponibilidad, {
+        where: {
+          profesionalCentroId: bloque.profesionalCentroId,
+          diaSemana: bloque.diaSemana,
+          horaDesde: this.normalizarHora(bloque.horaDesde),
+          horaHasta: this.normalizarHora(bloque.horaHasta),
+          duracionTurno: bloque.duracionTurno,
+        },
+      });
+      
+      if (duplicado) {
+        if (duplicado.fecha_baja) {
+          throw new BadRequestException(
+            `Ya existe un bloque INACTIVO con los mismos datos. Por favor, reactívelo desde la interfaz.`
+          );
+        } else {
+          throw new BadRequestException(
+            `Ya existe un bloque ACTIVO con el mismo horario y duración.`
+          );
+        }
+      }
+      
+      // Validar solapamiento contra ACTIVOS
+      const solapamiento = await queryRunner.manager.findOne(AgendaDisponibilidad, {
+        where: {
+          profesionalCentroId: bloque.profesionalCentroId,
+          diaSemana: bloque.diaSemana,
+          fecha_baja: IsNull(),
+        },
+      });
+      
+      if (solapamiento) {
+        const horaDesdeNorm = this.normalizarHora(bloque.horaDesde);
+        const horaHastaNorm = this.normalizarHora(bloque.horaHasta);
+        const solapa = (
+          (horaDesdeNorm < solapamiento.horaHasta && horaHastaNorm > solapamiento.horaDesde)
+        );
+        
+        if (solapa) {
+          throw new BadRequestException(
+            `No se permite solapamiento de horarios. Ya existe un bloque ACTIVO para este día con horario ${solapamiento.horaDesde} a ${solapamiento.horaHasta}.`
+          );
+        }
+      }
+      
+      // Crear nuevo bloque
+      const nuevoBloque = this.repository.create({
+        profesionalCentroId: bloque.profesionalCentroId,
+        diaSemana: bloque.diaSemana,
+        horaDesde: this.normalizarHora(bloque.horaDesde),
+        horaHasta: this.normalizarHora(bloque.horaHasta),
+        duracionTurno: bloque.duracionTurno,
+        bufferMinutos: bloque.bufferMinutos || 0,
+        fechaDesde: new Date(bloque.fechaDesde),
+        fechaHasta: bloque.fechaHasta ? new Date(bloque.fechaHasta) : null,
+        usuario_alta: usuario,
+        fecha_alta: new Date(),
+      });
+      
+      await queryRunner.manager.save(nuevoBloque);
+      console.log(`[guardarLote] Creado nuevo bloque para día ${bloque.diaSemana}`);
+    }
+    
+    // Confirmar transacción
+    await queryRunner.commitTransaction();
+    console.log(`[guardarLote] Transacción completada exitosamente`);
+    
+  } catch (error) {
+    // Revertir transacción en caso de error
+    await queryRunner.rollbackTransaction();
+    console.error(`[guardarLote] Error: ${error.message}`);
+    throw error;
+  } finally {
+    // Liberar query runner
+    await queryRunner.release();
+  }
 }
+}
+
+
