@@ -16,6 +16,25 @@ import { UpdateAgendaDisponibilidadDto } from './dto/update-agenda-disponibilida
 
 console.log('=== AGENDA-DISPONIBILIDAD CONTROLLER CARGADO ===');
 
+// DTO para el guardado en lote
+export class BloqueLoteDto {
+  id?: number;
+  profesionalCentroId: number;
+  diaSemana: number;
+  horaDesde: string;
+  horaHasta: string;
+  duracionTurno: number;
+  bufferMinutos?: number;
+  fechaDesde: string;
+  fechaHasta: string | null;
+  fecha_baja?: string | null;
+  diasHabilitados: number[];
+}
+
+export class GuardarLoteDto {
+  bloques: BloqueLoteDto[];
+}
+
 @Controller('agenda-disponibilidad')
 export class AgendaDisponibilidadController {
   constructor(private readonly service: AgendaDisponibilidadService) {}
@@ -57,6 +76,16 @@ export class AgendaDisponibilidadController {
       Number(agendaId),
     );
     return slots;
+  }
+
+  // ============================================================
+  // NUEVO ENDPOINT: Guardar lote completo de bloques
+  // ============================================================
+  @Post('guardar-lote')
+  async guardarLote(@Body() guardarLoteDto: GuardarLoteDto): Promise<{ message: string }> {
+    console.log(`[Controller] guardarLote - Recibidos ${guardarLoteDto.bloques.length} bloques`);
+    await this.service.guardarLote(guardarLoteDto.bloques, 'demo');
+    return { message: 'Agenda guardada correctamente' };
   }
 
   @Put('activar-desactivar')
