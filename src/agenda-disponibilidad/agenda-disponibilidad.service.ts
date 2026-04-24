@@ -199,7 +199,10 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     for (const agenda of agendasExistentes) {
       if (id && agenda.id === id) continue;
 
-      console.log(`[VERIFICAR] Comparando con bloque ID ${agenda.id}, horario: ${agenda.horaDesde}-${agenda.horaHasta}, duración: ${agenda.duracionTurno}`);
+    console.log(`[VERIFICAR] Nuevo bloque horario: ${horaDesde} a ${horaHasta}`);
+console.log(`[VERIFICAR] Existente bloque horario: ${agenda.horaDesde} a ${agenda.horaHasta}`);
+console.log(`[VERIFICAR] Condiciones: ${horaDesde} < ${agenda.horaHasta} = ${horaDesde < agenda.horaHasta}`);
+console.log(`[VERIFICAR] Condiciones: ${horaHasta} > ${agenda.horaDesde} = ${horaHasta > agenda.horaDesde}`);
 
       const haySolapamientoHorario = (
         (horaDesde < agenda.horaHasta && horaHasta > agenda.horaDesde)
