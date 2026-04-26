@@ -135,47 +135,42 @@ export class ActividadEspecialidadService {
   // ============================================================
   // NUEVO MÉTODO: Obtener especialidades por negocio y actividad
   // ============================================================
-  async findEspecialidadesPorNegocioYActividad(
-    negocioId: number,
-    actividadId: number,
-  ): Promise<{ id: number; nombre: string; negocioId: number; actividadId: number }[]> {
-    try {
-      console.log(`[DEBUG] Buscando especialidades para negocioId: ${negocioId}, actividadId: ${actividadId}`);
-      
-      // Verificar que el negocio tenga esta actividad (usando SQL directo con el repositorio)
-      const checkSql = `
-        SELECT 1 FROM negocio_actividades 
-        WHERE negocio_id = $1 AND actividad_id = $2 AND fecha_baja IS NULL
-        LIMIT 1
-      `;
-      const checkResult = await this.repository.query(checkSql, [negocioId, actividadId]);
-      
-      if (checkResult.length === 0) {
-        console.log(`[DEBUG] El negocio ${negocioId} no tiene la actividad ${actividadId}`);
-        return [];
-      }
-      
-      // Obtener especialidades de la actividad
-      const sql = `
-        SELECT DISTINCT 
-          e.id, 
-          e.nombre,
-          $1 as "negocioId",
-          $2 as "actividadId"
-        FROM especialidad e
-        INNER JOIN actividad_especialidad ae ON ae.especialidad_id = e.id
-        WHERE ae.actividad_id = $2
-          AND e.fecha_baja IS NULL
+async findEspecialidadesPorNegocioYActividad(
+  negocioId: number,
+  actividadId: number,
+): Promise<any[]> {
+  try {
+    console.log(`[DEBUG] INICIO - negocioId: ${negocioId}, actividadId: ${actividadId}`);
+    
+    // Consulta SQL súper simple
+    const sql = `
+      SELECT e.id, e.nombre
+      FROM especialidad e
+      WHERE e.id IN (
+        SELECT ae.especialidad_id 
+        FROM actividad_especialidad ae
+        WHERE ae.actividad_id = $1
           AND ae.fecha_baja IS NULL
-        ORDER BY e.nombre ASC
-      `;
-      
-      const results = await this.repository.query(sql, [negocioId, actividadId]);
-      console.log(`[DEBUG] Especialidades encontradas: ${results.length}`);
-      return results;
-    } catch (error) {
-      console.error('[DEBUG] Error en consulta:', error);
-      throw new BadRequestException(`Error al obtener especialidades: ${error.message}`);
-    }
+      )
+      AND e.fecha_baja IS NULL
+      ORDER BY e.nombre ASC
+    `;
+    
+    const results = await this.repository.query(sql, [actividadId]);
+    console.log(`[DEBUG] Resultados: ${JSON.stringify(results)}`);
+    
+    // Agregar negocioId y actividadId manualmente
+    const resultadosFinales = results.map((r: any) => ({
+      id: r.id,
+      nombre: r.nombre,
+      negocioId: negocioId,
+      actividadId: actividadId,
+    }));
+    
+    return resultadosFinales;
+  } catch (error) {
+    console.error('[DEBUG] ERROR:', error);
+    throw new BadRequestException(`Error: ${error.message}`);
   }
+}
 }
