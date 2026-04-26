@@ -5,7 +5,8 @@ import {
   Put, 
   Delete, 
   Body, 
-  Param 
+  Param,
+  Query
 } from '@nestjs/common';
 import { ProfesionalCentroService } from './profesional-centro.service';
 import { ProfesionalCentro } from './entities/profesional-centro.entity';
@@ -42,6 +43,21 @@ export class ProfesionalCentroController {
   async findByCentro(@Param('centroId') centroId: string): Promise<any[]> {
     const registros = await this.service.findByCentro(Number(centroId));
     return registros.map(r => this.agregarUltimoMovimiento(r));
+  }
+
+  // ============================================================
+  // NUEVO ENDPOINT: Obtener especialidades con disponibilidad
+  // ============================================================
+  @Get('especialidades-con-disponibilidad')
+  async getEspecialidadesConDisponibilidad(
+    @Query('negocioId') negocioId: string,
+    @Query('actividadId') actividadId: string,
+  ): Promise<{ id: number; nombre: string }[]> {
+    console.log(`[Controller] especialidades-con-disponibilidad - negocioId: ${negocioId}, actividadId: ${actividadId}`);
+    return this.service.findEspecialidadesConDisponibilidad(
+      Number(negocioId),
+      Number(actividadId),
+    );
   }
 
   // Crear nueva relación
