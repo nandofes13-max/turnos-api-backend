@@ -76,11 +76,9 @@ export class NegocioActividadesService {
 
   // Crear o reactivar una relación
   async create(createDto: CreateNegocioActividadDto, usuario?: string): Promise<NegocioActividad> {
-    // Validar que existan las entidades relacionadas (solo activas)
     await this.validarNegocio(createDto.negocioId);
     await this.validarActividad(createDto.actividadId);
 
-    // Buscar si ya existe una relación (activa o inactiva)
     const existente = await this.repository.findOneBy({
       negocioId: createDto.negocioId,
       actividadId: createDto.actividadId,
@@ -88,7 +86,6 @@ export class NegocioActividadesService {
 
     if (existente) {
       if (existente.fecha_baja) {
-        // Reactivar la relación inactiva
         (existente as any).fecha_baja = null;
         (existente as any).usuario_baja = null;
         existente.usuario_modificacion = usuario || 'demo';
@@ -98,7 +95,6 @@ export class NegocioActividadesService {
       }
     }
 
-    // Crear nueva relación
     const relacion = this.repository.create({
       ...createDto,
       usuario_alta: usuario || 'demo',
@@ -110,7 +106,6 @@ export class NegocioActividadesService {
   async update(id: number, updateDto: UpdateNegocioActividadDto, usuario?: string): Promise<NegocioActividad> {
     const relacion = await this.findOne(id);
 
-    // Si se cambia negocio o actividad, validar
     if (updateDto.negocioId && updateDto.negocioId !== relacion.negocioId) {
       await this.validarNegocio(updateDto.negocioId);
     }
@@ -189,17 +184,22 @@ export class NegocioActividadesService {
         .select('DISTINCT e.id', 'id')
         .addSelect('e.nombre', 'nombre')
         .addSelect('a.id', 'actividadId')
-        .addSelect(negocioId, 'negocioId')
-        .innerJoin('actividad_especialidad', 'ae', 'ae.actividad_id = a.id')
-        .innerJoin('especialidad', 'e', 'e.id = ae.especialidad_id')
         .where('a.id = :actividadId', { actividadId })
         .andWhere('e.fecha_baja IS NULL')
         .andWhere('ae.fecha_baja IS NULL')
+        .innerJoin('actividad_especialidad', 'ae', 'ae.actividad_id = a.id')
+        .innerJoin('especialidad', 'e', 'e.id = ae.especialidad_id')
         .orderBy('e.nombre', 'ASC')
         .getRawMany();
       
-      console.log(`[DEBUG] Especialidades encontradas: ${especialidades.length}`);
-      return especialidades;
+      // Agregar negocioId manualmente a cada resultado
+      const resultados = especialidades.map(esp => ({
+        ...esp,
+        negocioId: negocioId,
+      }));
+      
+      console.log(`[DEBUG] Especialidades encontradas: ${resultados.length}`);
+      return resultados;
     } catch (error) {
       console.error('[DEBUG] Error en consulta de especialidades:', error);
       throw new BadRequestException(`Error al obtener especialidades: ${error.message}`);
