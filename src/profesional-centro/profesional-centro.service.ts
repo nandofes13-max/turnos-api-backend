@@ -27,7 +27,7 @@ export class ProfesionalCentroService {
     private readonly negocioActividadRepository: Repository<NegocioActividad>,
   ) {}
 
-  // ===== FUNCIONES AUXILIARES (sin cambios) =====
+  // ===== FUNCIONES AUXILIARES =====
   private async verificarProfesionalActivo(id: number): Promise<void> {
     const profesional = await this.profesionalRepository.findOne({
       where: { id, fecha_baja: IsNull() },
@@ -65,7 +65,9 @@ export class ProfesionalCentroService {
     }
   }
 
+  // NUEVA VALIDACIÓN: Verificar que el centro pertenezca a un negocio que tenga la actividad de la especialidad
   private async verificarActividadCoincideConCentro(especialidadId: number, centroId: number): Promise<void> {
+    // 1. Obtener la actividad de la especialidad
     const actividadEspecialidad = await this.actividadEspecialidadRepository.findOne({
       where: { especialidadId, fecha_baja: IsNull() },
     });
@@ -76,6 +78,7 @@ export class ProfesionalCentroService {
 
     const actividadId = actividadEspecialidad.actividadId;
 
+    // 2. Obtener el negocio del centro
     const centro = await this.centroRepository.findOne({
       where: { id: centroId, fecha_baja: IsNull() },
     });
@@ -86,6 +89,7 @@ export class ProfesionalCentroService {
 
     const negocioId = centro.negocioId;
 
+    // 3. Verificar que el negocio tenga esa actividad
     const negocioActividad = await this.negocioActividadRepository.findOne({
       where: {
         negocioId: negocioId,
@@ -102,7 +106,7 @@ export class ProfesionalCentroService {
     }
   }
 
-  // ===== CRUD (sin cambios) =====
+  // ===== CRUD =====
   async findAll(): Promise<ProfesionalCentro[]> {
     return this.repository.find({
       relations: ['profesional', 'especialidad', 'centro', 'centro.negocio'],
@@ -137,15 +141,18 @@ export class ProfesionalCentroService {
   }
 
   async create(createDto: CreateProfesionalCentroDto, usuario?: string): Promise<ProfesionalCentro> {
+    // Validar que todos los IDs existan y estén activos
     await this.verificarProfesionalActivo(createDto.profesionalId);
     await this.verificarEspecialidadActiva(createDto.especialidadId);
     await this.verificarCentroActivo(createDto.centroId);
     
+    // NUEVA VALIDACIÓN: Verificar que el centro tenga la actividad correcta
     await this.verificarActividadCoincideConCentro(
       createDto.especialidadId,
       createDto.centroId,
     );
     
+    // Validar combinación única
     await this.verificarCombinacionUnica(
       createDto.profesionalId,
       createDto.especialidadId,
@@ -163,6 +170,7 @@ export class ProfesionalCentroService {
   async update(id: number, updateDto: UpdateProfesionalCentroDto, usuario?: string): Promise<ProfesionalCentro> {
     const registro = await this.findOne(id);
 
+    // Si se actualiza algún ID, validar existencia y actividad
     if (updateDto.profesionalId) {
       await this.verificarProfesionalActivo(updateDto.profesionalId);
     }
@@ -173,16 +181,19 @@ export class ProfesionalCentroService {
       await this.verificarCentroActivo(updateDto.centroId);
     }
 
+    // Validar combinación única si cambian los IDs
     const profesionalId = updateDto.profesionalId ?? registro.profesionalId;
     const especialidadId = updateDto.especialidadId ?? registro.especialidadId;
     const centroId = updateDto.centroId ?? registro.centroId;
     
     await this.verificarCombinacionUnica(profesionalId, especialidadId, centroId, id);
 
+    // Si cambia especialidad o centro, validar la relación actividad-negocio
     if (updateDto.especialidadId || updateDto.centroId) {
       await this.verificarActividadCoincideConCentro(especialidadId, centroId);
     }
 
+    // Para reactivar (enviar null)
     if (updateDto.fecha_baja !== undefined) {
       (registro as any).fecha_baja = updateDto.fecha_baja;
     }
@@ -204,60 +215,6 @@ export class ProfesionalCentroService {
     await this.repository.save(registro);
   }
 
-  // ============================================================
-  // NUEVO MÉTODO para obtener especialidades con disponibilidad
-  // ============================================================
-  async findEspecialidadesConDisponibilidad(
-    negocioId: number,
-    actividadId: number,
-  ): Promise<{ id: number; nombre: string }[]> {
-    try {
-      console.log(`[DEBUG] Buscando especialidades para negocioId: ${negocioId}, actividadId: ${actividadId}`);
-
-      // 1. Obtener IDs de centros del negocio usando Query Builder
-      const centros = await this.centroRepository
-        .createQueryBuilder('c')
-        .select('c.id')
-        .where('c.negocioId = :negocioId', { negocioId })
-        .andWhere('c.fecha_baja IS NULL')
-        .getMany();
-      
-      const centroIds = centros.map(c => c.id);
-      console.log(`[DEBUG] Centros encontrados: ${centroIds.length}`, centroIds);
-
-      if (centroIds.length === 0) {
-        return [];
-      }
-
-      // 2. Obtener especialidades distintas que cumplen todas las condiciones
-      const especialidades = await this.especialidadRepository
-        .createQueryBuilder('e')
-        .select('DISTINCT e.id', 'id')
-        .addSelect('e.nombre', 'nombre')
-        .innerJoin('actividad_especialidad', 'ae', 'ae.especialidad_id = e.id')
-        .innerJoin('profesional_centro', 'pc', 'pc.especialidad_id = e.id')
-        .innerJoin('agenda_disponibilidad', 'ag', 'ag.profesional_centro_id = pc.id')
-        .where('ae.actividad_id = :actividadId', { actividadId })
-        .andWhere('pc.centro_id IN (:...centroIds)', { centroIds })
-        .andWhere('e.fecha_baja IS NULL')
-        .andWhere('ae.fecha_baja IS NULL')
-        .andWhere('pc.fecha_baja IS NULL')
-        .andWhere('ag.fecha_baja IS NULL')
-        .orderBy('e.nombre', 'ASC')
-        .getRawMany();
-      
-      console.log(`[DEBUG] Especialidades encontradas: ${especialidades.length}`);
-      return especialidades;
-    } catch (error) {
-      console.error('[DEBUG] Error en consulta de especialidades:', error);
-      throw new BadRequestException(`Error al obtener especialidades: ${error.message}`);
-    }
-  }
-
-
-  // ============================================================
-  // MÉTODO AGREGADO para debug (corrige el error del controller)
-  // ============================================================
   async debugStructure(): Promise<any> {
     return this.repository.query(`
       SELECT column_name, data_type, is_nullable
