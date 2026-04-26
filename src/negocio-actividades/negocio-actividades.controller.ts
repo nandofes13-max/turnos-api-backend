@@ -1,5 +1,5 @@
 // src/negocio-actividades/negocio-actividades.controller.ts
-import { Body, Controller, Get, Param, Post, Put, Delete } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Delete, Query } from '@nestjs/common';
 import { NegocioActividadesService } from './negocio-actividades.service';
 import { NegocioActividad } from './entities/negocio-actividad.entity';
 import { CreateNegocioActividadDto } from './dto/create-negocio-actividad.dto';
@@ -35,6 +35,21 @@ export class NegocioActividadesController {
   async findByActividad(@Param('actividadId') actividadId: string): Promise<any[]> {
     const relaciones = await this.service.findByActividad(Number(actividadId));
     return relaciones.map(r => this.agregarUltimoMovimiento(r));
+  }
+
+  // ============================================================
+  // NUEVO ENDPOINT: Obtener especialidades por negocio y actividad
+  // ============================================================
+  @Get('especialidades-por-negocio-actividad')
+  async getEspecialidadesPorNegocioYActividad(
+    @Query('negocioId') negocioId: string,
+    @Query('actividadId') actividadId: string,
+  ): Promise<any[]> {
+    console.log(`[Controller] especialidades-por-negocio-actividad - negocioId: ${negocioId}, actividadId: ${actividadId}`);
+    return this.service.findEspecialidadesPorNegocioYActividad(
+      Number(negocioId),
+      Number(actividadId),
+    );
   }
 
   // Crear nueva relación
