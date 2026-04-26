@@ -27,7 +27,7 @@ export class ProfesionalCentroService {
     private readonly negocioActividadRepository: Repository<NegocioActividad>,
   ) {}
 
-  // ===== FUNCIONES AUXILIARES =====
+  // ===== FUNCIONES AUXILIARES (sin cambios) =====
   private async verificarProfesionalActivo(id: number): Promise<void> {
     const profesional = await this.profesionalRepository.findOne({
       where: { id, fecha_baja: IsNull() },
@@ -102,7 +102,7 @@ export class ProfesionalCentroService {
     }
   }
 
-  // ===== CRUD =====
+  // ===== CRUD (sin cambios) =====
   async findAll(): Promise<ProfesionalCentro[]> {
     return this.repository.find({
       relations: ['profesional', 'especialidad', 'centro', 'centro.negocio'],
@@ -205,51 +205,64 @@ export class ProfesionalCentroService {
   }
 
   // ============================================================
-  // NUEVO MÉTODO: Obtener especialidades con disponibilidad para un negocio y actividad
+  // NUEVO MÉTODO para obtener especialidades con disponibilidad
   // ============================================================
   async findEspecialidadesConDisponibilidad(
-  negocioId: number,
-  actividadId: number,
-): Promise<{ id: number; nombre: string }[]> {
-  try {
-    console.log(`[DEBUG] Iniciando búsqueda para negocioId: ${negocioId}, actividadId: ${actividadId}`);
+    negocioId: number,
+    actividadId: number,
+  ): Promise<{ id: number; nombre: string }[]> {
+    try {
+      console.log(`[DEBUG] Buscando especialidades para negocioId: ${negocioId}, actividadId: ${actividadId}`);
 
-    // 1. Obtener IDs de centros del negocio (Query Builder)
-    const centros = await this.centroRepository
-      .createQueryBuilder('c')
-      .select('c.id')
-      .where('c.negocioId = :negocioId', { negocioId })
-      .andWhere('c.fecha_baja IS NULL')
-      .getMany();
-    
-    const centroIds = centros.map(c => c.id);
-    console.log(`[DEBUG] Centros encontrados: ${centroIds.length}`, centroIds);
+      // 1. Obtener IDs de centros del negocio usando Query Builder
+      const centros = await this.centroRepository
+        .createQueryBuilder('c')
+        .select('c.id')
+        .where('c.negocioId = :negocioId', { negocioId })
+        .andWhere('c.fecha_baja IS NULL')
+        .getMany();
+      
+      const centroIds = centros.map(c => c.id);
+      console.log(`[DEBUG] Centros encontrados: ${centroIds.length}`, centroIds);
 
-    if (centroIds.length === 0) {
-      return [];
+      if (centroIds.length === 0) {
+        return [];
+      }
+
+      // 2. Obtener especialidades distintas que cumplen todas las condiciones
+      const especialidades = await this.especialidadRepository
+        .createQueryBuilder('e')
+        .select('DISTINCT e.id', 'id')
+        .addSelect('e.nombre', 'nombre')
+        .innerJoin('actividad_especialidad', 'ae', 'ae.especialidad_id = e.id')
+        .innerJoin('profesional_centro', 'pc', 'pc.especialidad_id = e.id')
+        .innerJoin('agenda_disponibilidad', 'ag', 'ag.profesional_centro_id = pc.id')
+        .where('ae.actividad_id = :actividadId', { actividadId })
+        .andWhere('pc.centro_id IN (:...centroIds)', { centroIds })
+        .andWhere('e.fecha_baja IS NULL')
+        .andWhere('ae.fecha_baja IS NULL')
+        .andWhere('pc.fecha_baja IS NULL')
+        .andWhere('ag.fecha_baja IS NULL')
+        .orderBy('e.nombre', 'ASC')
+        .getRawMany();
+      
+      console.log(`[DEBUG] Especialidades encontradas: ${especialidades.length}`);
+      return especialidades;
+    } catch (error) {
+      console.error('[DEBUG] Error en consulta de especialidades:', error);
+      throw new BadRequestException(`Error al obtener especialidades: ${error.message}`);
     }
+  }
 
-    // 2. Obtener especialidades distintas (Query Builder)
-    const especialidades = await this.especialidadRepository
-      .createQueryBuilder('e')
-      .select('DISTINCT e.id', 'id')
-      .addSelect('e.nombre', 'nombre')
-      .innerJoin('actividad_especialidad', 'ae', 'ae.especialidad_id = e.id')
-      .innerJoin('profesional_centro', 'pc', 'pc.especialidad_id = e.id')
-      .innerJoin('agenda_disponibilidad', 'ag', 'ag.profesional_centro_id = pc.id')
-      .where('ae.actividad_id = :actividadId', { actividadId })
-      .andWhere('pc.centro_id IN (:...centroIds)', { centroIds })
-      .andWhere('e.fecha_baja IS NULL')
-      .andWhere('ae.fecha_baja IS NULL')
-      .andWhere('pc.fecha_baja IS NULL')
-      .andWhere('ag.fecha_baja IS NULL')
-      .orderBy('e.nombre', 'ASC')
-      .getRawMany();
-    
-    console.log(`[DEBUG] Especialidades encontradas: ${especialidades.length}`);
-    return especialidades;
-  } catch (error) {
-    console.error('[DEBUG] Error en consulta de especialidades:', error);
-    throw new BadRequestException(`Error al obtener especialidades: ${error.message}`);
+
+  // ============================================================
+  // MÉTODO AGREGADO para debug (corrige el error del controller)
+  // ============================================================
+  async debugStructure(): Promise<any> {
+    return this.repository.query(`
+      SELECT column_name, data_type, is_nullable
+      FROM information_schema.columns
+      WHERE table_name = 'profesional_centro';
+    `);
   }
 }
