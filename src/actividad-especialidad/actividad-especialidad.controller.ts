@@ -37,6 +37,21 @@ export class ActividadEspecialidadController {
     return relaciones.map(r => this.agregarUltimoMovimiento(r));
   }
 
+  // ============================================================
+  // NUEVO ENDPOINT: Obtener especialidades por negocio y actividad
+  // ============================================================
+  @Get('especialidades-por-negocio-actividad')
+  async getEspecialidadesPorNegocioYActividad(
+    @Query('negocioId') negocioId: string,
+    @Query('actividadId') actividadId: string,
+  ): Promise<any[]> {
+    console.log(`[Controller] especialidades-por-negocio-actividad - negocioId: ${negocioId}, actividadId: ${actividadId}`);
+    return this.service.findEspecialidadesPorNegocioYActividad(
+      Number(negocioId),
+      Number(actividadId),
+    );
+  }
+
   // Crear nueva relación
   @Post()
   async create(@Body() createDto: CreateActividadEspecialidadDto): Promise<any> {
