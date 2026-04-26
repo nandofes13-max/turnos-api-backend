@@ -158,4 +158,51 @@ export class NegocioActividadesService {
       WHERE table_name = 'negocio_actividades';
     `);
   }
+
+  // ============================================================
+  // NUEVO MÉTODO: Obtener especialidades por negocio y actividad
+  // ============================================================
+  async findEspecialidadesPorNegocioYActividad(
+    negocioId: number,
+    actividadId: number,
+  ): Promise<{ id: number; nombre: string; actividadId: number; negocioId: number }[]> {
+    try {
+      console.log(`[DEBUG] Buscando especialidades para negocioId: ${negocioId}, actividadId: ${actividadId}`);
+      
+      // Verificar que el negocio tenga esta actividad
+      const negocioActividad = await this.repository.findOne({
+        where: {
+          negocioId: negocioId,
+          actividadId: actividadId,
+          fecha_baja: IsNull(),
+        },
+      });
+      
+      if (!negocioActividad) {
+        console.log(`[DEBUG] El negocio ${negocioId} no tiene la actividad ${actividadId}`);
+        return [];
+      }
+      
+      // Obtener las especialidades de la actividad
+      const especialidades = await this.actividadRepository
+        .createQueryBuilder('a')
+        .select('DISTINCT e.id', 'id')
+        .addSelect('e.nombre', 'nombre')
+        .addSelect('a.id', 'actividadId')
+        .addSelect(negocioId, 'negocioId')
+        .innerJoin('actividad_especialidad', 'ae', 'ae.actividad_id = a.id')
+        .innerJoin('especialidad', 'e', 'e.id = ae.especialidad_id')
+        .where('a.id = :actividadId', { actividadId })
+        .andWhere('e.fecha_baja IS NULL')
+        .andWhere('ae.fecha_baja IS NULL')
+        .orderBy('e.nombre', 'ASC')
+        .getRawMany();
+      
+      console.log(`[DEBUG] Especialidades encontradas: ${especialidades.length}`);
+      return especialidades;
+    } catch (error) {
+      console.error('[DEBUG] Error en consulta de especialidades:', error);
+      throw new BadRequestException(`Error al obtener especialidades: ${error.message}`);
+    }
+  }
 }
