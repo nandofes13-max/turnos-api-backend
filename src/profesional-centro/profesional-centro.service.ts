@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { ProfesionalCentro } from './entities/profesional-centro.entity';
 import { CreateProfesionalCentroDto } from './dto/create-profesional-centro.dto';
-import { UpdateProfesionalCentroDto } './dto/update-profesional-centro.dto';
+import { UpdateProfesionalCentroDto } from './dto/update-profesional-centro.dto';
 import { Profesional } from '../profesional/entities/profesional.entity';
 import { Especialidad } from '../especialidades/entities/especialidad.entity';
 import { Centro } from '../centro/entities/centro.entity';
