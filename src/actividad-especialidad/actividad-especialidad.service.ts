@@ -135,42 +135,41 @@ export class ActividadEspecialidadService {
   // ============================================================
   // NUEVO MÉTODO: Obtener especialidades por negocio y actividad
   // ============================================================
-async findEspecialidadesPorNegocioYActividad(
-  negocioId: number,
-  actividadId: number,
-): Promise<any[]> {
-  try {
-    console.log(`[DEBUG] INICIO - negocioId: ${negocioId}, actividadId: ${actividadId}`);
-    
-    // Consulta SQL súper simple
-    const sql = `
-      SELECT e.id, e.nombre
-      FROM especialidad e
-      WHERE e.id IN (
-        SELECT ae.especialidad_id 
-        FROM actividad_especialidad ae
-        WHERE ae.actividad_id = $1
-          AND ae.fecha_baja IS NULL
-      )
-      AND e.fecha_baja IS NULL
-      ORDER BY e.nombre ASC
-    `;
-    
-    const results = await this.repository.query(sql, [actividadId]);
-    console.log(`[DEBUG] Resultados: ${JSON.stringify(results)}`);
-    
-    // Agregar negocioId y actividadId manualmente
-    const resultadosFinales = results.map((r: any) => ({
-      id: r.id,
-      nombre: r.nombre,
-      negocioId: negocioId,
-      actividadId: actividadId,
-    }));
-    
-    return resultadosFinales;
-  } catch (error) {
-    console.error('[DEBUG] ERROR:', error);
-    throw new BadRequestException(`Error: ${error.message}`);
+  async findEspecialidadesPorNegocioYActividad(
+    negocioId: number,
+    actividadId: number,
+  ): Promise<any[]> {
+    try {
+      // --- 1. Verificar que el negocio tenga la actividad (usando SQL simple para evitar errores) ---
+      const checkNegocioActividad = await this.repository.query(`
+        SELECT 1 FROM negocio_actividades
+        WHERE negocio_id = $1 AND actividad_id = $2 AND fecha_baja IS NULL
+        LIMIT 1
+      `, [negocioId, actividadId]);
+
+      if (checkNegocioActividad.length === 0) {
+        console.log(`[DEBUG] El negocio ${negocioId} NO tiene la actividad ${actividadId}`);
+        return [];
+      }
+      
+      // --- 2. REUTILIZAR el método QUE YA FUNCIONA ---
+      // Este método (findByActividad) es el que probaste y devuelve los datos correctamente.
+      const relaciones = await this.findByActividad(actividadId);
+      
+      // --- 3. Transformar la respuesta al formato simple que espera el frontend ---
+      const especialidadesSimples = relaciones.map(rel => ({
+        id: rel.especialidad.id,
+        nombre: rel.especialidad.nombre,
+        negocioId: negocioId,
+        actividadId: actividadId,
+      }));
+      
+      console.log(`[DEBUG] Especialidades encontradas (simplificado): ${especialidadesSimples.length}`);
+      return especialidadesSimples;
+      
+    } catch (error) {
+      console.error('[DEBUG] Error en consulta de especialidades:', error);
+      throw new BadRequestException(`Error al obtener especialidades: ${error.message}`);
+    }
   }
-}
 }
