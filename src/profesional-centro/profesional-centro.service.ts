@@ -208,57 +208,58 @@ export class ProfesionalCentroService {
   // NUEVO MÉTODO: Obtener especialidades con disponibilidad para un negocio y actividad
   // ============================================================
   async findEspecialidadesConDisponibilidad(
-  negocioId: number,
-  actividadId: number,
-): Promise<{ id: number; nombre: string }[]> {
-  try {
-    console.log(`[DEBUG] findEspecialidadesConDisponibilidad - negocioId: ${negocioId}, actividadId: ${actividadId}`);
-    
-    // 1. Obtener los centros del negocio
-    const centros = await this.centroRepository.find({
-      where: { negocioId, fecha_baja: IsNull() },
-      select: ['id'],
-    });
-    
-    const centroIds = centros.map(c => c.id);
-    console.log(`[DEBUG] Centros encontrados: ${centroIds.length}`);
-    
-    if (centroIds.length === 0) {
-      console.log(`[DEBUG] No se encontraron centros para el negocio ${negocioId}`);
-      return [];
+    negocioId: number,
+    actividadId: number,
+  ): Promise<{ id: number; nombre: string }[]> {
+    try {
+      console.log(`[DEBUG] findEspecialidadesConDisponibilidad - negocioId: ${negocioId}, actividadId: ${actividadId}`);
+      
+      // 1. Obtener los centros del negocio
+      const centros = await this.centroRepository.find({
+        where: { negocioId, fecha_baja: IsNull() },
+        select: ['id'],
+      });
+      
+      const centroIds = centros.map(c => c.id);
+      console.log(`[DEBUG] Centros encontrados: ${centroIds.length}`);
+      
+      if (centroIds.length === 0) {
+        console.log(`[DEBUG] No se encontraron centros para el negocio ${negocioId}`);
+        return [];
+      }
+      
+      // 2. Obtener especialidades con agenda activa
+      const results = await this.repository
+        .createQueryBuilder('pc')
+        .select('DISTINCT pc.especialidadId', 'id')
+        .addSelect('e.nombre', 'nombre')
+        .innerJoin('pc.centro', 'c')
+        .innerJoin('pc.especialidad', 'e')
+        .innerJoin('actividad_especialidad', 'ae', 'ae.especialidad_id = pc.especialidadId')
+        .innerJoin('agenda_disponibilidad', 'ag', 'ag.profesional_centro_id = pc.id')
+        .where('c.negocioId = :negocioId', { negocioId })
+        .andWhere('ae.actividad_id = :actividadId', { actividadId })
+        .andWhere('pc.fecha_baja IS NULL')
+        .andWhere('c.fecha_baja IS NULL')
+        .andWhere('e.fecha_baja IS NULL')
+        .andWhere('ae.fecha_baja IS NULL')
+        .andWhere('ag.fecha_baja IS NULL')
+        .orderBy('e.nombre', 'ASC')
+        .getRawMany();
+      
+      console.log(`[DEBUG] Especialidades encontradas: ${results.length}`);
+      return results;
+    } catch (error) {
+      console.error('[DEBUG] Error en consulta:', error);
+      throw new BadRequestException(`Error al obtener especialidades: ${error.message}`);
     }
-    
-    // 2. Obtener especialidades con agenda activa
-    const results = await this.repository
-      .createQueryBuilder('pc')
-      .select('DISTINCT pc.especialidadId', 'id')
-      .addSelect('e.nombre', 'nombre')
-      .innerJoin('pc.centro', 'c')
-      .innerJoin('pc.especialidad', 'e')
-      .innerJoin('actividad_especialidad', 'ae', 'ae.especialidad_id = pc.especialidadId')
-      .innerJoin('agenda_disponibilidad', 'ag', 'ag.profesional_centro_id = pc.id')
-      .where('c.negocioId = :negocioId', { negocioId })
-      .andWhere('ae.actividad_id = :actividadId', { actividadId })
-      .andWhere('pc.fecha_baja IS NULL')
-      .andWhere('c.fecha_baja IS NULL')
-      .andWhere('e.fecha_baja IS NULL')
-      .andWhere('ae.fecha_baja IS NULL')
-      .andWhere('ag.fecha_baja IS NULL')
-      .orderBy('e.nombre', 'ASC')
-      .getRawMany();
-    
-    console.log(`[DEBUG] Especialidades encontradas: ${results.length}`);
-    return results;
-  } catch (error) {
-    console.error('[DEBUG] Error en consulta:', error);
-    throw new BadRequestException(`Error al obtener especialidades: ${error.message}`);
   }
-}
 
-async debugStructure(): Promise<any> {
-  return this.repository.query(`
-    SELECT column_name, data_type, is_nullable
-    FROM information_schema.columns
-    WHERE table_name = 'profesional_centro';
-  `);
+  async debugStructure(): Promise<any> {
+    return this.repository.query(`
+      SELECT column_name, data_type, is_nullable
+      FROM information_schema.columns
+      WHERE table_name = 'profesional_centro';
+    `);
+  }
 }
