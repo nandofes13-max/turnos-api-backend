@@ -76,9 +76,11 @@ export class NegocioActividadesService {
 
   // Crear o reactivar una relación
   async create(createDto: CreateNegocioActividadDto, usuario?: string): Promise<NegocioActividad> {
+    // Validar que existan las entidades relacionadas (solo activas)
     await this.validarNegocio(createDto.negocioId);
     await this.validarActividad(createDto.actividadId);
 
+    // Buscar si ya existe una relación (activa o inactiva)
     const existente = await this.repository.findOneBy({
       negocioId: createDto.negocioId,
       actividadId: createDto.actividadId,
@@ -86,6 +88,7 @@ export class NegocioActividadesService {
 
     if (existente) {
       if (existente.fecha_baja) {
+        // Reactivar la relación inactiva
         (existente as any).fecha_baja = null;
         (existente as any).usuario_baja = null;
         existente.usuario_modificacion = usuario || 'demo';
@@ -95,6 +98,7 @@ export class NegocioActividadesService {
       }
     }
 
+    // Crear nueva relación
     const relacion = this.repository.create({
       ...createDto,
       usuario_alta: usuario || 'demo',
@@ -106,6 +110,7 @@ export class NegocioActividadesService {
   async update(id: number, updateDto: UpdateNegocioActividadDto, usuario?: string): Promise<NegocioActividad> {
     const relacion = await this.findOne(id);
 
+    // Si se cambia negocio o actividad, validar
     if (updateDto.negocioId && updateDto.negocioId !== relacion.negocioId) {
       await this.validarNegocio(updateDto.negocioId);
     }
@@ -153,53 +158,4 @@ export class NegocioActividadesService {
       WHERE table_name = 'negocio_actividades';
     `);
   }
-
-  // ============================================================
-  // NUEVO MÉTODO: Obtener especialidades por negocio y actividad
-  // ============================================================
-  async findEspecialidadesPorNegocioYActividad(
-  negocioId: number,
-  actividadId: number,
-): Promise<{ id: number; nombre: string; actividadId: number; negocioId: number }[]> {
-  try {
-    console.log(`[DEBUG] Buscando especialidades para negocioId: ${negocioId}, actividadId: ${actividadId}`);
-    
-    // Verificar que el negocio tenga esta actividad
-    const negocioActividad = await this.repository.findOne({
-      where: {
-        negocioId: negocioId,
-        actividadId: actividadId,
-        fecha_baja: IsNull(),
-      },
-    });
-    
-    if (!negocioActividad) {
-      console.log(`[DEBUG] El negocio ${negocioId} no tiene la actividad ${actividadId}`);
-      return [];
-    }
-    
-    // Consulta SQL directa (más confiable)
-    const sql = `
-      SELECT DISTINCT 
-        e.id, 
-        e.nombre,
-        $1 as "negocioId",
-        $2 as "actividadId"
-      FROM especialidad e
-      INNER JOIN actividad_especialidad ae ON ae.especialidad_id = e.id
-      WHERE ae.actividad_id = $2
-        AND e.fecha_baja IS NULL
-        AND ae.fecha_baja IS NULL
-      ORDER BY e.nombre ASC
-    `;
-    
-    const especialidades = await this.repository.query(sql, [negocioId, actividadId]);
-    
-    console.log(`[DEBUG] Especialidades encontradas: ${especialidades.length}`);
-    return especialidades;
-  } catch (error) {
-    console.error('[DEBUG] Error en consulta de especialidades:', error);
-    throw new BadRequestException(`Error al obtener especialidades: ${error.message}`);
-  }
-}
 }
