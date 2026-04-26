@@ -158,51 +158,48 @@ export class NegocioActividadesService {
   // NUEVO MÉTODO: Obtener especialidades por negocio y actividad
   // ============================================================
   async findEspecialidadesPorNegocioYActividad(
-    negocioId: number,
-    actividadId: number,
-  ): Promise<{ id: number; nombre: string; actividadId: number; negocioId: number }[]> {
-    try {
-      console.log(`[DEBUG] Buscando especialidades para negocioId: ${negocioId}, actividadId: ${actividadId}`);
-      
-      // Verificar que el negocio tenga esta actividad
-      const negocioActividad = await this.repository.findOne({
-        where: {
-          negocioId: negocioId,
-          actividadId: actividadId,
-          fecha_baja: IsNull(),
-        },
-      });
-      
-      if (!negocioActividad) {
-        console.log(`[DEBUG] El negocio ${negocioId} no tiene la actividad ${actividadId}`);
-        return [];
-      }
-      
-      // Obtener las especialidades de la actividad
-      const especialidades = await this.actividadRepository
-        .createQueryBuilder('a')
-        .select('DISTINCT e.id', 'id')
-        .addSelect('e.nombre', 'nombre')
-        .addSelect('a.id', 'actividadId')
-        .where('a.id = :actividadId', { actividadId })
-        .andWhere('e.fecha_baja IS NULL')
-        .andWhere('ae.fecha_baja IS NULL')
-        .innerJoin('actividad_especialidad', 'ae', 'ae.actividad_id = a.id')
-        .innerJoin('especialidad', 'e', 'e.id = ae.especialidad_id')
-        .orderBy('e.nombre', 'ASC')
-        .getRawMany();
-      
-      // Agregar negocioId manualmente a cada resultado
-      const resultados = especialidades.map(esp => ({
-        ...esp,
+  negocioId: number,
+  actividadId: number,
+): Promise<{ id: number; nombre: string; actividadId: number; negocioId: number }[]> {
+  try {
+    console.log(`[DEBUG] Buscando especialidades para negocioId: ${negocioId}, actividadId: ${actividadId}`);
+    
+    // Verificar que el negocio tenga esta actividad
+    const negocioActividad = await this.repository.findOne({
+      where: {
         negocioId: negocioId,
-      }));
-      
-      console.log(`[DEBUG] Especialidades encontradas: ${resultados.length}`);
-      return resultados;
-    } catch (error) {
-      console.error('[DEBUG] Error en consulta de especialidades:', error);
-      throw new BadRequestException(`Error al obtener especialidades: ${error.message}`);
+        actividadId: actividadId,
+        fecha_baja: IsNull(),
+      },
+    });
+    
+    if (!negocioActividad) {
+      console.log(`[DEBUG] El negocio ${negocioId} no tiene la actividad ${actividadId}`);
+      return [];
     }
+    
+    // Consulta SQL directa (más confiable)
+    const sql = `
+      SELECT DISTINCT 
+        e.id, 
+        e.nombre,
+        $1 as "negocioId",
+        $2 as "actividadId"
+      FROM especialidad e
+      INNER JOIN actividad_especialidad ae ON ae.especialidad_id = e.id
+      WHERE ae.actividad_id = $2
+        AND e.fecha_baja IS NULL
+        AND ae.fecha_baja IS NULL
+      ORDER BY e.nombre ASC
+    `;
+    
+    const especialidades = await this.repository.query(sql, [negocioId, actividadId]);
+    
+    console.log(`[DEBUG] Especialidades encontradas: ${especialidades.length}`);
+    return especialidades;
+  } catch (error) {
+    console.error('[DEBUG] Error en consulta de especialidades:', error);
+    throw new BadRequestException(`Error al obtener especialidades: ${error.message}`);
   }
+}
 }
