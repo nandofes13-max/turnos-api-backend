@@ -135,32 +135,34 @@ export class ActividadEspecialidadService {
   // ============================================================
   // NUEVO MÉTODO: Obtener especialidades por negocio y actividad
   // ============================================================
-async findEspecialidadesPorNegocioYActividad(
-  negocioId: number,
-  actividadId: number,
-): Promise<any[]> {
-  try {
-    console.log(`[DEBUG] Iniciando método simplificado`);
+  async findEspecialidadesPorNegocioYActividadSimple(
+    negocioId: number,
+    actividadId: number,
+  ): Promise<any[]> {
+    // 1. Verificar que el negocio tenga la actividad
+    const negocioActividadQuery = `
+      SELECT 1 FROM negocio_actividades 
+      WHERE negocio_id = $1 AND actividad_id = $2 AND fecha_baja IS NULL
+      LIMIT 1
+    `;
+    const negocioActividad = await this.repository.query(negocioActividadQuery, [negocioId, actividadId]);
     
-    // Usar el método que ya funciona (sin verificación de negocio)
-    const relaciones = await this.findByActividad(actividadId);
-    
-    console.log(`[DEBUG] Relaciones encontradas: ${relaciones.length}`);
-    
-    // Transformar la respuesta
-    const especialidadesSimples = relaciones.map(rel => ({
-      id: rel.especialidadId,
+    if (negocioActividad.length === 0) {
+      return []; // El negocio no tiene esta actividad
+    }
+
+    // 2. Obtener las relaciones (actividad-especialidad) que ya funcionan
+    const relaciones = await this.repository.find({
+      where: { actividadId: actividadId, fecha_baja: IsNull() },
+      relations: ['especialidad'],
+    });
+
+    // 3. Transformar al formato deseado
+    return relaciones.map(rel => ({
+      id: rel.especialidad.id,
       nombre: rel.especialidad.nombre,
       negocioId: negocioId,
       actividadId: actividadId,
     }));
-    
-    console.log(`[DEBUG] Resultado final: ${JSON.stringify(especialidadesSimples)}`);
-    return especialidadesSimples;
-    
-  } catch (error) {
-    console.error('[DEBUG] Error:', error);
-    throw new BadRequestException(`Error: ${error.message}`);
   }
-}
 }
