@@ -47,11 +47,12 @@ export class ProfesionalCentroController {
 
   // ============================================================
   // NUEVO ENDPOINT: Obtener centros únicos por negocio y especialidad (con disponibilidad)
+  // USANDO @Param() (mismo patrón que funcionó ayer)
   // ============================================================
-  @Get('centros-por-especialidad')
+  @Get('centros-por-especialidad/:negocioId/:especialidadId')
   async getCentrosPorEspecialidad(
-    @Query('negocioId') negocioId: string,
-    @Query('especialidadId') especialidadId: string,
+    @Param('negocioId') negocioId: string,
+    @Param('especialidadId') especialidadId: string,
   ): Promise<any[]> {
     console.log(`[Controller] centros-por-especialidad - negocioId: ${negocioId}, especialidadId: ${especialidadId}`);
     return this.service.findCentrosPorEspecialidad(
