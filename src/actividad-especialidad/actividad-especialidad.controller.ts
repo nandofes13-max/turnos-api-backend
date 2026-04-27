@@ -1,5 +1,5 @@
 // src/actividad-especialidad/actividad-especialidad.controller.ts
-import { Body, Controller, Get, Param, Post, Put, Delete, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Delete } from '@nestjs/common';
 import { ActividadEspecialidadService } from './actividad-especialidad.service';
 import { ActividadEspecialidad } from './entities/actividad-especialidad.entity';
 import { CreateActividadEspecialidadDto } from './dto/create-actividad-especialidad.dto';
@@ -39,11 +39,12 @@ export class ActividadEspecialidadController {
 
   // ============================================================
   // NUEVO ENDPOINT: Obtener especialidades por negocio y actividad
+  // (Usa @Param como el endpoint que funciona)
   // ============================================================
-  @Get('especialidades-por-negocio-actividad')
+  @Get('especialidades-por-negocio-actividad/:negocioId/:actividadId')
   async getEspecialidadesPorNegocioYActividad(
-    @Query('negocioId') negocioId: string,
-    @Query('actividadId') actividadId: string,
+    @Param('negocioId') negocioId: string,
+    @Param('actividadId') actividadId: string,
   ): Promise<any[]> {
     console.log(`[Controller] especialidades-por-negocio-actividad - negocioId: ${negocioId}, actividadId: ${actividadId}`);
     return this.service.findEspecialidadesPorNegocioYActividadSimple(
