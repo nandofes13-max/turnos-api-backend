@@ -65,9 +65,7 @@ export class ProfesionalCentroService {
     }
   }
 
-  // NUEVA VALIDACIÓN: Verificar que el centro pertenezca a un negocio que tenga la actividad de la especialidad
   private async verificarActividadCoincideConCentro(especialidadId: number, centroId: number): Promise<void> {
-    // 1. Obtener la actividad de la especialidad
     const actividadEspecialidad = await this.actividadEspecialidadRepository.findOne({
       where: { especialidadId, fecha_baja: IsNull() },
     });
@@ -78,7 +76,6 @@ export class ProfesionalCentroService {
 
     const actividadId = actividadEspecialidad.actividadId;
 
-    // 2. Obtener el negocio del centro
     const centro = await this.centroRepository.findOne({
       where: { id: centroId, fecha_baja: IsNull() },
     });
@@ -89,7 +86,6 @@ export class ProfesionalCentroService {
 
     const negocioId = centro.negocioId;
 
-    // 3. Verificar que el negocio tenga esa actividad
     const negocioActividad = await this.negocioActividadRepository.findOne({
       where: {
         negocioId: negocioId,
@@ -141,18 +137,15 @@ export class ProfesionalCentroService {
   }
 
   async create(createDto: CreateProfesionalCentroDto, usuario?: string): Promise<ProfesionalCentro> {
-    // Validar que todos los IDs existan y estén activos
     await this.verificarProfesionalActivo(createDto.profesionalId);
     await this.verificarEspecialidadActiva(createDto.especialidadId);
     await this.verificarCentroActivo(createDto.centroId);
     
-    // NUEVA VALIDACIÓN: Verificar que el centro tenga la actividad correcta
     await this.verificarActividadCoincideConCentro(
       createDto.especialidadId,
       createDto.centroId,
     );
     
-    // Validar combinación única
     await this.verificarCombinacionUnica(
       createDto.profesionalId,
       createDto.especialidadId,
@@ -170,7 +163,6 @@ export class ProfesionalCentroService {
   async update(id: number, updateDto: UpdateProfesionalCentroDto, usuario?: string): Promise<ProfesionalCentro> {
     const registro = await this.findOne(id);
 
-    // Si se actualiza algún ID, validar existencia y actividad
     if (updateDto.profesionalId) {
       await this.verificarProfesionalActivo(updateDto.profesionalId);
     }
@@ -181,19 +173,16 @@ export class ProfesionalCentroService {
       await this.verificarCentroActivo(updateDto.centroId);
     }
 
-    // Validar combinación única si cambian los IDs
     const profesionalId = updateDto.profesionalId ?? registro.profesionalId;
     const especialidadId = updateDto.especialidadId ?? registro.especialidadId;
     const centroId = updateDto.centroId ?? registro.centroId;
     
     await this.verificarCombinacionUnica(profesionalId, especialidadId, centroId, id);
 
-    // Si cambia especialidad o centro, validar la relación actividad-negocio
     if (updateDto.especialidadId || updateDto.centroId) {
       await this.verificarActividadCoincideConCentro(especialidadId, centroId);
     }
 
-    // Para reactivar (enviar null)
     if (updateDto.fecha_baja !== undefined) {
       (registro as any).fecha_baja = updateDto.fecha_baja;
     }
@@ -221,5 +210,42 @@ export class ProfesionalCentroService {
       FROM information_schema.columns
       WHERE table_name = 'profesional_centro';
     `);
+  }
+
+  // ============================================================
+  // NUEVO MÉTODO: Obtener centros únicos por negocio y especialidad (con disponibilidad)
+  // ============================================================
+  async findCentrosPorEspecialidad(
+    negocioId: number,
+    especialidadId: number,
+  ): Promise<any[]> {
+    try {
+      console.log(`[DEBUG] Buscando centros para negocioId: ${negocioId}, especialidadId: ${especialidadId}`);
+      
+      const sql = `
+        SELECT DISTINCT 
+          c.id,
+          c.nombre,
+          c.codigo,
+          c.formatted_address,
+          c.latitude,
+          c.longitude
+        FROM profesional_centro pc
+        INNER JOIN centro c ON c.id = pc.centro_id AND c.fecha_baja IS NULL
+        INNER JOIN agenda_disponibilidad ag ON ag.profesional_centro_id = pc.id AND ag.fecha_baja IS NULL
+        WHERE pc.especialidad_id = $1
+          AND c.negocio_id = $2
+          AND pc.fecha_baja IS NULL
+        ORDER BY c.nombre ASC
+      `;
+      
+      const results = await this.repository.query(sql, [especialidadId, negocioId]);
+      
+      console.log(`[DEBUG] Centros encontrados: ${results.length}`);
+      return results;
+    } catch (error) {
+      console.error('[DEBUG] Error en consulta de centros:', error);
+      throw new BadRequestException(`Error al obtener centros: ${error.message}`);
+    }
   }
 }
