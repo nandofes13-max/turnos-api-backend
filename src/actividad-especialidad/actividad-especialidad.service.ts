@@ -135,41 +135,32 @@ export class ActividadEspecialidadService {
   // ============================================================
   // NUEVO MÉTODO: Obtener especialidades por negocio y actividad
   // ============================================================
-  async findEspecialidadesPorNegocioYActividad(
-    negocioId: number,
-    actividadId: number,
-  ): Promise<any[]> {
-    try {
-      // --- 1. Verificar que el negocio tenga la actividad (usando SQL simple para evitar errores) ---
-      const checkNegocioActividad = await this.repository.query(`
-        SELECT 1 FROM negocio_actividades
-        WHERE negocio_id = $1 AND actividad_id = $2 AND fecha_baja IS NULL
-        LIMIT 1
-      `, [negocioId, actividadId]);
-
-      if (checkNegocioActividad.length === 0) {
-        console.log(`[DEBUG] El negocio ${negocioId} NO tiene la actividad ${actividadId}`);
-        return [];
-      }
-      
-      // --- 2. REUTILIZAR el método QUE YA FUNCIONA ---
-      // Este método (findByActividad) es el que probaste y devuelve los datos correctamente.
-      const relaciones = await this.findByActividad(actividadId);
-      
-      // --- 3. Transformar la respuesta al formato simple que espera el frontend ---
-      const especialidadesSimples = relaciones.map(rel => ({
-        id: rel.especialidad.id,
-        nombre: rel.especialidad.nombre,
-        negocioId: negocioId,
-        actividadId: actividadId,
-      }));
-      
-      console.log(`[DEBUG] Especialidades encontradas (simplificado): ${especialidadesSimples.length}`);
-      return especialidadesSimples;
-      
-    } catch (error) {
-      console.error('[DEBUG] Error en consulta de especialidades:', error);
-      throw new BadRequestException(`Error al obtener especialidades: ${error.message}`);
-    }
+async findEspecialidadesPorNegocioYActividad(
+  negocioId: number,
+  actividadId: number,
+): Promise<any[]> {
+  try {
+    console.log(`[DEBUG] Iniciando método simplificado`);
+    
+    // Usar el método que ya funciona (sin verificación de negocio)
+    const relaciones = await this.findByActividad(actividadId);
+    
+    console.log(`[DEBUG] Relaciones encontradas: ${relaciones.length}`);
+    
+    // Transformar la respuesta
+    const especialidadesSimples = relaciones.map(rel => ({
+      id: rel.especialidadId,
+      nombre: rel.especialidad.nombre,
+      negocioId: negocioId,
+      actividadId: actividadId,
+    }));
+    
+    console.log(`[DEBUG] Resultado final: ${JSON.stringify(especialidadesSimples)}`);
+    return especialidadesSimples;
+    
+  } catch (error) {
+    console.error('[DEBUG] Error:', error);
+    throw new BadRequestException(`Error: ${error.message}`);
   }
+}
 }
