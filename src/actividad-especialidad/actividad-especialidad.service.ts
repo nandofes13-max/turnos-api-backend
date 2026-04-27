@@ -135,18 +135,36 @@ export class ActividadEspecialidadService {
   // ============================================================
   // NUEVO MÉTODO: Obtener especialidades por negocio y actividad
   // ============================================================
-   async findEspecialidadesPorNegocioYActividadSimple(
+  async findEspecialidadesPorNegocioYActividadSimple(
     negocioId: number,
     actividadId: number,
   ): Promise<any[]> {
-    console.log(`[DEBUG] Métulo simple llamado con negocioId: ${negocioId}, actividadId: ${actividadId}`);
-    // Devuelve un objeto fijo para verificar que el método y el endpoint estén conectados
-    return [{
-      id: 999,
-      nombre: "PRUEBA DE CONEXION",
+    console.log(`[DEBUG] Método simple llamado con negocioId: ${negocioId}, actividadId: ${actividadId}`);
+    
+    // Verificar que el negocio tenga la actividad
+    const negocioActividadQuery = `
+      SELECT 1 FROM negocio_actividades 
+      WHERE negocio_id = $1 AND actividad_id = $2 AND fecha_baja IS NULL
+      LIMIT 1
+    `;
+    const negocioActividad = await this.repository.query(negocioActividadQuery, [negocioId, actividadId]);
+    
+    if (negocioActividad.length === 0) {
+      return [];
+    }
+
+    // Obtener las relaciones (actividad-especialidad)
+    const relaciones = await this.repository.find({
+      where: { actividadId: actividadId, fecha_baja: IsNull() },
+      relations: ['especialidad'],
+    });
+
+    // Transformar al formato deseado
+    return relaciones.map(rel => ({
+      id: rel.especialidad.id,
+      nombre: rel.especialidad.nombre,
       negocioId: negocioId,
       actividadId: actividadId,
-      mensaje: "Si ves esto, el endpoint funciona"
-    }];
+    }));
   }
 }
