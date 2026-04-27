@@ -46,7 +46,7 @@ export class ActividadEspecialidadController {
     @Query('actividadId') actividadId: string,
   ): Promise<any[]> {
     console.log(`[Controller] especialidades-por-negocio-actividad - negocioId: ${negocioId}, actividadId: ${actividadId}`);
-    return this.service.findEspecialidadesPorNegocioYActividad(
+    return this.service.findEspecialidadesPorNegocioYActividadSimple(
       Number(negocioId),
       Number(actividadId),
     );
