@@ -228,6 +228,7 @@ export class ProfesionalCentroService {
           c.nombre,
           c.codigo,
           c.city,
+          c.es_virtual,
           c.formatted_address,
           c.latitude,
           c.longitude
