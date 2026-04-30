@@ -6,15 +6,14 @@ import { ProfesionalEspecialidad } from '../profesional-especialidad/entities/pr
 import { AgendaDisponibilidadService } from '../agenda-disponibilidad/agenda-disponibilidad.service';
 import { ProfesionalCentroService } from '../profesional-centro/profesional-centro.service';
 
-// Definimos la interfaz para los resultados de días disponibles
-interface DiaDisponible {
+// Exportamos las interfaces para que el controlador pueda usarlas
+export interface DiaDisponible {
   fecha: string;
   diaSemana: number;
   disponible: boolean;
 }
 
-// Definimos la interfaz para los resultados de profesionales y slots
-interface ProfesionalSlots {
+export interface ProfesionalSlots {
   profesionalId: number;
   nombre: string;
   documento: string;
