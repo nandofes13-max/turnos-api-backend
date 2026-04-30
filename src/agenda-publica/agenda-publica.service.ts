@@ -5,6 +5,26 @@ import { ProfesionalCentro } from '../profesional-centro/entities/profesional-ce
 import { AgendaDisponibilidadService } from '../agenda-disponibilidad/agenda-disponibilidad.service';
 import { ProfesionalCentroService } from '../profesional-centro/profesional-centro.service';
 
+// Definimos la interfaz para los resultados de días disponibles
+interface DiaDisponible {
+  fecha: string;
+  diaSemana: number;
+  disponible: boolean;
+}
+
+// Definimos la interfaz para los resultados de profesionales y slots
+interface ProfesionalSlots {
+  profesionalId: number;
+  nombre: string;
+  documento: string;
+  foto?: string;
+  especialidadId: number;
+  centroId: number;
+  profesionalCentroId: number;
+  descripcion?: string;
+  slots: string[];
+}
+
 @Injectable()
 export class AgendaPublicaService {
   constructor(
@@ -22,7 +42,7 @@ export class AgendaPublicaService {
     especialidadId: number,
     desde: string,
     hasta: string,
-  ): Promise<{ fecha: string; diaSemana: number; disponible: boolean }[]> {
+  ): Promise<DiaDisponible[]> {
     try {
       // 1. Obtener todos los profesionales_centro que cumplen: centroId + especialidadId
       const profesionalesCentro = await this.profesionalCentroRepository.find({
@@ -52,7 +72,7 @@ export class AgendaPublicaService {
       }
 
       // 3. Para cada fecha, verificar si algún profesional tiene agenda activa
-      const resultados = [];
+      const resultados: DiaDisponible[] = [];
 
       for (const fecha of diasEnRango) {
         const diaSemana = fecha.getDay(); // 0=Domingo, 1=Lunes, ..., 6=Sábado
@@ -99,11 +119,10 @@ export class AgendaPublicaService {
     centroId: number,
     especialidadId: number,
     fecha: string,
-  ): Promise<any[]> {
+  ): Promise<ProfesionalSlots[]> {
     try {
       const fechaObj = new Date(fecha);
       const diaSemana = fechaObj.getDay();
-      const fechaStr = fechaObj.toISOString().split('T')[0];
 
       // 1. Obtener todos los profesionales_centro que cumplen: centroId + especialidadId
       const profesionalesCentro = await this.profesionalCentroRepository.find({
@@ -120,7 +139,7 @@ export class AgendaPublicaService {
       }
 
       // 2. Para cada profesional, obtener sus slots
-      const resultados = [];
+      const resultados: ProfesionalSlots[] = [];
 
       for (const pc of profesionalesCentro) {
         try {
@@ -145,7 +164,7 @@ export class AgendaPublicaService {
                 especialidadId: especialidadId,
                 centroId: centroId,
                 profesionalCentroId: pc.id,
-                descripcion: pc.profesional.descripcion || '',
+                descripcion: pc.profesional.descripcion ?? '', // Usamos ?? para manejar null/undefined
                 slots: horariosDisponibles,
               });
             }
