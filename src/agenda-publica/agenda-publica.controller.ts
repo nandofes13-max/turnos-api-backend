@@ -1,5 +1,5 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { AgendaPublicaService } from './agenda-publica.service';
+import { AgendaPublicaService, DiaDisponible, ProfesionalSlots } from './agenda-publica.service';
 
 @Controller('agenda-publica')
 export class AgendaPublicaController {
@@ -14,7 +14,7 @@ export class AgendaPublicaController {
     @Query('especialidadId') especialidadId: string,
     @Query('desde') desde: string,
     @Query('hasta') hasta: string,
-  ) {
+  ): Promise<DiaDisponible[]> {
     console.log(`[AgendaPublica] dias-disponibles - centroId: ${centroId}, especialidadId: ${especialidadId}, desde: ${desde}, hasta: ${hasta}`);
     return this.service.getDiasDisponibles(
       Number(centroId),
@@ -32,7 +32,7 @@ export class AgendaPublicaController {
     @Query('centroId') centroId: string,
     @Query('especialidadId') especialidadId: string,
     @Query('fecha') fecha: string,
-  ) {
+  ): Promise<ProfesionalSlots[]> {
     console.log(`[AgendaPublica] profesionales-slots - centroId: ${centroId}, especialidadId: ${especialidadId}, fecha: ${fecha}`);
     return this.service.getProfesionalesSlots(
       Number(centroId),
