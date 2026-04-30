@@ -8,11 +8,13 @@ import { Centro } from '../centro/entities/centro.entity';
 import { Especialidad } from '../especialidades/entities/especialidad.entity';
 import { Profesional } from '../profesional/entities/profesional.entity';
 import { AgendaDisponibilidad } from '../agenda-disponibilidad/entities/agenda-disponibilidad.entity';
+import { ProfesionalEspecialidad } from '../profesional-especialidad/entities/profesional-especialidad.entity'; // 👈 AGREGAR
 // Importamos servicios existentes que vamos a reutilizar
 import { AgendaDisponibilidadService } from '../agenda-disponibilidad/agenda-disponibilidad.service';
 import { ProfesionalCentroService } from '../profesional-centro/profesional-centro.service';
 import { AgendaDisponibilidadModule } from '../agenda-disponibilidad/agenda-disponibilidad.module';
 import { ProfesionalCentroModule } from '../profesional-centro/profesional-centro.module';
+import { ProfesionalEspecialidadModule } from '../profesional-especialidad/profesional-especialidad.module'; // 👈 AGREGAR
 
 @Module({
   imports: [
@@ -22,10 +24,11 @@ import { ProfesionalCentroModule } from '../profesional-centro/profesional-centr
       Especialidad,
       Profesional,
       AgendaDisponibilidad,
+      ProfesionalEspecialidad, // 👈 AGREGAR
     ]),
-    // Importamos los módulos existentes para poder usar sus servicios
     AgendaDisponibilidadModule,
     ProfesionalCentroModule,
+    ProfesionalEspecialidadModule, // 👈 AGREGAR PARA QUE NEST RESUELVA EL REPOSITORIO
   ],
   controllers: [AgendaPublicaController],
   providers: [AgendaPublicaService],
