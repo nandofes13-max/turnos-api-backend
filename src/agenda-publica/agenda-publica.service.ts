@@ -111,76 +111,85 @@ export class AgendaPublicaService {
   // ENDPOINT 2: Obtener profesionales y slots para un día específico
   // ============================================================
   async getProfesionalesSlots(
-    centroId: number,
-    especialidadId: number,
-    fecha: string,
-  ): Promise<ProfesionalSlots[]> {
-    try {
-      const fechaObj = new Date(fecha);
-      const diaSemana = fechaObj.getDay();
+  centroId: number,
+  especialidadId: number,
+  fecha: string,
+): Promise<ProfesionalSlots[]> {
+  try {
+    const fechaObj = new Date(fecha);
+    const diaSemana = fechaObj.getDay();
 
-      const profesionalesCentro = await this.profesionalCentroRepository.find({
-        where: {
-          centroId: centroId,
-          especialidadId: especialidadId,
-          fecha_baja: IsNull(),
-        },
-        relations: ['profesional'],
-      });
+    // Obtener hora actual en minutos (para filtrar slots pasados)
+    const ahora = new Date();
+    const horaActualNum = ahora.getHours() * 60 + ahora.getMinutes();
 
-      if (profesionalesCentro.length === 0) {
-        return [];
-      }
+    const profesionalesCentro = await this.profesionalCentroRepository.find({
+      where: {
+        centroId: centroId,
+        especialidadId: especialidadId,
+        fecha_baja: IsNull(),
+      },
+      relations: ['profesional'],
+    });
 
-      const resultados: ProfesionalSlots[] = [];
-
-      for (const pc of profesionalesCentro) {
-        try {
-          // Obtener la descripción para esta especialidad desde profesional_especialidad
-          const profEsp = await this.profesionalEspecialidadRepository.findOne({
-            where: {
-              profesionalId: pc.profesional.id,
-              especialidadId: especialidadId,
-              fecha_baja: IsNull(),
-            },
-          });
-
-          const descripcion = profEsp?.descripcion || '';
-
-          const slots = await this.agendaDisponibilidadService.generarSlots(
-            pc.id,
-            diaSemana,
-          );
-
-          if (slots && slots.length > 0) {
-            const horariosDisponibles = slots
-              .filter(slot => slot.disponible)
-              .map(slot => slot.hora);
-
-            if (horariosDisponibles.length > 0) {
-              resultados.push({
-                profesionalId: pc.profesional.id,
-                nombre: pc.profesional.nombre,
-                documento: pc.profesional.documento,
-                foto: pc.profesional.foto,
-                especialidadId: especialidadId,
-                centroId: centroId,
-                profesionalCentroId: pc.id,
-                descripcion: descripcion,
-                slots: horariosDisponibles,
-              });
-            }
-          }
-        } catch (error) {
-          console.log(`Profesional ${pc.id} no tiene agenda para día ${diaSemana}`);
-          continue;
-        }
-      }
-
-      return resultados;
-    } catch (error) {
-      console.error('[AgendaPublica] Error en getProfesionalesSlots:', error);
-      throw new BadRequestException(`Error al obtener profesionales y slots: ${error.message}`);
+    if (profesionalesCentro.length === 0) {
+      return [];
     }
+
+    const resultados: ProfesionalSlots[] = [];
+
+    for (const pc of profesionalesCentro) {
+      try {
+        const profEsp = await this.profesionalEspecialidadRepository.findOne({
+          where: {
+            profesionalId: pc.profesional.id,
+            especialidadId: especialidadId,
+            fecha_baja: IsNull(),
+          },
+        });
+
+        const descripcion = profEsp?.descripcion || '';
+
+        const slots = await this.agendaDisponibilidadService.generarSlots(
+          pc.id,
+          diaSemana,
+        );
+
+        if (slots && slots.length > 0) {
+          // Filtrar slots por hora actual y disponibilidad
+          const horariosDisponibles = slots
+            .filter(slot => {
+              if (!slot.disponible) return false;
+              const [h, m] = slot.hora.split(':').map(Number);
+              const slotMinutos = h * 60 + m;
+              return slotMinutos > horaActualNum;
+            })
+            .map(slot => slot.hora);
+
+          if (horariosDisponibles.length > 0) {
+            resultados.push({
+              profesionalId: pc.profesional.id,
+              nombre: pc.profesional.nombre,
+              documento: pc.profesional.documento,
+              foto: pc.profesional.foto,
+              especialidadId: especialidadId,
+              centroId: centroId,
+              profesionalCentroId: pc.id,
+              descripcion: descripcion,
+              slots: horariosDisponibles,
+            });
+          }
+        }
+      } catch (error) {
+        console.log(`Profesional ${pc.id} no tiene agenda para día ${diaSemana}`);
+        continue;
+      }
+    }
+
+    return resultados;
+  } catch (error) {
+    console.error('[AgendaPublica] Error en getProfesionalesSlots:', error);
+    throw new BadRequestException(`Error al obtener profesionales y slots: ${error.message}`);
   }
+}  }
 }
