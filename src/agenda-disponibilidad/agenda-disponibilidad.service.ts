@@ -7,6 +7,7 @@ import { CreateAgendaDisponibilidadDto } from './dto/create-agenda-disponibilida
 import { UpdateAgendaDisponibilidadDto } from './dto/update-agenda-disponibilidad.dto';
 import { ProfesionalCentro } from '../profesional-centro/entities/profesional-centro.entity';
 import { ExcepcionFecha } from '../excepciones-fechas/entities/excepcion-fecha.entity';
+import { utcToZonedTime } from 'date-fns-tz';
 
 @Injectable()
 export class AgendaDisponibilidadService implements OnModuleInit {
@@ -301,82 +302,99 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 
   // ============================================================
-  // NUEVO MÉTODO: Generar slots por ID de agenda (preciso)
-  // ============================================================
-  async generarSlotsPorId(
-    profesionalCentroId: number,
-    agendaId: number,
-  ): Promise<{ disponible: boolean; hora: string; bloqueado: boolean }[]> {
+// NUEVO MÉTODO: Generar slots por ID de agenda (preciso) con filtro de hora actual
+// ============================================================
+async generarSlotsPorId(
+  profesionalCentroId: number,
+  agendaId: number,
+): Promise<{ disponible: boolean; hora: string; bloqueado: boolean }[]> {
+  
+  console.log(`[SLOTS] Buscando agenda por ID: ${agendaId}, profesionalCentroId: ${profesionalCentroId}`);
+  
+  const agenda = await this.repository.findOne({
+    where: {
+      id: agendaId,
+      profesionalCentroId,
+      fecha_baja: IsNull(),
+    },
+  });
+  
+  if (!agenda) {
+    console.log(`[SLOTS] No se encontró agenda para ID ${agendaId}`);
+    return [];
+  }
+  
+  // Obtener zona horaria directamente de la agenda (o usar default)
+  const timezone = agenda.timezone || 'America/Argentina/Buenos_Aires';
+  console.log(`[SLOTS] Agenda ID ${agenda.id} - Zona horaria: ${timezone}`);
+  
+  // Hora actual en la zona horaria de la agenda
+  const ahora = utcToZonedTime(new Date(), timezone);
+  console.log(`[SLOTS] Hora actual en ${timezone}: ${ahora.toISOString()}`);
+  
+  const slots: { hora: string; bloqueado: boolean }[] = [];
+  let horaActual = this.normalizarHora(agenda.horaDesde);
+  const horaFin = this.normalizarHora(agenda.horaHasta);
+  let contador = 0;
+  const maxIteraciones = 100;
+  
+  while (horaActual < horaFin && contador < maxIteraciones) {
+    // Crear fecha completa del slot (hoy con la hora del slot)
+    const [h, m] = horaActual.split(':').map(Number);
+    const slotFecha = new Date();
+    slotFecha.setHours(h, m, 0, 0);
+    const slotEnTimezone = utcToZonedTime(slotFecha, timezone);
     
-    console.log(`[SLOTS] Buscando agenda por ID: ${agendaId}, profesionalCentroId: ${profesionalCentroId}`);
-    
-    const agenda = await this.repository.findOne({
-      where: {
-        id: agendaId,
-        profesionalCentroId,
-        fecha_baja: IsNull(),
-      },
-    });
-    
-    if (!agenda) {
-      console.log(`[SLOTS] No se encontró agenda para ID ${agendaId} y profesionalCentroId ${profesionalCentroId}`);
-      return [];
-    }
-    
-    console.log(`[SLOTS] Agenda encontrada - ID: ${agenda.id}, duracionTurno: ${agenda.duracionTurno} min, horaDesde: ${agenda.horaDesde}, horaHasta: ${agenda.horaHasta}`);
-    
-    const slots: { hora: string; bloqueado: boolean }[] = [];
-    let horaActual = this.normalizarHora(agenda.horaDesde);
-    const horaFin = this.normalizarHora(agenda.horaHasta);
-    let contador = 0;
-    const maxIteraciones = 100;
-    
-    while (horaActual < horaFin && contador < maxIteraciones) {
+    // Solo agregar si el slot es posterior a la hora actual
+    if (slotEnTimezone > ahora) {
       slots.push({ hora: horaActual, bloqueado: false });
-      contador++;
-      
-      const [h, m] = horaActual.split(':').map(Number);
-      let minutos = m + agenda.duracionTurno;
-      let horas = h;
-      if (minutos >= 60) {
-        horas += Math.floor(minutos / 60);
-        minutos = minutos % 60;
-      }
-      horaActual = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
+    } else {
+      console.log(`[SLOTS] Slot ${horaActual} descartado (pasado en ${timezone})`);
     }
+    contador++;
     
-    console.log(`[SLOTS] Generados ${slots.length} slots para agenda ID ${agenda.id}. Primeros 3: ${slots.slice(0, 3).map(s => s.hora).join(', ')}`);
-    
-    const excepcionesFechas = await this.excepcionesFechasRepository.find({
-      where: {
-        profesionalCentroId: profesionalCentroId,
-        fecha_baja: IsNull(),
-      },
-    });
-    
-    for (const excepcion of excepcionesFechas) {
-      if (!excepcion.horaDesde && !excepcion.horaHasta) {
-        for (let i = 0; i < slots.length; i++) {
+    // Avanzar al siguiente slot según la duración
+    let minutos = m + agenda.duracionTurno;
+    let horas = h;
+    if (minutos >= 60) {
+      horas += Math.floor(minutos / 60);
+      minutos = minutos % 60;
+    }
+    horaActual = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
+  }
+  
+  console.log(`[SLOTS] Agenda ID ${agenda.id} - Generados ${slots.length} slots futuros de ${contador} posibles`);
+  
+  // Excepciones de fechas (se mantiene igual)
+  const excepcionesFechas = await this.excepcionesFechasRepository.find({
+    where: {
+      profesionalCentroId: profesionalCentroId,
+      fecha_baja: IsNull(),
+    },
+  });
+  
+  for (const excepcion of excepcionesFechas) {
+    if (!excepcion.horaDesde && !excepcion.horaHasta) {
+      for (let i = 0; i < slots.length; i++) {
+        slots[i].bloqueado = true;
+      }
+    } else if (excepcion.horaDesde && excepcion.horaHasta) {
+      for (let i = 0; i < slots.length; i++) {
+        const slotHora = slots[i].hora;
+        const exHoraDesde = this.normalizarHora(excepcion.horaDesde);
+        const exHoraHasta = this.normalizarHora(excepcion.horaHasta);
+        if (slotHora >= exHoraDesde && slotHora < exHoraHasta) {
           slots[i].bloqueado = true;
         }
-      } else if (excepcion.horaDesde && excepcion.horaHasta) {
-        for (let i = 0; i < slots.length; i++) {
-          const slotHora = slots[i].hora;
-          const exHoraDesde = this.normalizarHora(excepcion.horaDesde);
-          const exHoraHasta = this.normalizarHora(excepcion.horaHasta);
-          if (slotHora >= exHoraDesde && slotHora < exHoraHasta) {
-            slots[i].bloqueado = true;
-          }
-        }
       }
     }
-    
-    return slots.map(slot => ({
-      ...slot,
-      disponible: !slot.bloqueado,
-    }));
   }
-
+  
+  return slots.map(slot => ({
+    ...slot,
+    disponible: !slot.bloqueado,
+  }));
+}
   async findAll(): Promise<AgendaDisponibilidad[]> {
     return this.repository.find({
       relations: ['profesionalCentro', 'profesionalCentro.profesional', 'profesionalCentro.especialidad', 'profesionalCentro.centro'],
