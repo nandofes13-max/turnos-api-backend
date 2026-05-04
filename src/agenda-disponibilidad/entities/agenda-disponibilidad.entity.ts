@@ -25,6 +25,9 @@ export class AgendaDisponibilidad extends BaseEntityAuditable {
   @Column({ name: 'buffer_minutos', type: 'int', default: 0 })
   bufferMinutos: number;
 
+  @Column({ name: 'timezone', type: 'varchar', length: 50, nullable: true })
+timezone: string;
+
   @Column({ name: 'fecha_desde', type: 'date' })
   fechaDesde: Date;
 
