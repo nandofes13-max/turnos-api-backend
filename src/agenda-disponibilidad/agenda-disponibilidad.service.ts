@@ -7,7 +7,8 @@ import { CreateAgendaDisponibilidadDto } from './dto/create-agenda-disponibilida
 import { UpdateAgendaDisponibilidadDto } from './dto/update-agenda-disponibilidad.dto';
 import { ProfesionalCentro } from '../profesional-centro/entities/profesional-centro.entity';
 import { ExcepcionFecha } from '../excepciones-fechas/entities/excepcion-fecha.entity';
-import { utcToZonedTime } from 'date-fns-tz';
+// CORRECTO
+import { toZonedTime } from 'date-fns-tz';
 
 @Injectable()
 export class AgendaDisponibilidadService implements OnModuleInit {
@@ -329,7 +330,9 @@ async generarSlotsPorId(
   console.log(`[SLOTS] Agenda ID ${agenda.id} - Zona horaria: ${timezone}`);
   
   // Hora actual en la zona horaria de la agenda
-  const ahora = utcToZonedTime(new Date(), timezone);
+  // CORRECTO
+const ahora = toZonedTime(new Date(), timezone);
+const slotEnTimezone = toZonedTime(slotFecha, timezone);
   console.log(`[SLOTS] Hora actual en ${timezone}: ${ahora.toISOString()}`);
   
   const slots: { hora: string; bloqueado: boolean }[] = [];
