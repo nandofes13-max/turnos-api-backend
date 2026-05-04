@@ -303,7 +303,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 
 // ============================================================
-// NUEVO MÉTODO: Generar slots por ID de agenda (preciso) con filtro de hora actual
+// MÉTODO: Generar slots por ID de agenda (con filtro de hora actual)
 // ============================================================
 async generarSlotsPorId(
   profesionalCentroId: number,
@@ -325,13 +325,12 @@ async generarSlotsPorId(
     return [];
   }
   
-  // Obtener zona horaria directamente de la agenda (o usar default)
-  const timezone = agenda.timezone || 'America/Argentina/Buenos_Aires';
-  console.log(`[SLOTS] Agenda ID ${agenda.id} - Zona horaria: ${timezone}`);
+  console.log(`[SLOTS] Agenda encontrada - ID: ${agenda.id}, duracionTurno: ${agenda.duracionTurno} min, horaDesde: ${agenda.horaDesde}, horaHasta: ${agenda.horaHasta}`);
   
-  // Hora actual en la zona horaria de la agenda
-  const ahora = toZonedTime(new Date(), timezone);
-  console.log(`[SLOTS] Hora actual en ${timezone}: ${ahora.toISOString()}`);
+  // Obtener hora actual
+  const ahora = new Date();
+  const horaActualNum = ahora.getHours() * 60 + ahora.getMinutes();
+  console.log(`[SLOTS] Hora actual (minutos desde medianoche): ${horaActualNum}`);
   
   const slots: { hora: string; bloqueado: boolean }[] = [];
   let horaActual = this.normalizarHora(agenda.horaDesde);
@@ -340,26 +339,19 @@ async generarSlotsPorId(
   const maxIteraciones = 100;
   
   while (horaActual < horaFin && contador < maxIteraciones) {
-    // 1. Crear un objeto Date para el día de HOY a la hora del slot (en UTC)
-    const [h, m] = horaActual.split(':').map(Number);
-    const slotFechaBase = new Date();
-    slotFechaBase.setUTCHours(h, m, 0, 0);
+    // Convertir hora del slot a minutos para comparar
+    const [hSlot, mSlot] = horaActual.split(':').map(Number);
+    const slotMinutos = hSlot * 60 + mSlot;
     
-    // 2. Convertir esa fecha/hora (que está en UTC) a la zona horaria de la agenda
-    const slotEnTimezone = toZonedTime(slotFechaBase, timezone);
-    
-    // 3. Obtener la hora actual en la misma zona horaria
-    const ahora = toZonedTime(new Date(), timezone);
-    
-    // 4. Solo agregar si la hora del slot es posterior a la hora actual
-    if (slotEnTimezone > ahora) {
+    // Solo agregar si el slot es posterior a la hora actual
+    if (slotMinutos > horaActualNum) {
       slots.push({ hora: horaActual, bloqueado: false });
     } else {
-      console.log(`[SLOTS] Slot ${horaActual} descartado (pasado en ${timezone})`);
+      console.log(`[SLOTS] Slot ${horaActual} descartado (pasado)`);
     }
     contador++;
     
-    // 5. Avanzar al siguiente slot según la duración
+    const [h, m] = horaActual.split(':').map(Number);
     let minutos = m + agenda.duracionTurno;
     let horas = h;
     if (minutos >= 60) {
@@ -369,9 +361,9 @@ async generarSlotsPorId(
     horaActual = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
   }
   
-  console.log(`[SLOTS] Agenda ID ${agenda.id} - Generados ${slots.length} slots futuros de ${contador} posibles`);
+  console.log(`[SLOTS] Generados ${slots.length} slots futuros de ${contador} posibles`);
   
-  // Excepciones de fechas (se mantiene igual, pero asegúrate de que el código esté completo)
+  // Excepciones de fechas (sin cambios)
   const excepcionesFechas = await this.excepcionesFechasRepository.find({
     where: {
       profesionalCentroId: profesionalCentroId,
@@ -401,6 +393,7 @@ async generarSlotsPorId(
     disponible: !slot.bloqueado,
   }));
 }
+  
   async findAll(): Promise<AgendaDisponibilidad[]> {
     return this.repository.find({
       relations: ['profesionalCentro', 'profesionalCentro.profesional', 'profesionalCentro.especialidad', 'profesionalCentro.centro'],
