@@ -6,7 +6,6 @@ import { ProfesionalEspecialidad } from '../profesional-especialidad/entities/pr
 import { AgendaDisponibilidadService } from '../agenda-disponibilidad/agenda-disponibilidad.service';
 import { ProfesionalCentroService } from '../profesional-centro/profesional-centro.service';
 
-// Exportamos las interfaces para que el controlador pueda usarlas
 export interface DiaDisponible {
   fecha: string;
   diaSemana: number;
@@ -37,7 +36,7 @@ export class AgendaPublicaService {
   ) {}
 
   // ============================================================
-  // ENDPOINT 1: Obtener días disponibles (con disponibilidad)
+  // ENDPOINT 1: Obtener días disponibles
   // ============================================================
   async getDiasDisponibles(
     centroId: number,
@@ -60,7 +59,6 @@ export class AgendaPublicaService {
       }
 
       const profesionalCentroIds = profesionalesCentro.map(pc => pc.id);
-
       const fechaInicio = new Date(desde);
       const fechaFin = new Date(hasta);
       const diasEnRango: Date[] = [];
@@ -80,10 +78,7 @@ export class AgendaPublicaService {
 
         for (const pcId of profesionalCentroIds) {
           try {
-            const slots = await this.agendaDisponibilidadService.generarSlots(
-              pcId,
-              diaSemana,
-            );
+            const slots = await this.agendaDisponibilidadService.generarSlots(pcId, diaSemana);
             if (slots && slots.length > 0) {
               disponible = true;
               break;
@@ -93,13 +88,8 @@ export class AgendaPublicaService {
           }
         }
 
-        resultados.push({
-          fecha: fechaStr,
-          diaSemana: diaSemana,
-          disponible: disponible,
-        });
+        resultados.push({ fecha: fechaStr, diaSemana: diaSemana, disponible: disponible });
       }
-
       return resultados;
     } catch (error) {
       console.error('[AgendaPublica] Error en getDiasDisponibles:', error);
@@ -111,85 +101,78 @@ export class AgendaPublicaService {
   // ENDPOINT 2: Obtener profesionales y slots para un día específico
   // ============================================================
   async getProfesionalesSlots(
-  centroId: number,
-  especialidadId: number,
-  fecha: string,
-): Promise<ProfesionalSlots[]> {
-  try {
-    const fechaObj = new Date(fecha);
-    const diaSemana = fechaObj.getDay();
+    centroId: number,
+    especialidadId: number,
+    fecha: string,
+  ): Promise<ProfesionalSlots[]> {
+    try {
+      const fechaObj = new Date(fecha);
+      const diaSemana = fechaObj.getDay();
 
-    // Obtener hora actual en minutos (para filtrar slots pasados)
-    const ahora = new Date();
-    const horaActualNum = ahora.getHours() * 60 + ahora.getMinutes();
+      const ahora = new Date();
+      const horaActualNum = ahora.getHours() * 60 + ahora.getMinutes();
 
-    const profesionalesCentro = await this.profesionalCentroRepository.find({
-      where: {
-        centroId: centroId,
-        especialidadId: especialidadId,
-        fecha_baja: IsNull(),
-      },
-      relations: ['profesional'],
-    });
+      const profesionalesCentro = await this.profesionalCentroRepository.find({
+        where: {
+          centroId: centroId,
+          especialidadId: especialidadId,
+          fecha_baja: IsNull(),
+        },
+        relations: ['profesional'],
+      });
 
-    if (profesionalesCentro.length === 0) {
-      return [];
-    }
-
-    const resultados: ProfesionalSlots[] = [];
-
-    for (const pc of profesionalesCentro) {
-      try {
-        const profEsp = await this.profesionalEspecialidadRepository.findOne({
-          where: {
-            profesionalId: pc.profesional.id,
-            especialidadId: especialidadId,
-            fecha_baja: IsNull(),
-          },
-        });
-
-        const descripcion = profEsp?.descripcion || '';
-
-        const slots = await this.agendaDisponibilidadService.generarSlots(
-          pc.id,
-          diaSemana,
-        );
-
-        if (slots && slots.length > 0) {
-          // Filtrar slots por hora actual y disponibilidad
-          const horariosDisponibles = slots
-            .filter(slot => {
-              if (!slot.disponible) return false;
-              const [h, m] = slot.hora.split(':').map(Number);
-              const slotMinutos = h * 60 + m;
-              return slotMinutos > horaActualNum;
-            })
-            .map(slot => slot.hora);
-
-          if (horariosDisponibles.length > 0) {
-            resultados.push({
-              profesionalId: pc.profesional.id,
-              nombre: pc.profesional.nombre,
-              documento: pc.profesional.documento,
-              foto: pc.profesional.foto,
-              especialidadId: especialidadId,
-              centroId: centroId,
-              profesionalCentroId: pc.id,
-              descripcion: descripcion,
-              slots: horariosDisponibles,
-            });
-          }
-        }
-      } catch (error) {
-        console.log(`Profesional ${pc.id} no tiene agenda para día ${diaSemana}`);
-        continue;
+      if (profesionalesCentro.length === 0) {
+        return [];
       }
-    }
 
-    return resultados;
-  } catch (error) {
-    console.error('[AgendaPublica] Error en getProfesionalesSlots:', error);
-    throw new BadRequestException(`Error al obtener profesionales y slots: ${error.message}`);
+      const resultados: ProfesionalSlots[] = [];
+
+      for (const pc of profesionalesCentro) {
+        try {
+          const profEsp = await this.profesionalEspecialidadRepository.findOne({
+            where: {
+              profesionalId: pc.profesional.id,
+              especialidadId: especialidadId,
+              fecha_baja: IsNull(),
+            },
+          });
+          const descripcion = profEsp?.descripcion || '';
+
+          const slots = await this.agendaDisponibilidadService.generarSlots(pc.id, diaSemana);
+
+          if (slots && slots.length > 0) {
+            const horariosDisponibles = slots
+              .filter(slot => {
+                if (!slot.disponible) return false;
+                const [h, m] = slot.hora.split(':').map(Number);
+                const slotMinutos = h * 60 + m;
+                return slotMinutos > horaActualNum;
+              })
+              .map(slot => slot.hora);
+
+            if (horariosDisponibles.length > 0) {
+              resultados.push({
+                profesionalId: pc.profesional.id,
+                nombre: pc.profesional.nombre,
+                documento: pc.profesional.documento,
+                foto: pc.profesional.foto,
+                especialidadId: especialidadId,
+                centroId: centroId,
+                profesionalCentroId: pc.id,
+                descripcion: descripcion,
+                slots: horariosDisponibles,
+              });
+            }
+          }
+        } catch (error) {
+          console.log(`Profesional ${pc.id} no tiene agenda para día ${diaSemana}`);
+          continue;
+        }
+      }
+      return resultados;
+    } catch (error) {
+      console.error('[AgendaPublica] Error en getProfesionalesSlots:', error);
+      throw new BadRequestException(`Error al obtener profesionales y slots: ${error.message}`);
+    }
   }
-}  }
 }
