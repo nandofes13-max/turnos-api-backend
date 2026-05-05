@@ -84,4 +84,9 @@ export class CreateCentroDto {
   @Type(() => DomicilioDto)
   @IsOptional()
   domicilio?: DomicilioDto;
+
+  // 🔹 NUEVO: Timezone (solo para centros virtuales, opcional)
+  @IsString({ message: 'La zona horaria debe ser texto' })
+  @IsOptional()
+  timezone?: string;
 }
