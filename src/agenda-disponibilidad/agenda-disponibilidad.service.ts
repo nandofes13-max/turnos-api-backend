@@ -6,6 +6,7 @@ import { AgendaDisponibilidad } from './entities/agenda-disponibilidad.entity';
 import { CreateAgendaDisponibilidadDto } from './dto/create-agenda-disponibilidad.dto';
 import { UpdateAgendaDisponibilidadDto } from './dto/update-agenda-disponibilidad.dto';
 import { ProfesionalCentro } from '../profesional-centro/entities/profesional-centro.entity';
+import { Centro } from '../centro/entities/centro.entity';
 import { ExcepcionFecha } from '../excepciones-fechas/entities/excepcion-fecha.entity';
 
 @Injectable()
@@ -15,9 +16,50 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     private readonly repository: Repository<AgendaDisponibilidad>,
     @InjectRepository(ProfesionalCentro)
     private readonly profesionalCentroRepository: Repository<ProfesionalCentro>,
+    @InjectRepository(Centro)
+    private readonly centroRepository: Repository<Centro>,
     @InjectRepository(ExcepcionFecha)
     private readonly excepcionesFechasRepository: Repository<ExcepcionFecha>,
   ) {}
+
+  // ===== NUEVO: OBTENER TIMEZONE DESDE PROFESIONAL_CENTRO =====
+  private async obtenerTimezoneDesdeProfesionalCentro(profesionalCentroId: number): Promise<string> {
+    try {
+      // 1. Buscar la relación profesional-centro
+      const relacion = await this.profesionalCentroRepository.findOne({
+        where: { id: profesionalCentroId, fecha_baja: IsNull() },
+        relations: ['centro'],
+      });
+      
+      if (!relacion) {
+        console.warn(`No se encontró la relación profesional-centro ID ${profesionalCentroId}`);
+        return 'America/Argentina/Buenos_Aires';
+      }
+      
+      // 2. Obtener el timezone del centro
+      if (relacion.centro && relacion.centro.timezone) {
+        console.log(`Timezone obtenido para agenda: ${relacion.centro.timezone} (desde centro ID ${relacion.centro.id})`);
+        return relacion.centro.timezone;
+      }
+      
+      // 3. Si el centro no tiene timezone, buscar directamente
+      if (relacion.centroId) {
+        const centro = await this.centroRepository.findOne({
+          where: { id: relacion.centroId },
+        });
+        if (centro && centro.timezone) {
+          console.log(`Timezone obtenido para agenda: ${centro.timezone} (desde centro ID ${centro.id})`);
+          return centro.timezone;
+        }
+      }
+      
+      console.warn(`No se pudo obtener timezone para profesional-centro ID ${profesionalCentroId}, usando default`);
+      return 'America/Argentina/Buenos_Aires';
+    } catch (error) {
+      console.error('Error obteniendo timezone:', error);
+      return 'America/Argentina/Buenos_Aires';
+    }
+  }
 
   private normalizarHora(hora: string): string {
     if (!hora) return hora;
@@ -174,9 +216,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     }
   }
 
-  // ============================================================
-  // VERIFICAR SOLAPAMIENTO - SIMPLIFICADO (sin fechas)
-  // ============================================================
   private async verificarSolapamiento(
     profesionalCentroId: number,
     diaSemana: number,
@@ -223,9 +262,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     console.log(`[VERIFICAR] No se detectaron conflictos`);
   }
 
-  // ============================================================
-  // MÉTODO GENERAR SLOTS - MODIFICADO (recibe diaSemana, no fecha)
-  // ============================================================
   async generarSlots(
     profesionalCentroId: number,
     diaSemana: number,
@@ -300,9 +336,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     }));
   }
 
-  // ============================================================
-  // NUEVO MÉTODO: Generar slots por ID de agenda (preciso)
-  // ============================================================
   async generarSlotsPorId(
     profesionalCentroId: number,
     agendaId: number,
@@ -427,6 +460,9 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       createDto.horaHasta,
     );
 
+    // 🔹 NUEVO: OBTENER TIMEZONE DESDE EL CENTRO ASOCIADO
+    const timezone = await this.obtenerTimezoneDesdeProfesionalCentro(createDto.profesionalCentroId);
+
     const bloqueActivoExistente = await this.repository.findOne({
       where: {
         profesionalCentroId: createDto.profesionalCentroId,
@@ -439,26 +475,13 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     });
 
     if (bloqueActivoExistente) {
-      throw new BadRequestException('Ya existe un bloque activo con el mismo horario y duración');
-    }
-
-    const existenteActivo = await this.repository.findOne({
-      where: {
-        profesionalCentroId: createDto.profesionalCentroId,
-        diaSemana: createDto.diaSemana,
-        horaDesde: createDto.horaDesde,
-        horaHasta: createDto.horaHasta,
-        duracionTurno: createDto.duracionTurno,
-        fecha_baja: IsNull(),
-      },
-    });
-    
-    if (existenteActivo) {
-      Object.assign(existenteActivo, {
+      // Actualizar también el timezone
+      bloqueActivoExistente.timezone = timezone;
+      Object.assign(bloqueActivoExistente, {
         ...createDto,
         usuario_modificacion: usuario || 'demo',
       });
-      return this.repository.save(existenteActivo);
+      return this.repository.save(bloqueActivoExistente);
     }
     
     const existenteEliminado = await this.repository.findOne({
@@ -476,12 +499,14 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       existenteEliminado.fecha_baja = null!;
       existenteEliminado.usuario_baja = null!;
       existenteEliminado.usuario_modificacion = usuario || 'demo';
+      existenteEliminado.timezone = timezone;  // 🔹 AGREGAR TIMEZONE
       Object.assign(existenteEliminado, createDto);
       return this.repository.save(existenteEliminado);
     }
 
     const registro = this.repository.create({
       ...createDto,
+      timezone: timezone,  // 🔹 NUEVO: GUARDAR TIMEZONE
       usuario_alta: usuario || 'demo',
     });
 
@@ -533,6 +558,12 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       horaHasta,
       id,
     );
+
+    // 🔹 NUEVO: SI CAMBIA EL PROFESIONAL_CENTRO, RECALCULAR TIMEZONE
+    if (updateDto.profesionalCentroId && updateDto.profesionalCentroId !== registro.profesionalCentroId) {
+      const nuevoTimezone = await this.obtenerTimezoneDesdeProfesionalCentro(updateDto.profesionalCentroId);
+      registro.timezone = nuevoTimezone;
+    }
 
     Object.assign(registro, updateDto);
     registro.usuario_modificacion = usuario || 'demo';
@@ -663,6 +694,9 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     const horaDesdeNorm = this.normalizarHora(horaDesde);
     const horaHastaNorm = this.normalizarHora(horaHasta);
 
+    // 🔹 Obtener timezone para los nuevos bloques
+    const timezone = await this.obtenerTimezoneDesdeProfesionalCentro(profesionalCentroId);
+
     const bloqueActivo = await this.repository.findOne({
       where: {
         profesionalCentroId,
@@ -684,6 +718,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
           bufferMinutos: 0,
           fechaDesde: new Date(fechaDesde),
           fechaHasta: fechaHasta ? new Date(fechaHasta) : null,
+          timezone: timezone,  // 🔹 AGREGAR TIMEZONE
           usuario_alta: usuario || 'demo',
         });
         await this.repository.save(nuevoBloque);
@@ -714,6 +749,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
           bufferMinutos: 0,
           fechaDesde: new Date(fechaDesde),
           fechaHasta: fechaHasta ? new Date(fechaHasta) : null,
+          timezone: timezone,  // 🔹 AGREGAR TIMEZONE
           usuario_alta: usuario || 'demo',
         });
         await this.repository.save(nuevoBloque);
@@ -738,9 +774,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     `);
   }
 
-  // ============================================================
-  // NUEVO MÉTODO: Guardar lote completo de bloques (transaccional)
-  // ============================================================
   async guardarLote(bloques: any[], usuario: string): Promise<void> {
     const queryRunner = this.repository.manager.connection.createQueryRunner();
     await queryRunner.connect();
@@ -853,6 +886,9 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         console.log(`[guardarLote] ===== PROCESANDO NUEVO BLOQUE =====`);
         console.log(`[guardarLote] Datos del nuevo bloque: diaSemana=${bloque.diaSemana}, horario=${bloque.horaDesde} a ${bloque.horaHasta}, duracion=${bloque.duracionTurno}`);
         
+        // 🔹 Obtener timezone para el nuevo bloque
+        const timezone = await this.obtenerTimezoneDesdeProfesionalCentro(bloque.profesionalCentroId);
+        
         // Validar duplicado exacto
         const duplicado = await queryRunner.manager.findOne(AgendaDisponibilidad, {
           where: {
@@ -916,12 +952,13 @@ export class AgendaDisponibilidadService implements OnModuleInit {
           bufferMinutos: bloque.bufferMinutos || 0,
           fechaDesde: new Date(bloque.fechaDesde),
           fechaHasta: bloque.fechaHasta ? new Date(bloque.fechaHasta) : null,
+          timezone: timezone,  // 🔹 GUARDAR TIMEZONE
           usuario_alta: usuario,
           fecha_alta: new Date(),
         });
         
         await queryRunner.manager.save(nuevoBloque);
-        console.log(`[guardarLote] ✅ Creado nuevo bloque para día ${bloque.diaSemana}`);
+        console.log(`[guardarLote] ✅ Creado nuevo bloque para día ${bloque.diaSemana} con timezone ${timezone}`);
       }
       
       await queryRunner.commitTransaction();
