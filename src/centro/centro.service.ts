@@ -37,17 +37,23 @@ export class CentroService {
     }
   }
 
-  // ===== OBTENER TIMEZONE DEL NEGOCIO (para centros virtuales) =====
+  // ===== OBTENER TIMEZONE DEL NEGOCIO (para centros virtuales) - SQL DIRECTO =====
   private async obtenerTimezoneDesdeNegocio(negocioId: number): Promise<string> {
-    const { Negocio } = await import('../../negocios/entities/negocio.entity');
-    const negocio = await this.centroRepository.manager.findOne(Negocio, {
-      where: { id: negocioId }
-    });
-    
-    if (negocio && negocio.timezone) {
-      return negocio.timezone;
+    try {
+      const result = await this.centroRepository.query(
+        `SELECT timezone FROM negocio WHERE id = $1`,
+        [negocioId]
+      );
+      
+      if (result && result[0] && result[0].timezone) {
+        console.log(`Timezone heredado del negocio ${negocioId}: ${result[0].timezone}`);
+        return result[0].timezone;
+      }
+      return 'America/Argentina/Buenos_Aires';
+    } catch (error) {
+      console.error('Error obteniendo timezone del negocio:', error);
+      return 'America/Argentina/Buenos_Aires';
     }
-    return 'America/Argentina/Buenos_Aires';
   }
 
   private validarWhatsApp(country_code: number, national_number: string): string {
@@ -158,9 +164,14 @@ export class CentroService {
     let timezone: string;
     
     if (createCentroDto.es_virtual) {
-      // Centro virtual: hereda timezone del negocio
-      timezone = await this.obtenerTimezoneDesdeNegocio(createCentroDto.negocioId);
-      console.log(`Centro virtual creado con timezone heredado: ${timezone}`);
+      // Centro virtual: hereda timezone del negocio (o usa el enviado)
+      if (createCentroDto.timezone) {
+        timezone = createCentroDto.timezone;
+        console.log(`Centro virtual con timezone especificado: ${timezone}`);
+      } else {
+        timezone = await this.obtenerTimezoneDesdeNegocio(createCentroDto.negocioId);
+        console.log(`Centro virtual creado con timezone heredado: ${timezone}`);
+      }
     } else {
       // Centro físico: requiere domicilio y obtiene timezone de coordenadas
       if (!createCentroDto.domicilio || !createCentroDto.domicilio.formatted_address) {
