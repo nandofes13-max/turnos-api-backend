@@ -14,19 +14,22 @@ export class NegociosService {
     private readonly negociosRepository: Repository<Negocio>,
   ) {}
 
-  // ===== NUEVO: OBTENER TIMEZONE DESDE COORDENADAS (BigDataCloud - GRATIS) =====
+  // ===== OBTENER TIMEZONE DESDE COORDENADAS (TimezoneDB) =====
   private async obtenerTimezoneDesdeCoordenadas(lat: number, lng: number): Promise<string> {
+    const API_KEY = 'DAPTMA97YA6B';  // Tu API key de TimezoneDB
+    
     try {
-      // BigDataCloud Free API - No requiere API key
-      const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=es`;
+      const url = `https://api.timezonedb.com/v2.1/get-time-zone?key=${API_KEY}&format=json&by=position&lat=${lat}&lng=${lng}`;
+      console.log(`Consultando timezone para lat: ${lat}, lng: ${lng}`);
+      
       const response = await fetch(url);
       const data = await response.json();
       
-      if (data && data.timezone) {
-        console.log(`Timezone obtenido: ${data.timezone} para (${lat}, ${lng})`);
-        return data.timezone;
+      if (data.status === 'OK' && data.zoneName) {
+        console.log(`✅ Timezone obtenido: ${data.zoneName}`);
+        return data.zoneName;
       } else {
-        console.warn('No se pudo obtener timezone, usando default Argentina');
+        console.error('Error TimezoneDB:', data.message);
         return 'America/Argentina/Buenos_Aires';
       }
     } catch (error) {
@@ -144,7 +147,7 @@ export class NegociosService {
 
     this.validarDireccion(createNegocioDto.domicilio);
 
-    // 🔹 NUEVO: OBTENER TIMEZONE DESDE LAS COORDENADAS
+    // 🔹 OBTENER TIMEZONE DESDE LAS COORDENADAS
     const timezone = await this.obtenerTimezoneDesdeCoordenadas(
       createNegocioDto.domicilio.latitude,
       createNegocioDto.domicilio.longitude
@@ -168,7 +171,7 @@ export class NegociosService {
       latitude: createNegocioDto.domicilio.latitude,
       longitude: createNegocioDto.domicilio.longitude,
       formatted_address: createNegocioDto.domicilio.formatted_address,
-      timezone: timezone,  // 🔹 NUEVO: GUARDAR TIMEZONE
+      timezone: timezone,
       usuario_alta: usuario || 'demo',
     });
 
@@ -187,11 +190,11 @@ export class NegociosService {
       negocioExistente.whatsapp_e164 = whatsappE164;
     }
 
-    // Si se actualiza el domicilio, validar y RECALCULAR TIMEZONE
+    // Si se actualiza el domicilio, validar y recalcular timezone
     if (updateNegocioDto.domicilio) {
       this.validarDireccion(updateNegocioDto.domicilio);
       
-      // 🔹 NUEVO: RECALCULAR TIMEZONE SI CAMBIA LA DIRECCIÓN
+      // 🔹 RECALCULAR TIMEZONE SI CAMBIA LA DIRECCIÓN
       const nuevoTimezone = await this.obtenerTimezoneDesdeCoordenadas(
         updateNegocioDto.domicilio.latitude,
         updateNegocioDto.domicilio.longitude
