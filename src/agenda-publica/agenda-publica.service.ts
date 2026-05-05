@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { ProfesionalCentro } from '../profesional-centro/entities/profesional-centro.entity';
 import { ProfesionalEspecialidad } from '../profesional-especialidad/entities/profesional-especialidad.entity';
+import { Centro } from '../centro/entities/centro.entity';
 import { AgendaDisponibilidadService } from '../agenda-disponibilidad/agenda-disponibilidad.service';
 import { ProfesionalCentroService } from '../profesional-centro/profesional-centro.service';
 
@@ -31,20 +32,30 @@ export class AgendaPublicaService {
     private readonly profesionalCentroRepository: Repository<ProfesionalCentro>,
     @InjectRepository(ProfesionalEspecialidad)
     private readonly profesionalEspecialidadRepository: Repository<ProfesionalEspecialidad>,
+    @InjectRepository(Centro)
+    private readonly centroRepository: Repository<Centro>,
     private readonly agendaDisponibilidadService: AgendaDisponibilidadService,
     private readonly profesionalCentroService: ProfesionalCentroService,
   ) {}
 
-  // ===== FUNCIÓN AUXILIAR: Verificar si una fecha es hoy =====
+  // ===== OBTENER FECHA ACTUAL EN UNA ZONA HORARIA (formato YYYY-MM-DD) =====
+  private obtenerFechaActualEnTimezone(timezone: string): string {
+    const formatter = new Intl.DateTimeFormat('es-AR', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    
+    const hoyEnTimezone = formatter.format(new Date());
+    const [dia, mes, anio] = hoyEnTimezone.split('/');
+    return `${anio}-${mes}-${dia}`;
+  }
+
+  // ===== FUNCIÓN AUXILIAR: Verificar si una fecha es hoy en la zona horaria especificada =====
   private esHoy(fechaStr: string, timezone: string): boolean {
-    const hoy = new Date();
-    const fechaSlot = new Date(fechaStr);
-    
-    // Normalizar a las 00:00:00 en la zona horaria especificada
-    const hoyStr = hoy.toLocaleDateString('es-AR', { timeZone: timezone });
-    const slotStr = fechaSlot.toLocaleDateString('es-AR', { timeZone: timezone });
-    
-    return hoyStr === slotStr;
+    const hoyStr = this.obtenerFechaActualEnTimezone(timezone);
+    return hoyStr === fechaStr;
   }
 
   // ===== FUNCIÓN AUXILIAR: Obtener hora actual en una zona horaria =====
@@ -65,6 +76,36 @@ export class AgendaPublicaService {
     hasta: string,
   ): Promise<DiaDisponible[]> {
     try {
+      // 🔹 Obtener el timezone del centro
+      const centro = await this.centroRepository.findOne({
+        where: { id: centroId },
+      });
+      const timezone = centro?.timezone || 'America/Argentina/Buenos_Aires';
+      
+      // 🔹 Calcular la fecha actual en la zona horaria del centro
+      const hoyStr = this.obtenerFechaActualEnTimezone(timezone);
+      const hoy = new Date(hoyStr);
+      
+      console.log(`[DiasDisponibles] Centro ID ${centroId}, timezone: ${timezone}`);
+      console.log(`[DiasDisponibles] Hoy en ${timezone}: ${hoyStr}`);
+      
+      // 🔹 Ajustar las fechas desde/hasta usando la fecha actual en el timezone
+      const fechaInicio = new Date(desde);
+      const fechaFin = new Date(hasta);
+      
+      // Si la fecha 'desde' es anterior a hoy, empezar desde hoy
+      const inicioReal = fechaInicio < hoy ? hoy : fechaInicio;
+      
+      const diasEnRango: Date[] = [];
+      let currentDate = new Date(inicioReal);
+      
+      while (currentDate <= fechaFin) {
+        diasEnRango.push(new Date(currentDate));
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      
+      console.log(`[DiasDisponibles] Generando ${diasEnRango.length} días desde ${inicioReal.toISOString().split('T')[0]}`);
+
       const profesionalesCentro = await this.profesionalCentroRepository.find({
         where: {
           centroId: centroId,
@@ -79,17 +120,6 @@ export class AgendaPublicaService {
       }
 
       const profesionalCentroIds = profesionalesCentro.map(pc => pc.id);
-
-      const fechaInicio = new Date(desde);
-      const fechaFin = new Date(hasta);
-      const diasEnRango: Date[] = [];
-      let currentDate = new Date(fechaInicio);
-
-      while (currentDate <= fechaFin) {
-        diasEnRango.push(new Date(currentDate));
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
-
       const resultados: DiaDisponible[] = [];
 
       for (const fecha of diasEnRango) {
@@ -132,6 +162,12 @@ export class AgendaPublicaService {
     fecha: string,
   ): Promise<ProfesionalSlots[]> {
     try {
+      // 🔹 Obtener el timezone del centro (para el filtro)
+      const centro = await this.centroRepository.findOne({
+        where: { id: centroId },
+      });
+      const timezoneCentro = centro?.timezone || 'America/Argentina/Buenos_Aires';
+      
       const fechaObj = new Date(fecha);
       const diaSemana = fechaObj.getDay();
 
@@ -162,7 +198,6 @@ export class AgendaPublicaService {
 
           const descripcion = profEsp?.descripcion || '';
 
-          // 🔹 NUEVO: Obtener slots + timezone
           const { slots, timezone } = await this.agendaDisponibilidadService.generarSlots(
             pc.id,
             diaSemana,
@@ -173,17 +208,22 @@ export class AgendaPublicaService {
               .filter(slot => slot.disponible)
               .map(slot => slot.hora);
 
-            // 🔹 FILTRAR SOLO PARA HOY
-            if (this.esHoy(fecha, timezone)) {
-              const horaActual = this.obtenerHoraActual(timezone);
+            // 🔹 Usar el timezone de la agenda (que es el del centro)
+            const tz = timezone || timezoneCentro;
+            
+            if (this.esHoy(fecha, tz)) {
+              const horaActual = this.obtenerHoraActual(tz);
               const horariosFiltrados = horariosDisponibles.filter(hora => hora > horaActual);
               
-              console.log(`[Filtro] Profesional ${pc.profesional.nombre} - Zona horaria: ${timezone}`);
+              console.log(`[Filtro] Profesional ${pc.profesional.nombre} - Zona horaria: ${tz}`);
+              console.log(`[Filtro] Fecha consultada: ${fecha}, ¿es hoy? Sí`);
               console.log(`[Filtro] Hora actual: ${horaActual}`);
               console.log(`[Filtro] Slots originales: ${horariosDisponibles.join(', ')}`);
               console.log(`[Filtro] Slots filtrados: ${horariosFiltrados.join(', ')}`);
               
               horariosDisponibles = horariosFiltrados;
+            } else {
+              console.log(`[Filtro] Profesional ${pc.profesional.nombre} - Fecha ${fecha} no es hoy (en ${tz}), mostrando todos los slots`);
             }
 
             if (horariosDisponibles.length > 0) {
