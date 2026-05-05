@@ -6,7 +6,6 @@ import { ProfesionalEspecialidad } from '../profesional-especialidad/entities/pr
 import { AgendaDisponibilidadService } from '../agenda-disponibilidad/agenda-disponibilidad.service';
 import { ProfesionalCentroService } from '../profesional-centro/profesional-centro.service';
 
-// Exportamos las interfaces para que el controlador pueda usarlas
 export interface DiaDisponible {
   fecha: string;
   diaSemana: number;
@@ -36,9 +35,29 @@ export class AgendaPublicaService {
     private readonly profesionalCentroService: ProfesionalCentroService,
   ) {}
 
-  // ============================================================
-  // ENDPOINT 1: Obtener días disponibles (con disponibilidad)
-  // ============================================================
+  // ===== FUNCIÓN AUXILIAR: Verificar si una fecha es hoy =====
+  private esHoy(fechaStr: string, timezone: string): boolean {
+    const hoy = new Date();
+    const fechaSlot = new Date(fechaStr);
+    
+    // Normalizar a las 00:00:00 en la zona horaria especificada
+    const hoyStr = hoy.toLocaleDateString('es-AR', { timeZone: timezone });
+    const slotStr = fechaSlot.toLocaleDateString('es-AR', { timeZone: timezone });
+    
+    return hoyStr === slotStr;
+  }
+
+  // ===== FUNCIÓN AUXILIAR: Obtener hora actual en una zona horaria =====
+  private obtenerHoraActual(timezone: string): string {
+    const ahora = new Date();
+    return ahora.toLocaleTimeString('es-AR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: timezone
+    });
+  }
+
   async getDiasDisponibles(
     centroId: number,
     especialidadId: number,
@@ -80,7 +99,7 @@ export class AgendaPublicaService {
 
         for (const pcId of profesionalCentroIds) {
           try {
-            const slots = await this.agendaDisponibilidadService.generarSlots(
+            const { slots } = await this.agendaDisponibilidadService.generarSlots(
               pcId,
               diaSemana,
             );
@@ -107,9 +126,6 @@ export class AgendaPublicaService {
     }
   }
 
-  // ============================================================
-  // ENDPOINT 2: Obtener profesionales y slots para un día específico
-  // ============================================================
   async getProfesionalesSlots(
     centroId: number,
     especialidadId: number,
@@ -136,7 +152,6 @@ export class AgendaPublicaService {
 
       for (const pc of profesionalesCentro) {
         try {
-          // Obtener la descripción para esta especialidad desde profesional_especialidad
           const profEsp = await this.profesionalEspecialidadRepository.findOne({
             where: {
               profesionalId: pc.profesional.id,
@@ -147,15 +162,29 @@ export class AgendaPublicaService {
 
           const descripcion = profEsp?.descripcion || '';
 
-          const slots = await this.agendaDisponibilidadService.generarSlots(
+          // 🔹 NUEVO: Obtener slots + timezone
+          const { slots, timezone } = await this.agendaDisponibilidadService.generarSlots(
             pc.id,
             diaSemana,
           );
 
           if (slots && slots.length > 0) {
-            const horariosDisponibles = slots
+            let horariosDisponibles = slots
               .filter(slot => slot.disponible)
               .map(slot => slot.hora);
+
+            // 🔹 FILTRAR SOLO PARA HOY
+            if (this.esHoy(fecha, timezone)) {
+              const horaActual = this.obtenerHoraActual(timezone);
+              const horariosFiltrados = horariosDisponibles.filter(hora => hora > horaActual);
+              
+              console.log(`[Filtro] Profesional ${pc.profesional.nombre} - Zona horaria: ${timezone}`);
+              console.log(`[Filtro] Hora actual: ${horaActual}`);
+              console.log(`[Filtro] Slots originales: ${horariosDisponibles.join(', ')}`);
+              console.log(`[Filtro] Slots filtrados: ${horariosFiltrados.join(', ')}`);
+              
+              horariosDisponibles = horariosFiltrados;
+            }
 
             if (horariosDisponibles.length > 0) {
               resultados.push({
