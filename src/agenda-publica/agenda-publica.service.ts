@@ -6,6 +6,7 @@ import { ProfesionalEspecialidad } from '../profesional-especialidad/entities/pr
 import { AgendaDisponibilidadService } from '../agenda-disponibilidad/agenda-disponibilidad.service';
 import { ProfesionalCentroService } from '../profesional-centro/profesional-centro.service';
 
+// Exportamos las interfaces para que el controlador pueda usarlas
 export interface DiaDisponible {
   fecha: string;
   diaSemana: number;
@@ -36,7 +37,7 @@ export class AgendaPublicaService {
   ) {}
 
   // ============================================================
-  // ENDPOINT 1: Obtener días disponibles
+  // ENDPOINT 1: Obtener días disponibles (con disponibilidad)
   // ============================================================
   async getDiasDisponibles(
     centroId: number,
@@ -59,6 +60,7 @@ export class AgendaPublicaService {
       }
 
       const profesionalCentroIds = profesionalesCentro.map(pc => pc.id);
+
       const fechaInicio = new Date(desde);
       const fechaFin = new Date(hasta);
       const diasEnRango: Date[] = [];
@@ -78,7 +80,10 @@ export class AgendaPublicaService {
 
         for (const pcId of profesionalCentroIds) {
           try {
-            const slots = await this.agendaDisponibilidadService.generarSlots(pcId, diaSemana);
+            const slots = await this.agendaDisponibilidadService.generarSlots(
+              pcId,
+              diaSemana,
+            );
             if (slots && slots.length > 0) {
               disponible = true;
               break;
@@ -88,8 +93,13 @@ export class AgendaPublicaService {
           }
         }
 
-        resultados.push({ fecha: fechaStr, diaSemana: diaSemana, disponible: disponible });
+        resultados.push({
+          fecha: fechaStr,
+          diaSemana: diaSemana,
+          disponible: disponible,
+        });
       }
+
       return resultados;
     } catch (error) {
       console.error('[AgendaPublica] Error en getDiasDisponibles:', error);
@@ -109,11 +119,6 @@ export class AgendaPublicaService {
       const fechaObj = new Date(fecha);
       const diaSemana = fechaObj.getDay();
 
-      // Hora actual (solo para comparar si es la fecha actual)
-      const ahora = new Date();
-      const hoyStr = ahora.toISOString().split('T')[0];
-      const horaActualNum = ahora.getHours() * 60 + ahora.getMinutes();
-
       const profesionalesCentro = await this.profesionalCentroRepository.find({
         where: {
           centroId: centroId,
@@ -131,6 +136,7 @@ export class AgendaPublicaService {
 
       for (const pc of profesionalesCentro) {
         try {
+          // Obtener la descripción para esta especialidad desde profesional_especialidad
           const profEsp = await this.profesionalEspecialidadRepository.findOne({
             where: {
               profesionalId: pc.profesional.id,
@@ -138,24 +144,17 @@ export class AgendaPublicaService {
               fecha_baja: IsNull(),
             },
           });
+
           const descripcion = profEsp?.descripcion || '';
 
-          const slots = await this.agendaDisponibilidadService.generarSlots(pc.id, diaSemana);
+          const slots = await this.agendaDisponibilidadService.generarSlots(
+            pc.id,
+            diaSemana,
+          );
 
           if (slots && slots.length > 0) {
-            // Filtrar slots: solo aplicar filtro de hora si la fecha consultada es hoy
             const horariosDisponibles = slots
-              .filter(slot => {
-                if (!slot.disponible) return false;
-                
-                // Si la fecha consultada NO es hoy, mostrar todos los slots sin filtrar por hora
-                if (fecha !== hoyStr) return true;
-                
-                // Si es hoy, filtrar slots pasados
-                const [h, m] = slot.hora.split(':').map(Number);
-                const slotMinutos = h * 60 + m;
-                return slotMinutos > horaActualNum;
-              })
+              .filter(slot => slot.disponible)
               .map(slot => slot.hora);
 
             if (horariosDisponibles.length > 0) {
@@ -177,6 +176,7 @@ export class AgendaPublicaService {
           continue;
         }
       }
+
       return resultados;
     } catch (error) {
       console.error('[AgendaPublica] Error en getProfesionalesSlots:', error);
