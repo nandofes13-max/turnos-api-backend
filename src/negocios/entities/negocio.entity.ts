@@ -52,6 +52,9 @@ export class Negocio extends BaseEntityAuditable {
   @Column({ type: 'text', nullable: true })
   formatted_address: string;
 
+  @Column({ length: 50, nullable: true, default: 'America/Argentina/Buenos_Aires' })
+timezone: string;
+
   // Getter para último movimiento
   get ultimoMovimiento(): string {
     if (this.fecha_baja && this.usuario_baja) {
