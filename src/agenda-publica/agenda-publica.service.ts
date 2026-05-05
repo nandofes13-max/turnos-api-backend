@@ -109,7 +109,9 @@ export class AgendaPublicaService {
       const fechaObj = new Date(fecha);
       const diaSemana = fechaObj.getDay();
 
+      // Hora actual (solo para comparar si es la fecha actual)
       const ahora = new Date();
+      const hoyStr = ahora.toISOString().split('T')[0];
       const horaActualNum = ahora.getHours() * 60 + ahora.getMinutes();
 
       const profesionalesCentro = await this.profesionalCentroRepository.find({
@@ -141,9 +143,15 @@ export class AgendaPublicaService {
           const slots = await this.agendaDisponibilidadService.generarSlots(pc.id, diaSemana);
 
           if (slots && slots.length > 0) {
+            // Filtrar slots: solo aplicar filtro de hora si la fecha consultada es hoy
             const horariosDisponibles = slots
               .filter(slot => {
                 if (!slot.disponible) return false;
+                
+                // Si la fecha consultada NO es hoy, mostrar todos los slots sin filtrar por hora
+                if (fecha !== hoyStr) return true;
+                
+                // Si es hoy, filtrar slots pasados
                 const [h, m] = slot.hora.split(':').map(Number);
                 const slotMinutos = h * 60 + m;
                 return slotMinutos > horaActualNum;
