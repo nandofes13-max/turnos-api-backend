@@ -22,10 +22,9 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     private readonly excepcionesFechasRepository: Repository<ExcepcionFecha>,
   ) {}
 
-  // ===== NUEVO: OBTENER TIMEZONE DESDE PROFESIONAL_CENTRO =====
+  // ===== OBTENER TIMEZONE DESDE PROFESIONAL_CENTRO =====
   private async obtenerTimezoneDesdeProfesionalCentro(profesionalCentroId: number): Promise<string> {
     try {
-      // 1. Buscar la relación profesional-centro
       const relacion = await this.profesionalCentroRepository.findOne({
         where: { id: profesionalCentroId, fecha_baja: IsNull() },
         relations: ['centro'],
@@ -36,13 +35,11 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         return 'America/Argentina/Buenos_Aires';
       }
       
-      // 2. Obtener el timezone del centro
       if (relacion.centro && relacion.centro.timezone) {
         console.log(`Timezone obtenido para agenda: ${relacion.centro.timezone} (desde centro ID ${relacion.centro.id})`);
         return relacion.centro.timezone;
       }
       
-      // 3. Si el centro no tiene timezone, buscar directamente
       if (relacion.centroId) {
         const centro = await this.centroRepository.findOne({
           where: { id: relacion.centroId },
@@ -69,9 +66,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     return hora;
   }
 
-  async onModuleInit() {
-    // await this.crearConstraintExclusion();
-  }
+  async onModuleInit() {}
 
   private async crearConstraintExclusion() {
     try {
@@ -101,9 +96,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         )
         WHERE (fecha_baja IS NULL);
       `);
-    } catch (error) {
-      // silent
-    }
+    } catch (error) {}
   }
 
   private async verificarProfesionalCentroActivo(id: number): Promise<void> {
@@ -240,8 +233,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
 
       console.log(`[VERIFICAR] Nuevo bloque horario: ${horaDesde} a ${horaHasta}`);
       console.log(`[VERIFICAR] Existente bloque horario: ${agenda.horaDesde} a ${agenda.horaHasta}`);
-      console.log(`[VERIFICAR] Condiciones: ${horaDesde} < ${agenda.horaHasta} = ${horaDesde < agenda.horaHasta}`);
-      console.log(`[VERIFICAR] Condiciones: ${horaHasta} > ${agenda.horaDesde} = ${horaHasta > agenda.horaDesde}`);
 
       const haySolapamientoHorario = (
         (horaDesde < agenda.horaHasta && horaHasta > agenda.horaDesde)
@@ -262,10 +253,13 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     console.log(`[VERIFICAR] No se detectaron conflictos`);
   }
 
+  // ============================================================
+  // MÉTODO MODIFICADO: generarSlots ahora devuelve timezone
+  // ============================================================
   async generarSlots(
     profesionalCentroId: number,
     diaSemana: number,
-  ): Promise<{ disponible: boolean; hora: string; bloqueado: boolean }[]> {
+  ): Promise<{ slots: { disponible: boolean; hora: string; bloqueado: boolean }[]; timezone: string }> {
     
     console.log(`[SLOTS] Buscando agenda - profesionalCentroId: ${profesionalCentroId}, diaSemana: ${diaSemana}`);
     
@@ -279,10 +273,10 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     
     if (!agenda) {
       console.log(`[SLOTS] No se encontró agenda para esos parámetros`);
-      return [];
+      return { slots: [], timezone: 'America/Argentina/Buenos_Aires' };
     }
     
-    console.log(`[SLOTS] Agenda encontrada - ID: ${agenda.id}, duracionTurno: ${agenda.duracionTurno} min, horaDesde: ${agenda.horaDesde}, horaHasta: ${agenda.horaHasta}`);
+    console.log(`[SLOTS] Agenda encontrada - ID: ${agenda.id}, timezone: ${agenda.timezone}, duracionTurno: ${agenda.duracionTurno} min, horaDesde: ${agenda.horaDesde}, horaHasta: ${agenda.horaHasta}`);
     
     const slots: { hora: string; bloqueado: boolean }[] = [];
     let horaActual = agenda.horaDesde;
@@ -330,10 +324,14 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       }
     }
     
-    return slots.map(slot => ({
-      ...slot,
-      disponible: !slot.bloqueado,
-    }));
+    // 🔹 NUEVO: Devolver slots + timezone
+    return {
+      slots: slots.map(slot => ({
+        ...slot,
+        disponible: !slot.bloqueado,
+      })),
+      timezone: agenda.timezone || 'America/Argentina/Buenos_Aires'
+    };
   }
 
   async generarSlotsPorId(
@@ -460,7 +458,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       createDto.horaHasta,
     );
 
-    // 🔹 NUEVO: OBTENER TIMEZONE DESDE EL CENTRO ASOCIADO
     const timezone = await this.obtenerTimezoneDesdeProfesionalCentro(createDto.profesionalCentroId);
 
     const bloqueActivoExistente = await this.repository.findOne({
@@ -475,7 +472,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     });
 
     if (bloqueActivoExistente) {
-      // Actualizar también el timezone
       bloqueActivoExistente.timezone = timezone;
       Object.assign(bloqueActivoExistente, {
         ...createDto,
@@ -499,14 +495,14 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       existenteEliminado.fecha_baja = null!;
       existenteEliminado.usuario_baja = null!;
       existenteEliminado.usuario_modificacion = usuario || 'demo';
-      existenteEliminado.timezone = timezone;  // 🔹 AGREGAR TIMEZONE
+      existenteEliminado.timezone = timezone;
       Object.assign(existenteEliminado, createDto);
       return this.repository.save(existenteEliminado);
     }
 
     const registro = this.repository.create({
       ...createDto,
-      timezone: timezone,  // 🔹 NUEVO: GUARDAR TIMEZONE
+      timezone: timezone,
       usuario_alta: usuario || 'demo',
     });
 
@@ -559,7 +555,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       id,
     );
 
-    // 🔹 NUEVO: SI CAMBIA EL PROFESIONAL_CENTRO, RECALCULAR TIMEZONE
     if (updateDto.profesionalCentroId && updateDto.profesionalCentroId !== registro.profesionalCentroId) {
       const nuevoTimezone = await this.obtenerTimezoneDesdeProfesionalCentro(updateDto.profesionalCentroId);
       registro.timezone = nuevoTimezone;
@@ -694,7 +689,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     const horaDesdeNorm = this.normalizarHora(horaDesde);
     const horaHastaNorm = this.normalizarHora(horaHasta);
 
-    // 🔹 Obtener timezone para los nuevos bloques
     const timezone = await this.obtenerTimezoneDesdeProfesionalCentro(profesionalCentroId);
 
     const bloqueActivo = await this.repository.findOne({
@@ -718,7 +712,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
           bufferMinutos: 0,
           fechaDesde: new Date(fechaDesde),
           fechaHasta: fechaHasta ? new Date(fechaHasta) : null,
-          timezone: timezone,  // 🔹 AGREGAR TIMEZONE
+          timezone: timezone,
           usuario_alta: usuario || 'demo',
         });
         await this.repository.save(nuevoBloque);
@@ -749,7 +743,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
           bufferMinutos: 0,
           fechaDesde: new Date(fechaDesde),
           fechaHasta: fechaHasta ? new Date(fechaHasta) : null,
-          timezone: timezone,  // 🔹 AGREGAR TIMEZONE
+          timezone: timezone,
           usuario_alta: usuario || 'demo',
         });
         await this.repository.save(nuevoBloque);
@@ -786,7 +780,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       
       console.log(`[guardarLote] Inactivos: ${inactivos.length}, Activos: ${activos.length}, Nuevos: ${nuevos.length}`);
       
-      // PASO 1: Actualizar INACTIVOS (sin validaciones)
       for (const bloque of inactivos) {
         const existing = await queryRunner.manager.findOne(AgendaDisponibilidad, {
           where: { id: bloque.id }
@@ -806,11 +799,9 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         }
       }
       
-      // PASO 2: Validar y actualizar ACTIVOS
       for (const bloque of activos) {
         console.log(`[guardarLote] Validando ACTIVO ID ${bloque.id}, diaSemana=${bloque.diaSemana}, horario=${bloque.horaDesde} a ${bloque.horaHasta}`);
         
-        // Validar duplicado exacto
         const duplicado = await queryRunner.manager.findOne(AgendaDisponibilidad, {
           where: {
             profesionalCentroId: bloque.profesionalCentroId,
@@ -828,7 +819,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
           );
         }
         
-        // Validar solapamiento
         const solapamiento = await queryRunner.manager.findOne(AgendaDisponibilidad, {
           where: {
             profesionalCentroId: bloque.profesionalCentroId,
@@ -846,11 +836,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
           const agendaDesdeNorm = this.normalizarHora(solapamiento.horaDesde);
           const agendaHastaNorm = this.normalizarHora(solapamiento.horaHasta);
           
-          console.log(`[guardarLote] Comparando: ${horaDesdeNorm} < ${agendaHastaNorm} = ${horaDesdeNorm < agendaHastaNorm}`);
-          console.log(`[guardarLote] Comparando: ${horaHastaNorm} > ${agendaDesdeNorm} = ${horaHastaNorm > agendaDesdeNorm}`);
-          
           const solapa = (horaDesdeNorm < agendaHastaNorm && horaHastaNorm > agendaDesdeNorm);
-          console.log(`[guardarLote] Resultado solapamiento: ${solapa}`);
           
           if (solapa) {
             throw new BadRequestException(
@@ -861,7 +847,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
           console.log(`[guardarLote] No se encontró solapamiento para bloque ID ${bloque.id}`);
         }
         
-        // Actualizar bloque ACTIVO
         const existing = await queryRunner.manager.findOne(AgendaDisponibilidad, {
           where: { id: bloque.id }
         });
@@ -881,15 +866,12 @@ export class AgendaDisponibilidadService implements OnModuleInit {
         }
       }
       
-      // PASO 3: Validar y crear NUEVOS bloques
       for (const bloque of nuevos) {
         console.log(`[guardarLote] ===== PROCESANDO NUEVO BLOQUE =====`);
         console.log(`[guardarLote] Datos del nuevo bloque: diaSemana=${bloque.diaSemana}, horario=${bloque.horaDesde} a ${bloque.horaHasta}, duracion=${bloque.duracionTurno}`);
         
-        // 🔹 Obtener timezone para el nuevo bloque
         const timezone = await this.obtenerTimezoneDesdeProfesionalCentro(bloque.profesionalCentroId);
         
-        // Validar duplicado exacto
         const duplicado = await queryRunner.manager.findOne(AgendaDisponibilidad, {
           where: {
             profesionalCentroId: bloque.profesionalCentroId,
@@ -912,7 +894,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
           }
         }
         
-        // Validar solapamiento
         const solapamiento = await queryRunner.manager.findOne(AgendaDisponibilidad, {
           where: {
             profesionalCentroId: bloque.profesionalCentroId,
@@ -928,12 +909,8 @@ export class AgendaDisponibilidadService implements OnModuleInit {
           const agendaHastaNorm = this.normalizarHora(solapamiento.horaHasta);
           
           console.log(`[guardarLote] Bloque existente encontrado: ID=${solapamiento.id}, horario=${agendaDesdeNorm} a ${agendaHastaNorm}`);
-          console.log(`[guardarLote] Comparando: nuevo=${horaDesdeNorm} a ${horaHastaNorm} vs existente=${agendaDesdeNorm} a ${agendaHastaNorm}`);
-          console.log(`[guardarLote] Condición 1: ${horaDesdeNorm} < ${agendaHastaNorm} = ${horaDesdeNorm < agendaHastaNorm}`);
-          console.log(`[guardarLote] Condición 2: ${horaHastaNorm} > ${agendaDesdeNorm} = ${horaHastaNorm > agendaDesdeNorm}`);
           
           const solapa = (horaDesdeNorm < agendaHastaNorm && horaHastaNorm > agendaDesdeNorm);
-          console.log(`[guardarLote] Resultado solapamiento: ${solapa}`);
           
           if (solapa) {
             throw new BadRequestException(
@@ -942,7 +919,6 @@ export class AgendaDisponibilidadService implements OnModuleInit {
           }
         }
         
-        // Crear nuevo bloque
         const nuevoBloque = this.repository.create({
           profesionalCentroId: bloque.profesionalCentroId,
           diaSemana: bloque.diaSemana,
@@ -952,7 +928,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
           bufferMinutos: bloque.bufferMinutos || 0,
           fechaDesde: new Date(bloque.fechaDesde),
           fechaHasta: bloque.fechaHasta ? new Date(bloque.fechaHasta) : null,
-          timezone: timezone,  // 🔹 GUARDAR TIMEZONE
+          timezone: timezone,
           usuario_alta: usuario,
           fecha_alta: new Date(),
         });
