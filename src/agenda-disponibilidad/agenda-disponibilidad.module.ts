@@ -5,6 +5,7 @@ import { AgendaDisponibilidad } from './entities/agenda-disponibilidad.entity';
 import { AgendaDisponibilidadService } from './agenda-disponibilidad.service';
 import { AgendaDisponibilidadController } from './agenda-disponibilidad.controller';
 import { ProfesionalCentro } from '../profesional-centro/entities/profesional-centro.entity';
+import { Centro } from '../centro/entities/centro.entity';
 import { ExcepcionFecha } from '../excepciones-fechas/entities/excepcion-fecha.entity';
 
 @Module({
@@ -12,6 +13,7 @@ import { ExcepcionFecha } from '../excepciones-fechas/entities/excepcion-fecha.e
     TypeOrmModule.forFeature([
       AgendaDisponibilidad,
       ProfesionalCentro,
+      Centro,
       ExcepcionFecha,
     ])
   ],
