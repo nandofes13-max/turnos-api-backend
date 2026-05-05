@@ -13,6 +13,43 @@ export class CentroService {
     private readonly centroRepository: Repository<Centro>,
   ) {}
 
+  // ===== OBTENER TIMEZONE DESDE COORDENADAS (TimezoneDB) =====
+  private async obtenerTimezoneDesdeCoordenadas(lat: number, lng: number): Promise<string> {
+    const API_KEY = 'DAPTMA97YA6B';  // Tu API key de TimezoneDB
+    
+    try {
+      const url = `https://api.timezonedb.com/v2.1/get-time-zone?key=${API_KEY}&format=json&by=position&lat=${lat}&lng=${lng}`;
+      console.log(`Consultando timezone para centro - lat: ${lat}, lng: ${lng}`);
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.status === 'OK' && data.zoneName) {
+        console.log(`✅ Timezone obtenido para centro: ${data.zoneName}`);
+        return data.zoneName;
+      } else {
+        console.error('Error TimezoneDB:', data.message);
+        return 'America/Argentina/Buenos_Aires';
+      }
+    } catch (error) {
+      console.error('Error en API timezone:', error);
+      return 'America/Argentina/Buenos_Aires';
+    }
+  }
+
+  // ===== OBTENER TIMEZONE DEL NEGOCIO (para centros virtuales) =====
+  private async obtenerTimezoneDesdeNegocio(negocioId: number): Promise<string> {
+    const { Negocio } = await import('../../negocios/entities/negocio.entity');
+    const negocio = await this.centroRepository.manager.findOne(Negocio, {
+      where: { id: negocioId }
+    });
+    
+    if (negocio && negocio.timezone) {
+      return negocio.timezone;
+    }
+    return 'America/Argentina/Buenos_Aires';
+  }
+
   private validarWhatsApp(country_code: number, national_number: string): string {
     const numeroCompleto = `+${country_code}${national_number.replace(/\D/g, '')}`;
     
@@ -117,11 +154,24 @@ export class CentroService {
 
     await this.verificarCentroVirtualUnico(createCentroDto.negocioId, createCentroDto.es_virtual);
 
-    if (!createCentroDto.es_virtual) {
+    // ===== VALIDACIONES SEGÚN TIPO DE CENTRO =====
+    let timezone: string;
+    
+    if (createCentroDto.es_virtual) {
+      // Centro virtual: hereda timezone del negocio
+      timezone = await this.obtenerTimezoneDesdeNegocio(createCentroDto.negocioId);
+      console.log(`Centro virtual creado con timezone heredado: ${timezone}`);
+    } else {
+      // Centro físico: requiere domicilio y obtiene timezone de coordenadas
       if (!createCentroDto.domicilio || !createCentroDto.domicilio.formatted_address) {
         throw new BadRequestException('El domicilio es obligatorio para centros físicos');
       }
       this.validarDireccion(createCentroDto.domicilio);
+      
+      timezone = await this.obtenerTimezoneDesdeCoordenadas(
+        createCentroDto.domicilio.latitude,
+        createCentroDto.domicilio.longitude
+      );
     }
 
     const codigo = await this.generarCodigoUnico(createCentroDto.negocioId);
@@ -135,6 +185,7 @@ export class CentroService {
     nuevoCentro.country_code = createCentroDto.country_code;
     nuevoCentro.national_number = createCentroDto.national_number;
     nuevoCentro.whatsapp_e164 = whatsappE164;
+    nuevoCentro.timezone = timezone;  // 🔹 GUARDAR TIMEZONE
     nuevoCentro.usuario_alta = usuario || 'demo';
 
     if (!createCentroDto.es_virtual && createCentroDto.domicilio) {
@@ -168,8 +219,16 @@ export class CentroService {
       await this.verificarCentroVirtualUnico(centroExistente.negocioId, updateCentroDto.es_virtual, id);
     }
 
+    // ===== ACTUALIZAR TIMEZONE SEGÚN EL CASO =====
     if (updateCentroDto.domicilio) {
+      // Si se actualiza domicilio, recalcular timezone
       this.validarDireccion(updateCentroDto.domicilio);
+      
+      const nuevoTimezone = await this.obtenerTimezoneDesdeCoordenadas(
+        updateCentroDto.domicilio.latitude,
+        updateCentroDto.domicilio.longitude
+      );
+      centroExistente.timezone = nuevoTimezone;
       
       centroExistente.street = updateCentroDto.domicilio.street;
       centroExistente.street_number = updateCentroDto.domicilio.street_number;
@@ -181,6 +240,13 @@ export class CentroService {
       centroExistente.latitude = updateCentroDto.domicilio.latitude;
       centroExistente.longitude = updateCentroDto.domicilio.longitude;
       centroExistente.formatted_address = updateCentroDto.domicilio.formatted_address;
+    } else if (updateCentroDto.es_virtual === true && !updateCentroDto.domicilio) {
+      // Si se convierte a virtual y no hay domicilio, heredar timezone del negocio
+      const timezoneNegocio = await this.obtenerTimezoneDesdeNegocio(centroExistente.negocioId);
+      centroExistente.timezone = timezoneNegocio;
+    } else if (updateCentroDto.timezone) {
+      // Permitir actualizar timezone directamente (para centros virtuales)
+      centroExistente.timezone = updateCentroDto.timezone;
     }
 
     if (updateCentroDto.nombre) {
