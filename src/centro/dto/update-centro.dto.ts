@@ -16,4 +16,9 @@ export class UpdateCentroDto extends PartialType(CreateCentroDto) {
   @IsOptional()
   @IsString()
   usuario_baja?: string | null;
+
+  // 🔹 NUEVO: Timezone (para centros virtuales editables)
+  @IsOptional()
+  @IsString()
+  timezone?: string;
 }
