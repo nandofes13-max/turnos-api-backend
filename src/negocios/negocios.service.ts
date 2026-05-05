@@ -14,6 +14,27 @@ export class NegociosService {
     private readonly negociosRepository: Repository<Negocio>,
   ) {}
 
+  // ===== NUEVO: OBTENER TIMEZONE DESDE COORDENADAS (BigDataCloud - GRATIS) =====
+  private async obtenerTimezoneDesdeCoordenadas(lat: number, lng: number): Promise<string> {
+    try {
+      // BigDataCloud Free API - No requiere API key
+      const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=es`;
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data && data.timezone) {
+        console.log(`Timezone obtenido: ${data.timezone} para (${lat}, ${lng})`);
+        return data.timezone;
+      } else {
+        console.warn('No se pudo obtener timezone, usando default Argentina');
+        return 'America/Argentina/Buenos_Aires';
+      }
+    } catch (error) {
+      console.error('Error en API timezone:', error);
+      return 'America/Argentina/Buenos_Aires';
+    }
+  }
+
   // ===== VALIDACIÓN DE WHATSAPP CON LIBPHONENUMBER =====
   private validarWhatsApp(country_code: number, national_number: string): string {
     const numeroCompleto = `+${country_code}${national_number.replace(/\D/g, '')}`;
@@ -123,6 +144,12 @@ export class NegociosService {
 
     this.validarDireccion(createNegocioDto.domicilio);
 
+    // 🔹 NUEVO: OBTENER TIMEZONE DESDE LAS COORDENADAS
+    const timezone = await this.obtenerTimezoneDesdeCoordenadas(
+      createNegocioDto.domicilio.latitude,
+      createNegocioDto.domicilio.longitude
+    );
+
     const url = await this.generarUrlUnica(createNegocioDto.nombre);
 
     const negocioEntity = this.negociosRepository.create({
@@ -141,6 +168,7 @@ export class NegociosService {
       latitude: createNegocioDto.domicilio.latitude,
       longitude: createNegocioDto.domicilio.longitude,
       formatted_address: createNegocioDto.domicilio.formatted_address,
+      timezone: timezone,  // 🔹 NUEVO: GUARDAR TIMEZONE
       usuario_alta: usuario || 'demo',
     });
 
@@ -159,9 +187,16 @@ export class NegociosService {
       negocioExistente.whatsapp_e164 = whatsappE164;
     }
 
-    // Si se actualiza el domicilio, validar
+    // Si se actualiza el domicilio, validar y RECALCULAR TIMEZONE
     if (updateNegocioDto.domicilio) {
       this.validarDireccion(updateNegocioDto.domicilio);
+      
+      // 🔹 NUEVO: RECALCULAR TIMEZONE SI CAMBIA LA DIRECCIÓN
+      const nuevoTimezone = await this.obtenerTimezoneDesdeCoordenadas(
+        updateNegocioDto.domicilio.latitude,
+        updateNegocioDto.domicilio.longitude
+      );
+      negocioExistente.timezone = nuevoTimezone;
       
       negocioExistente.street = updateNegocioDto.domicilio.street;
       negocioExistente.street_number = updateNegocioDto.domicilio.street_number;
@@ -186,7 +221,7 @@ export class NegociosService {
       negocioExistente.national_number = updateNegocioDto.national_number;
     }
 
-    // 👇 AGREGAR ESTO PARA REACTIVAR (igual que en actividades)
+    // Para reactivar
     if (updateNegocioDto.fecha_baja === null) {
       (negocioExistente as any).fecha_baja = null;
       (negocioExistente as any).usuario_baja = null;
