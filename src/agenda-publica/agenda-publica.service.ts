@@ -38,6 +38,13 @@ export class AgendaPublicaService {
     private readonly profesionalCentroService: ProfesionalCentroService,
   ) {}
 
+  // ===== FUNCIÓN AUXILIAR: Convertir string YYYY-MM-DD a Date sin zona horaria =====
+  private fechaStrToDate(fechaStr: string): Date {
+    const [year, month, day] = fechaStr.split('-').map(Number);
+    // Usar constructor local (año, mes, día) → evita UTC
+    return new Date(year, month - 1, day);
+  }
+
   private obtenerFechaActualEnTimezone(timezone: string): string {
     const formatter = new Intl.DateTimeFormat('es-AR', {
       timeZone: timezone,
@@ -79,13 +86,15 @@ export class AgendaPublicaService {
       const timezone = centro?.timezone || 'America/Argentina/Buenos_Aires';
       
       const hoyStr = this.obtenerFechaActualEnTimezone(timezone);
-      const hoy = new Date(hoyStr);
+      // 🔹 CORRECCIÓN: Usar fechaStrToDate en lugar de new Date(hoyStr)
+      const hoy = this.fechaStrToDate(hoyStr);
       
       console.log(`[DiasDisponibles] Centro ID ${centroId}, timezone: ${timezone}`);
       console.log(`[DiasDisponibles] Hoy en ${timezone}: ${hoyStr}`);
       
-      const fechaInicio = new Date(desde);
-      const fechaFin = new Date(hasta);
+      // 🔹 CORRECCIÓN: Usar fechaStrToDate en lugar de new Date(desde)
+      const fechaInicio = this.fechaStrToDate(desde);
+      const fechaFin = this.fechaStrToDate(hasta);
       
       const inicioReal = fechaInicio < hoy ? hoy : fechaInicio;
       
@@ -117,7 +126,8 @@ export class AgendaPublicaService {
 
       for (const fecha of diasEnRango) {
         const diaSemana = fecha.getDay();
-        const fechaStr = fecha.toISOString().split('T')[0];
+        // 🔹 CORRECCIÓN: Obtener fechaStr directamente del objeto Date (sin toISOString)
+        const fechaStr = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
         let disponible = false;
 
         for (const pcId of profesionalCentroIds) {
@@ -160,7 +170,8 @@ export class AgendaPublicaService {
       });
       const timezoneCentro = centro?.timezone || 'America/Argentina/Buenos_Aires';
       
-      const fechaObj = new Date(fecha);
+      // Esto está bien porque necesitamos el día de la semana numérico
+      const fechaObj = this.fechaStrToDate(fecha);
       const diaSemana = fechaObj.getDay();
 
       console.log(`[getProfesionalesSlots] ========================================`);
