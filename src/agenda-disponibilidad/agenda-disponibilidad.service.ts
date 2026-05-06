@@ -279,8 +279,8 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     console.log(`[SLOTS] Agenda encontrada - ID: ${agenda.id}, timezone: ${agenda.timezone}, duracionTurno: ${agenda.duracionTurno} min, horaDesde: ${agenda.horaDesde}, horaHasta: ${agenda.horaHasta}`);
     
     const slots: { hora: string; bloqueado: boolean }[] = [];
-    let horaActual = agenda.horaDesde;
-    const horaFin = agenda.horaHasta;
+    let horaActual = this.normalizarHora(agenda.horaDesde);
+const horaFin = this.normalizarHora(agenda.horaHasta);
     let contador = 0;
     const maxIteraciones = 100;
     
