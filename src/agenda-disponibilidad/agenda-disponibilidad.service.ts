@@ -22,6 +22,20 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     private readonly excepcionesFechasRepository: Repository<ExcepcionFecha>,
   ) {}
 
+  // ===== FUNCIÓN AUXILIAR: Convertir Date a string YYYY-MM-DD sin zona horaria =====
+  private dateToStr(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  // ===== FUNCIÓN AUXILIAR: Convertir string YYYY-MM-DD a Date sin zona horaria =====
+  private strToDate(fechaStr: string): Date {
+    const [year, month, day] = fechaStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+
   // ===== OBTENER TIMEZONE DESDE PROFESIONAL_CENTRO =====
   private async obtenerTimezoneDesdeProfesionalCentro(profesionalCentroId: number): Promise<string> {
     try {
@@ -149,16 +163,23 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     }
   }
 
+  // ============================================================
+  // MÉTODO CORREGIDO: verificarFechasValidas (usa comparación de strings)
+  // ============================================================
   private async verificarFechasValidas(fechaDesde: Date, fechaHasta: Date | null): Promise<void> {
     const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    const hoyStr = this.dateToStr(hoy);
+    const fechaDesdeStr = this.dateToStr(fechaDesde);
     
-    if (fechaDesde < hoy) {
+    if (fechaDesdeStr < hoyStr) {
       throw new BadRequestException(`La fecha desde no puede ser anterior a hoy`);
     }
     
-    if (fechaHasta && fechaHasta < fechaDesde) {
-      throw new BadRequestException(`La fecha hasta debe ser mayor o igual a la fecha desde`);
+    if (fechaHasta) {
+      const fechaHastaStr = this.dateToStr(fechaHasta);
+      if (fechaHastaStr < fechaDesdeStr) {
+        throw new BadRequestException(`La fecha hasta debe ser mayor o igual a la fecha desde`);
+      }
     }
   }
 
@@ -254,7 +275,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 
   // ============================================================
-  // MÉTODO MODIFICADO: generarSlots ahora devuelve timezone
+  // MÉTODO generarSlots (corregido con normalizacion)
   // ============================================================
   async generarSlots(
     profesionalCentroId: number,
@@ -280,7 +301,7 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     
     const slots: { hora: string; bloqueado: boolean }[] = [];
     let horaActual = this.normalizarHora(agenda.horaDesde);
-const horaFin = this.normalizarHora(agenda.horaHasta);
+    const horaFin = this.normalizarHora(agenda.horaHasta);
     let contador = 0;
     const maxIteraciones = 100;
     
@@ -324,7 +345,6 @@ const horaFin = this.normalizarHora(agenda.horaHasta);
       }
     }
     
-    // 🔹 NUEVO: Devolver slots + timezone
     return {
       slots: slots.map(slot => ({
         ...slot,
@@ -710,8 +730,8 @@ const horaFin = this.normalizarHora(agenda.horaHasta);
           horaHasta: horaHastaNorm,
           duracionTurno,
           bufferMinutos: 0,
-          fechaDesde: new Date(fechaDesde),
-          fechaHasta: fechaHasta ? new Date(fechaHasta) : null,
+          fechaDesde: this.strToDate(fechaDesde),
+          fechaHasta: fechaHasta ? this.strToDate(fechaHasta) : null,
           timezone: timezone,
           usuario_alta: usuario || 'demo',
         });
@@ -741,8 +761,8 @@ const horaFin = this.normalizarHora(agenda.horaHasta);
           horaHasta: horaHastaNorm,
           duracionTurno,
           bufferMinutos: 0,
-          fechaDesde: new Date(fechaDesde),
-          fechaHasta: fechaHasta ? new Date(fechaHasta) : null,
+          fechaDesde: this.strToDate(fechaDesde),
+          fechaHasta: fechaHasta ? this.strToDate(fechaHasta) : null,
           timezone: timezone,
           usuario_alta: usuario || 'demo',
         });
@@ -789,8 +809,8 @@ const horaFin = this.normalizarHora(agenda.horaHasta);
           existing.horaDesde = this.normalizarHora(bloque.horaDesde);
           existing.horaHasta = this.normalizarHora(bloque.horaHasta);
           existing.duracionTurno = bloque.duracionTurno;
-          existing.fechaDesde = new Date(bloque.fechaDesde);
-          existing.fechaHasta = bloque.fechaHasta ? new Date(bloque.fechaHasta) : null;
+          existing.fechaDesde = this.strToDate(bloque.fechaDesde);
+          existing.fechaHasta = bloque.fechaHasta ? this.strToDate(bloque.fechaHasta) : null;
           existing.usuario_modificacion = usuario;
           existing.fecha_modificacion = new Date();
           
@@ -855,8 +875,8 @@ const horaFin = this.normalizarHora(agenda.horaHasta);
           existing.horaDesde = this.normalizarHora(bloque.horaDesde);
           existing.horaHasta = this.normalizarHora(bloque.horaHasta);
           existing.duracionTurno = bloque.duracionTurno;
-          existing.fechaDesde = new Date(bloque.fechaDesde);
-          existing.fechaHasta = bloque.fechaHasta ? new Date(bloque.fechaHasta) : null;
+          existing.fechaDesde = this.strToDate(bloque.fechaDesde);
+          existing.fechaHasta = bloque.fechaHasta ? this.strToDate(bloque.fechaHasta) : null;
           existing.fecha_baja = null!;
           existing.usuario_modificacion = usuario;
           existing.fecha_modificacion = new Date();
@@ -926,8 +946,8 @@ const horaFin = this.normalizarHora(agenda.horaHasta);
           horaHasta: this.normalizarHora(bloque.horaHasta),
           duracionTurno: bloque.duracionTurno,
           bufferMinutos: bloque.bufferMinutos || 0,
-          fechaDesde: new Date(bloque.fechaDesde),
-          fechaHasta: bloque.fechaHasta ? new Date(bloque.fechaHasta) : null,
+          fechaDesde: this.strToDate(bloque.fechaDesde),
+          fechaHasta: bloque.fechaHasta ? this.strToDate(bloque.fechaHasta) : null,
           timezone: timezone,
           usuario_alta: usuario,
           fecha_alta: new Date(),
