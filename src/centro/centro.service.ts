@@ -1,16 +1,19 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, forwardRef, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { Centro } from './entities/centro.entity';
 import { CreateCentroDto, DomicilioDto } from './dto/create-centro.dto';
 import { UpdateCentroDto } from './dto/update-centro.dto';
 import { parsePhoneNumber } from 'libphonenumber-js';
+import { ProfesionalCentroService } from '../profesional-centro/profesional-centro.service';
 
 @Injectable()
 export class CentroService {
   constructor(
     @InjectRepository(Centro)
     private readonly centroRepository: Repository<Centro>,
+    @Inject(forwardRef(() => ProfesionalCentroService))
+    private readonly profesionalCentroService: ProfesionalCentroService,
   ) {}
 
   // ===== OBTENER TIMEZONE DESDE COORDENADAS (TimezoneDB) =====
@@ -160,11 +163,9 @@ export class CentroService {
 
     await this.verificarCentroVirtualUnico(createCentroDto.negocioId, createCentroDto.es_virtual);
 
-    // ===== VALIDACIONES SEGÚN TIPO DE CENTRO =====
     let timezone: string;
     
     if (createCentroDto.es_virtual) {
-      // Centro virtual: hereda timezone del negocio (o usa el enviado)
       if (createCentroDto.timezone) {
         timezone = createCentroDto.timezone;
         console.log(`Centro virtual con timezone especificado: ${timezone}`);
@@ -173,7 +174,6 @@ export class CentroService {
         console.log(`Centro virtual creado con timezone heredado: ${timezone}`);
       }
     } else {
-      // Centro físico: requiere domicilio y obtiene timezone de coordenadas
       if (!createCentroDto.domicilio || !createCentroDto.domicilio.formatted_address) {
         throw new BadRequestException('El domicilio es obligatorio para centros físicos');
       }
@@ -187,7 +187,6 @@ export class CentroService {
 
     const codigo = await this.generarCodigoUnico(createCentroDto.negocioId);
 
-    // Crear nuevo objeto Centro directamente
     const nuevoCentro = new Centro();
     nuevoCentro.negocioId = createCentroDto.negocioId;
     nuevoCentro.nombre = createCentroDto.nombre.toUpperCase();
@@ -196,7 +195,7 @@ export class CentroService {
     nuevoCentro.country_code = createCentroDto.country_code;
     nuevoCentro.national_number = createCentroDto.national_number;
     nuevoCentro.whatsapp_e164 = whatsappE164;
-    nuevoCentro.timezone = timezone;  // 🔹 GUARDAR TIMEZONE
+    nuevoCentro.timezone = timezone;
     nuevoCentro.usuario_alta = usuario || 'demo';
 
     if (!createCentroDto.es_virtual && createCentroDto.domicilio) {
@@ -230,9 +229,7 @@ export class CentroService {
       await this.verificarCentroVirtualUnico(centroExistente.negocioId, updateCentroDto.es_virtual, id);
     }
 
-    // ===== ACTUALIZAR TIMEZONE SEGÚN EL CASO =====
     if (updateCentroDto.domicilio) {
-      // Si se actualiza domicilio, recalcular timezone
       this.validarDireccion(updateCentroDto.domicilio);
       
       const nuevoTimezone = await this.obtenerTimezoneDesdeCoordenadas(
@@ -252,11 +249,9 @@ export class CentroService {
       centroExistente.longitude = updateCentroDto.domicilio.longitude;
       centroExistente.formatted_address = updateCentroDto.domicilio.formatted_address;
     } else if (updateCentroDto.es_virtual === true && !updateCentroDto.domicilio) {
-      // Si se convierte a virtual y no hay domicilio, heredar timezone del negocio
       const timezoneNegocio = await this.obtenerTimezoneDesdeNegocio(centroExistente.negocioId);
       centroExistente.timezone = timezoneNegocio;
     } else if (updateCentroDto.timezone) {
-      // Permitir actualizar timezone directamente (para centros virtuales)
       centroExistente.timezone = updateCentroDto.timezone;
     }
 
@@ -288,12 +283,29 @@ export class CentroService {
     return await this.centroRepository.save(centroExistente);
   }
 
+  // ============================================================
+  // MÉTODO softDelete MODIFICADO: Desactiva en cascada relaciones y agendas
+  // ============================================================
   async softDelete(id: number, usuario?: string): Promise<void> {
     const centroExistente = await this.findOne(id);
+    
+    // 🔹 1. Buscar todas las relaciones profesional_centro activas de este centro
+    const relaciones = await this.profesionalCentroService.findByCentro(id);
+    console.log(`[Centro.softDelete] Desactivando ${relaciones.length} relaciones del centro ${centroExistente.nombre}`);
+    
+    // 🔹 2. Desactivar cada relación (esto activará su propia cascada hacia las agendas)
+    for (const relacion of relaciones) {
+      if (!relacion.fecha_baja) {
+        await this.profesionalCentroService.softDelete(relacion.id, usuario);
+      }
+    }
+    
+    // 🔹 3. Desactivar el centro
     centroExistente.fecha_baja = new Date();
     centroExistente.usuario_baja = usuario || 'demo';
-
+    
     await this.centroRepository.save(centroExistente);
+    console.log(`[Centro.softDelete] Centro ${centroExistente.nombre} desactivado correctamente`);
   }
 
   async debugStructure(): Promise<any> {
