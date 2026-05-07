@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, forwardRef, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { ProfesionalCentro } from './entities/profesional-centro.entity';
@@ -9,6 +9,7 @@ import { Especialidad } from '../especialidades/entities/especialidad.entity';
 import { Centro } from '../centro/entities/centro.entity';
 import { ActividadEspecialidad } from '../actividad-especialidad/entities/actividad-especialidad.entity';
 import { NegocioActividad } from '../negocio-actividades/entities/negocio-actividad.entity';
+import { AgendaDisponibilidadService } from '../agenda-disponibilidad/agenda-disponibilidad.service';
 
 @Injectable()
 export class ProfesionalCentroService {
@@ -25,6 +26,8 @@ export class ProfesionalCentroService {
     private readonly actividadEspecialidadRepository: Repository<ActividadEspecialidad>,
     @InjectRepository(NegocioActividad)
     private readonly negocioActividadRepository: Repository<NegocioActividad>,
+    @Inject(forwardRef(() => AgendaDisponibilidadService))
+    private readonly agendaDisponibilidadService: AgendaDisponibilidadService,
   ) {}
 
   // ===== FUNCIONES AUXILIARES =====
@@ -131,7 +134,7 @@ export class ProfesionalCentroService {
 
   async findByCentro(centroId: number): Promise<ProfesionalCentro[]> {
     return this.repository.find({
-      where: { centroId },
+      where: { centroId, fecha_baja: IsNull() },
       relations: ['profesional', 'especialidad', 'centro', 'centro.negocio'],
     });
   }
@@ -196,12 +199,29 @@ export class ProfesionalCentroService {
     return this.repository.save(registro);
   }
 
+  // ============================================================
+  // MÉTODO softDelete MODIFICADO: Desactiva en cascada las agendas
+  // ============================================================
   async softDelete(id: number, usuario?: string): Promise<void> {
     const registro = await this.findOne(id);
+    
+    // 🔹 1. Buscar todas las agendas activas de esta relación profesional-centro
+    const agendas = await this.agendaDisponibilidadService.findByProfesionalCentro(id);
+    console.log(`[ProfesionalCentro.softDelete] Desactivando ${agendas.length} agendas de la relación ID ${id}`);
+    
+    // 🔹 2. Desactivar cada agenda
+    for (const agenda of agendas) {
+      if (!agenda.fecha_baja) {
+        await this.agendaDisponibilidadService.softDelete(agenda.id, usuario);
+      }
+    }
+    
+    // 🔹 3. Desactivar la relación profesional-centro
     registro.fecha_baja = new Date();
     registro.usuario_baja = usuario || 'demo';
-
+    
     await this.repository.save(registro);
+    console.log(`[ProfesionalCentro.softDelete] Relación ID ${id} desactivada correctamente`);
   }
 
   async debugStructure(): Promise<any> {
@@ -213,7 +233,7 @@ export class ProfesionalCentroService {
   }
 
   // ============================================================
-  // NUEVO MÉTODO: Obtener centros únicos por negocio y especialidad (con disponibilidad)
+  // Método: Obtener centros únicos por negocio y especialidad (con disponibilidad)
   // ============================================================
   async findCentrosPorEspecialidad(
     negocioId: number,
