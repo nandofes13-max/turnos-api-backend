@@ -1,5 +1,5 @@
 // src/agenda-disponibilidad/agenda-disponibilidad.module.ts
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgendaDisponibilidad } from './entities/agenda-disponibilidad.entity';
 import { AgendaDisponibilidadService } from './agenda-disponibilidad.service';
@@ -7,6 +7,7 @@ import { AgendaDisponibilidadController } from './agenda-disponibilidad.controll
 import { ProfesionalCentro } from '../profesional-centro/entities/profesional-centro.entity';
 import { Centro } from '../centro/entities/centro.entity';
 import { ExcepcionFecha } from '../excepciones-fechas/entities/excepcion-fecha.entity';
+import { ProfesionalCentroModule } from '../profesional-centro/profesional-centro.module';
 
 @Module({
   imports: [
@@ -15,7 +16,8 @@ import { ExcepcionFecha } from '../excepciones-fechas/entities/excepcion-fecha.e
       ProfesionalCentro,
       Centro,
       ExcepcionFecha,
-    ])
+    ]),
+    forwardRef(() => ProfesionalCentroModule),
   ],
   controllers: [AgendaDisponibilidadController],
   providers: [AgendaDisponibilidadService],
