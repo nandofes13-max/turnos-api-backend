@@ -1,8 +1,9 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, Between } from 'typeorm';
+import { Repository, IsNull, Not } from 'typeorm';
 import { Turno } from './entities/turno.entity';
 import { CreateTurnoDto } from './dto/create-turno.dto';
+import { UpdateTurnoDto } from './dto/update-turno.dto';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { NegociosUsuariosRoles } from '../negocios-usuarios-roles/entities/negocios-usuarios-rol.entity';
 import { Rol } from '../roles/entities/rol.entity';
@@ -20,17 +21,12 @@ export class TurnosService {
     private readonly rolRepository: Repository<Rol>,
   ) {}
 
-  // ============================================================
-  // BUSCAR O CREAR USUARIO
-  // ============================================================
   private async buscarOCrearUsuario(email: string, apellido: string, nombre: string, telefono: string): Promise<Usuario> {
-    // Buscar usuario existente por email
     let usuario = await this.usuarioRepository.findOne({
       where: { email, fecha_baja: IsNull() },
     });
 
     if (usuario) {
-      // Si existe, actualizar datos si es necesario
       let actualizado = false;
       if (usuario.apellido !== apellido) {
         usuario.apellido = apellido;
@@ -50,7 +46,6 @@ export class TurnosService {
       return usuario;
     }
 
-    // Crear nuevo usuario
     const nuevoUsuario = this.usuarioRepository.create({
       email,
       apellido,
@@ -62,11 +57,7 @@ export class TurnosService {
     return await this.usuarioRepository.save(nuevoUsuario);
   }
 
-  // ============================================================
-  // ASIGNAR ROL PACIENTE AL USUARIO EN EL NEGOCIO
-  // ============================================================
   private async asignarRolPaciente(usuarioId: number, negocioId: number): Promise<void> {
-    // Buscar rol PACIENTE
     const rolPaciente = await this.rolRepository.findOne({
       where: { nombre: 'PACIENTE', fecha_baja: IsNull() },
     });
@@ -75,7 +66,6 @@ export class TurnosService {
       throw new BadRequestException('El rol PACIENTE no existe en el sistema');
     }
 
-    // Verificar si ya existe la relación
     const existeRelacion = await this.negocioUsuarioRolRepository.findOne({
       where: {
         usuarioId,
@@ -96,27 +86,27 @@ export class TurnosService {
     }
   }
 
-  // ============================================================
-  // VALIDAR DISPONIBILIDAD (sin solapamiento)
-  // ============================================================
-  private async validarDisponibilidad(
+  async validarDisponibilidad(
     profesionalCentroId: number,
     inicio: Date,
     fin: Date,
+    excludeId?: number,
   ): Promise<void> {
-    const turnoExistente = await this.turnoRepository.findOne({
-      where: {
-        profesionalCentroId,
-        fecha_baja: IsNull(),
-      },
+    const whereCondition: any = {
+      profesionalCentroId,
+      fecha_baja: IsNull(),
+    };
+    
+    if (excludeId) {
+      whereCondition.id = Not(excludeId);
+    }
+    
+    const turnosExistentes = await this.turnoRepository.find({
+      where: whereCondition,
     });
 
-    if (turnoExistente) {
-      // Verificar si hay solapamiento
-      const haySolapamiento = (
-        (inicio < turnoExistente.fin && fin > turnoExistente.inicio)
-      );
-
+    for (const turno of turnosExistentes) {
+      const haySolapamiento = (inicio < turno.fin && fin > turno.inicio);
       if (haySolapamiento) {
         throw new BadRequestException(
           `El horario seleccionado (${inicio.toISOString()} - ${fin.toISOString()}) ` +
@@ -126,11 +116,7 @@ export class TurnosService {
     }
   }
 
-  // ============================================================
-  // CREAR TURNO (RESERVA)
-  // ============================================================
   async create(createTurnoDto: CreateTurnoDto): Promise<Turno> {
-    // 1. Validar que fin > inicio
     const inicio = new Date(createTurnoDto.inicio);
     const fin = new Date(createTurnoDto.fin);
 
@@ -138,13 +124,11 @@ export class TurnosService {
       throw new BadRequestException('La fecha/hora de fin debe ser posterior a la de inicio');
     }
 
-    // 2. Validar duración
     const duracionCalculada = Math.round((fin.getTime() - inicio.getTime()) / 60000);
     if (duracionCalculada !== createTurnoDto.duracionMinutos) {
       throw new BadRequestException('La duración no coincide con el rango horario');
     }
 
-    // 3. Buscar o crear usuario
     const usuario = await this.buscarOCrearUsuario(
       createTurnoDto.email,
       createTurnoDto.apellido,
@@ -152,17 +136,9 @@ export class TurnosService {
       createTurnoDto.telefono,
     );
 
-    // 4. Asignar rol PACIENTE en el negocio
     await this.asignarRolPaciente(usuario.id, createTurnoDto.negocioId);
+    await this.validarDisponibilidad(createTurnoDto.profesionalCentroId, inicio, fin);
 
-    // 5. Validar disponibilidad (sin solapamiento)
-    await this.validarDisponibilidad(
-      createTurnoDto.profesionalCentroId,
-      inicio,
-      fin,
-    );
-
-    // 6. Crear el turno
     const turno = this.turnoRepository.create({
       negocioId: createTurnoDto.negocioId,
       centroId: createTurnoDto.centroId,
@@ -176,21 +152,52 @@ export class TurnosService {
       precioReserva: createTurnoDto.precioReserva || null,
       moneda: createTurnoDto.moneda || 'ARS',
       canalOrigen: 'WEB',
+      observaciones: createTurnoDto.observaciones || null,
       usuario_alta: usuario.email || 'sistema',
     });
 
     const turnoGuardado = await this.turnoRepository.save(turno);
-
-    // 7. TODO: Enviar notificaciones (email + WhatsApp)
-    // Por ahora solo log
     console.log(`[TURNO CREADO] ID: ${turnoGuardado.id} - Usuario: ${usuario.email} - ${inicio.toISOString()}`);
 
     return turnoGuardado;
   }
 
-  // ============================================================
-  // OBTENER TURNOS POR USUARIO
-  // ============================================================
+  async update(id: number, updateTurnoDto: UpdateTurnoDto, usuarioModificador: string): Promise<Turno> {
+    const turno = await this.turnoRepository.findOne({
+      where: { id, fecha_baja: IsNull() },
+    });
+
+    if (!turno) {
+      throw new NotFoundException(`Turno con ID ${id} no encontrado`);
+    }
+
+    if (updateTurnoDto.inicio && updateTurnoDto.fin) {
+      const nuevoInicio = new Date(updateTurnoDto.inicio);
+      const nuevoFin = new Date(updateTurnoDto.fin);
+      
+      if (nuevoFin <= nuevoInicio) {
+        throw new BadRequestException('La fecha/hora de fin debe ser posterior a la de inicio');
+      }
+      
+      await this.validarDisponibilidad(turno.profesionalCentroId, nuevoInicio, nuevoFin, id);
+      
+      turno.inicio = nuevoInicio;
+      turno.fin = nuevoFin;
+    }
+
+    if (updateTurnoDto.duracionMinutos) turno.duracionMinutos = updateTurnoDto.duracionMinutos;
+    if (updateTurnoDto.estado) turno.estado = updateTurnoDto.estado;
+    if (updateTurnoDto.confirmado !== undefined) turno.confirmado = updateTurnoDto.confirmado;
+    if (updateTurnoDto.motivoCancelacion) turno.motivoCancelacion = updateTurnoDto.motivoCancelacion;
+    if (updateTurnoDto.observaciones) turno.observaciones = updateTurnoDto.observaciones;
+    if (updateTurnoDto.precioReserva) turno.precioReserva = updateTurnoDto.precioReserva;
+    if (updateTurnoDto.moneda) turno.moneda = updateTurnoDto.moneda;
+
+    turno.usuario_modificacion = usuarioModificador;
+
+    return await this.turnoRepository.save(turno);
+  }
+
   async findByUsuario(usuarioId: number): Promise<Turno[]> {
     return this.turnoRepository.find({
       where: { usuarioId, fecha_baja: IsNull() },
@@ -199,9 +206,6 @@ export class TurnosService {
     });
   }
 
-  // ============================================================
-  // OBTENER TURNOS POR PROFESIONAL
-  // ============================================================
   async findByProfesionalCentro(profesionalCentroId: number): Promise<Turno[]> {
     return this.turnoRepository.find({
       where: { profesionalCentroId, fecha_baja: IsNull() },
@@ -210,9 +214,6 @@ export class TurnosService {
     });
   }
 
-  // ============================================================
-  // CANCELAR TURNO
-  // ============================================================
   async cancelar(id: number, motivo: string, usuarioCancelador: string): Promise<Turno> {
     const turno = await this.turnoRepository.findOne({
       where: { id, fecha_baja: IsNull() },
@@ -235,9 +236,6 @@ export class TurnosService {
     return await this.turnoRepository.save(turno);
   }
 
-  // ============================================================
-  // CONFIRMAR TURNO
-  // ============================================================
   async confirmar(id: number, usuarioConfirmador: string): Promise<Turno> {
     const turno = await this.turnoRepository.findOne({
       where: { id, fecha_baja: IsNull() },
