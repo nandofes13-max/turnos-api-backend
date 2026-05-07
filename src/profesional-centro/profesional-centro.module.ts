@@ -9,6 +9,7 @@ import { Centro } from '../centro/entities/centro.entity';
 import { ActividadEspecialidad } from '../actividad-especialidad/entities/actividad-especialidad.entity';
 import { NegocioActividad } from '../negocio-actividades/entities/negocio-actividad.entity';
 import { CentroModule } from '../centro/centro.module';
+import { AgendaDisponibilidadModule } from '../agenda-disponibilidad/agenda-disponibilidad.module';
 
 @Module({
   imports: [
@@ -20,7 +21,8 @@ import { CentroModule } from '../centro/centro.module';
       ActividadEspecialidad,
       NegocioActividad
     ]),
-    forwardRef(() => CentroModule),  // 👈 AGREGAR para resolver dependencia circular
+    forwardRef(() => CentroModule),
+    forwardRef(() => AgendaDisponibilidadModule),  // 👈 AGREGAR
   ],
   controllers: [ProfesionalCentroController],
   providers: [ProfesionalCentroService],
