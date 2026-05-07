@@ -7,12 +7,11 @@ import { Especialidad } from '../../especialidades/entities/especialidad.entity'
 import { Usuario } from '../../usuarios/entities/usuario.entity';
 
 @Entity('turnos')
-@Index(['profesionalCentroId', 'inicio'])  // Índice compuesto para búsquedas frecuentes
+@Index(['profesionalCentroId', 'inicio'])
 @Check(`estado IN ('PENDIENTE', 'CONFIRMADO', 'CANCELADO', 'REPROGRAMADO', 'ATENDIDO', 'NO_SHOW', 'BLOQUEADO')`)
 @Check(`moneda IN ('ARS', 'USD', 'EUR')`)
 export class Turno extends BaseEntityAuditable {
-  // ===== RELACIONES (claves foráneas) =====
-
+  // ===== RELACIONES =====
   @Column({ name: 'negocio_id' })
   negocioId: number;
 
@@ -49,7 +48,6 @@ export class Turno extends BaseEntityAuditable {
   usuario: Usuario;
 
   // ===== FECHA Y HORA =====
-
   @Column({ type: 'timestamp' })
   @Index()
   inicio: Date;
@@ -62,12 +60,10 @@ export class Turno extends BaseEntityAuditable {
   duracionMinutos: number;
 
   // ===== ESTADO =====
-
   @Column({ type: 'varchar', length: 30, default: 'PENDIENTE' })
   estado: string;
 
-  // ===== PRECIO (opcional por ahora) =====
-
+  // ===== PRECIO =====
   @Column({ name: 'precio_reserva', type: 'decimal', precision: 10, scale: 2, nullable: true })
   precioReserva: number;
 
@@ -75,7 +71,6 @@ export class Turno extends BaseEntityAuditable {
   moneda: string;
 
   // ===== CONFIRMACIÓN =====
-
   @Column({ default: false })
   confirmado: boolean;
 
@@ -83,7 +78,6 @@ export class Turno extends BaseEntityAuditable {
   confirmadoAt: Date;
 
   // ===== CANCELACIÓN =====
-
   @Column({ name: 'cancelado_at', type: 'timestamp', nullable: true })
   canceladoAt: Date;
 
@@ -94,12 +88,10 @@ export class Turno extends BaseEntityAuditable {
   motivoCancelacion: string;
 
   // ===== REPROGRAMACIÓN =====
-
   @Column({ name: 'reprogramado_desde_id', type: 'bigint', nullable: true })
   reprogramadoDesdeId: number;
 
   // ===== ASISTENCIA =====
-
   @Column({ default: false })
   asistio: boolean;
 
@@ -107,7 +99,10 @@ export class Turno extends BaseEntityAuditable {
   llegadaAt: Date;
 
   // ===== CANAL DE ORIGEN =====
-
   @Column({ name: 'canal_origen', type: 'varchar', length: 30, default: 'WEB' })
   canalOrigen: string;
+
+  // ===== OBSERVACIONES =====
+  @Column({ type: 'text', nullable: true })
+  observaciones: string;
 }
