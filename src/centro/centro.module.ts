@@ -10,7 +10,7 @@ import { ProfesionalCentroModule } from '../profesional-centro/profesional-centr
   imports: [
     TypeOrmModule.forFeature([Centro]),
     forwardRef(() => NegociosModule),
-    forwardRef(() => ProfesionalCentroModule),  // 👈 AGREGAR
+    forwardRef(() => ProfesionalCentroModule),
   ],
   controllers: [CentroController],
   providers: [CentroService],
