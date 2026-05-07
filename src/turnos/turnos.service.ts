@@ -5,7 +5,7 @@ import { Turno } from './entities/turno.entity';
 import { CreateTurnoDto } from './dto/create-turno.dto';
 import { UpdateTurnoDto } from './dto/update-turno.dto';
 import { Usuario } from '../usuarios/entities/usuario.entity';
-import { NegociosUsuariosRoles } from '../negocios-usuarios-roles/entities/negocios-usuarios-rol.entity';
+import { NegocioUsuarioRol } from '../negocios-usuarios-roles/entities/negocio-usuario-rol.entity';
 import { Rol } from '../roles/entities/rol.entity';
 
 @Injectable()
@@ -15,8 +15,8 @@ export class TurnosService {
     private readonly turnoRepository: Repository<Turno>,
     @InjectRepository(Usuario)
     private readonly usuarioRepository: Repository<Usuario>,
-    @InjectRepository(NegociosUsuariosRoles)
-    private readonly negocioUsuarioRolRepository: Repository<NegociosUsuariosRoles>,
+    @InjectRepository(NegocioUsuarioRol)
+    private readonly negocioUsuarioRolRepository: Repository<NegocioUsuarioRol>,
     @InjectRepository(Rol)
     private readonly rolRepository: Repository<Rol>,
   ) {}
@@ -139,22 +139,22 @@ export class TurnosService {
     await this.asignarRolPaciente(usuario.id, createTurnoDto.negocioId);
     await this.validarDisponibilidad(createTurnoDto.profesionalCentroId, inicio, fin);
 
-    const turno = this.turnoRepository.create({
-      negocioId: createTurnoDto.negocioId,
-      centroId: createTurnoDto.centroId,
-      profesionalCentroId: createTurnoDto.profesionalCentroId,
-      especialidadId: createTurnoDto.especialidadId || null,
-      usuarioId: usuario.id,
-      inicio,
-      fin,
-      duracionMinutos: createTurnoDto.duracionMinutos,
-      estado: createTurnoDto.estado || 'PENDIENTE',
-      precioReserva: createTurnoDto.precioReserva || null,
-      moneda: createTurnoDto.moneda || 'ARS',
-      canalOrigen: 'WEB',
-      observaciones: createTurnoDto.observaciones || null,
-      usuario_alta: usuario.email || 'sistema',
-    });
+    // Crear el turno usando new Turno() en lugar de create()
+    const turno = new Turno();
+    turno.negocioId = createTurnoDto.negocioId;
+    turno.centroId = createTurnoDto.centroId;
+    turno.profesionalCentroId = createTurnoDto.profesionalCentroId;
+    turno.especialidadId = createTurnoDto.especialidadId || null;
+    turno.usuarioId = usuario.id;
+    turno.inicio = inicio;
+    turno.fin = fin;
+    turno.duracionMinutos = createTurnoDto.duracionMinutos;
+    turno.estado = createTurnoDto.estado || 'PENDIENTE';
+    turno.precioReserva = createTurnoDto.precioReserva || null;
+    turno.moneda = createTurnoDto.moneda || 'ARS';
+    turno.canalOrigen = 'WEB';
+    turno.observaciones = createTurnoDto.observaciones || null;
+    turno.usuario_alta = usuario.email || 'sistema';
 
     const turnoGuardado = await this.turnoRepository.save(turno);
     console.log(`[TURNO CREADO] ID: ${turnoGuardado.id} - Usuario: ${usuario.email} - ${inicio.toISOString()}`);
