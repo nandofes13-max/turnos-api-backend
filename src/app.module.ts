@@ -16,7 +16,8 @@ import { CentroModule } from './centro/centro.module';
 import { ProfesionalCentroModule } from './profesional-centro/profesional-centro.module';
 import { AgendaDisponibilidadModule } from './agenda-disponibilidad/agenda-disponibilidad.module';
 import { ExcepcionesFechasModule } from './excepciones-fechas/excepciones-fechas.module';
-import { AgendaPublicaModule } from './agenda-publica/agenda-publica.module';  // 👈 AGREGADO
+import { AgendaPublicaModule } from './agenda-publica/agenda-publica.module';
+import { TurnosModule } from './turnos/turnos.module';  // 👈 AGREGADO
 
 @Module({
   imports: [
@@ -45,7 +46,8 @@ import { AgendaPublicaModule } from './agenda-publica/agenda-publica.module';  /
     ProfesionalCentroModule,
     AgendaDisponibilidadModule,
     ExcepcionesFechasModule,
-    AgendaPublicaModule,  // 👈 AGREGADO
+    AgendaPublicaModule,
+    TurnosModule,  // 👈 AGREGADO
   ],
 })
 export class AppModule {}
