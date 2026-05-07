@@ -139,21 +139,20 @@ export class TurnosService {
     await this.asignarRolPaciente(usuario.id, createTurnoDto.negocioId);
     await this.validarDisponibilidad(createTurnoDto.profesionalCentroId, inicio, fin);
 
-    // Crear el turno usando new Turno() en lugar de create()
     const turno = new Turno();
     turno.negocioId = createTurnoDto.negocioId;
     turno.centroId = createTurnoDto.centroId;
     turno.profesionalCentroId = createTurnoDto.profesionalCentroId;
-    turno.especialidadId = createTurnoDto.especialidadId || null;
+    turno.especialidadId = createTurnoDto.especialidadId ?? null;
     turno.usuarioId = usuario.id;
     turno.inicio = inicio;
     turno.fin = fin;
     turno.duracionMinutos = createTurnoDto.duracionMinutos;
     turno.estado = createTurnoDto.estado || 'PENDIENTE';
-    turno.precioReserva = createTurnoDto.precioReserva || null;
+    turno.precioReserva = createTurnoDto.precioReserva ?? null;
     turno.moneda = createTurnoDto.moneda || 'ARS';
     turno.canalOrigen = 'WEB';
-    turno.observaciones = createTurnoDto.observaciones || null;
+    turno.observaciones = createTurnoDto.observaciones ?? null;
     turno.usuario_alta = usuario.email || 'sistema';
 
     const turnoGuardado = await this.turnoRepository.save(turno);
