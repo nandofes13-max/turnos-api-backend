@@ -19,6 +19,7 @@ import { ExcepcionesFechasModule } from './excepciones-fechas/excepciones-fechas
 import { AgendaPublicaModule } from './agenda-publica/agenda-publica.module';
 import { TurnosModule } from './turnos/turnos.module';
 import { NegociosEstadosTurnoModule } from './negocios-estados-turno/negocios-estados-turno.module';
+import { NegociosEstadosPagoModule } from './negocios-estados-pago/negocios-estados-pago.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { NegociosEstadosTurnoModule } from './negocios-estados-turno/negocios-es
     AgendaPublicaModule,
     TurnosModule,
     NegociosEstadosTurnoModule,
+    NegociosEstadosPagoModule,
   ],
 })
 export class AppModule {}
