@@ -11,7 +11,6 @@ import { Usuario } from '../../usuarios/entities/usuario.entity';
 @Check(`estado IN ('PENDIENTE', 'CONFIRMADO', 'CANCELADO', 'REPROGRAMADO', 'ATENDIDO', 'NO_SHOW', 'BLOQUEADO')`)
 @Check(`moneda IN ('ARS', 'USD', 'EUR')`)
 export class Turno extends BaseEntityAuditable {
-  // ===== RELACIONES =====
   @Column({ name: 'negocio_id' })
   negocioId: number;
 
@@ -34,7 +33,7 @@ export class Turno extends BaseEntityAuditable {
   profesionalCentro: ProfesionalCentro;
 
   @Column({ name: 'especialidad_id', nullable: true })
-  especialidadId: number;
+  especialidadId: number | null;
 
   @ManyToOne(() => Especialidad)
   @JoinColumn({ name: 'especialidad_id' })
@@ -47,7 +46,6 @@ export class Turno extends BaseEntityAuditable {
   @JoinColumn({ name: 'usuario_id' })
   usuario: Usuario;
 
-  // ===== FECHA Y HORA =====
   @Column({ type: 'timestamp' })
   @Index()
   inicio: Date;
@@ -59,50 +57,42 @@ export class Turno extends BaseEntityAuditable {
   @Column({ name: 'duracion_minutos', type: 'int' })
   duracionMinutos: number;
 
-  // ===== ESTADO =====
   @Column({ type: 'varchar', length: 30, default: 'PENDIENTE' })
   estado: string;
 
-  // ===== PRECIO =====
   @Column({ name: 'precio_reserva', type: 'decimal', precision: 10, scale: 2, nullable: true })
-  precioReserva: number;
+  precioReserva: number | null;
 
   @Column({ type: 'varchar', length: 3, default: 'ARS', nullable: true })
-  moneda: string;
+  moneda: string | null;
 
-  // ===== CONFIRMACIÓN =====
   @Column({ default: false })
   confirmado: boolean;
 
   @Column({ name: 'confirmado_at', type: 'timestamp', nullable: true })
-  confirmadoAt: Date;
+  confirmadoAt: Date | null;
 
-  // ===== CANCELACIÓN =====
   @Column({ name: 'cancelado_at', type: 'timestamp', nullable: true })
-  canceladoAt: Date;
+  canceladoAt: Date | null;
 
   @Column({ name: 'cancelado_por', type: 'varchar', length: 30, nullable: true })
-  canceladoPor: string;
+  canceladoPor: string | null;
 
   @Column({ name: 'motivo_cancelacion', type: 'text', nullable: true })
-  motivoCancelacion: string;
+  motivoCancelacion: string | null;
 
-  // ===== REPROGRAMACIÓN =====
   @Column({ name: 'reprogramado_desde_id', type: 'bigint', nullable: true })
-  reprogramadoDesdeId: number;
+  reprogramadoDesdeId: number | null;
 
-  // ===== ASISTENCIA =====
   @Column({ default: false })
   asistio: boolean;
 
   @Column({ name: 'llegada_at', type: 'timestamp', nullable: true })
-  llegadaAt: Date;
+  llegadaAt: Date | null;
 
-  // ===== CANAL DE ORIGEN =====
   @Column({ name: 'canal_origen', type: 'varchar', length: 30, default: 'WEB' })
   canalOrigen: string;
 
-  // ===== OBSERVACIONES =====
   @Column({ type: 'text', nullable: true })
-  observaciones: string;
+  observaciones: string | null;
 }
