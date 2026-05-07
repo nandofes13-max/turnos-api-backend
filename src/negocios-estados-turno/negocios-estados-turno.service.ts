@@ -58,12 +58,16 @@ export class NegociosEstadosTurnoService {
   }
 
   async create(createDto: CreateNegocioEstadoTurnoDto, usuario?: string): Promise<NegocioEstadoTurno> {
+    // Configurar valores por defecto
+    const centroId = createDto.centroId ?? undefined;
+    const especialidadId = createDto.especialidadId ?? undefined;
+    
     // Verificar que no exista un estado con el mismo nombre para el mismo nivel
     const existente = await this.repository.findOne({
       where: {
         negocioId: createDto.negocioId,
-        centroId: createDto.centroId || null,
-        especialidadId: createDto.especialidadId || null,
+        centroId: centroId,
+        especialidadId: especialidadId,
         nombre: createDto.nombre,
         fecha_baja: IsNull(),
       },
@@ -75,6 +79,8 @@ export class NegociosEstadosTurnoService {
 
     const registro = this.repository.create({
       ...createDto,
+      centroId: centroId,
+      especialidadId: especialidadId,
       usuario_alta: usuario || 'sistema',
     });
 
@@ -84,13 +90,18 @@ export class NegociosEstadosTurnoService {
   async update(id: number, updateDto: UpdateNegocioEstadoTurnoDto, usuario?: string): Promise<NegocioEstadoTurno> {
     const registro = await this.findOne(id);
 
+    // Configurar valores
+    const centroId = updateDto.centroId ?? registro.centroId ?? undefined;
+    const especialidadId = updateDto.especialidadId ?? registro.especialidadId ?? undefined;
+    const negocioId = updateDto.negocioId ?? registro.negocioId;
+
     // Si está cambiando el nombre, verificar duplicado (excluyendo este registro)
     if (updateDto.nombre && updateDto.nombre !== registro.nombre) {
       const existente = await this.repository.findOne({
         where: {
-          negocioId: updateDto.negocioId ?? registro.negocioId,
-          centroId: updateDto.centroId ?? registro.centroId,
-          especialidadId: updateDto.especialidadId ?? registro.especialidadId,
+          negocioId: negocioId,
+          centroId: centroId,
+          especialidadId: especialidadId,
           nombre: updateDto.nombre,
           fecha_baja: IsNull(),
           id: Not(id),
@@ -115,12 +126,6 @@ export class NegociosEstadosTurnoService {
     if (registro.fecha_baja) {
       throw new BadRequestException('El estado ya está inactivo');
     }
-
-    // Verificar que no haya turnos usando este estado (opcional)
-    // const turnosUsando = await this.turnoRepository.count({ where: { estadoTurnoId: id } });
-    // if (turnosUsando > 0) {
-    //   throw new BadRequestException('No se puede desactivar un estado que está siendo usado por turnos');
-    // }
 
     registro.fecha_baja = new Date();
     registro.usuario_baja = usuario || 'sistema';
