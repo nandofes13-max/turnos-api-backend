@@ -24,25 +24,25 @@ export class CreateTurnoDto {
   
   @IsDateString({}, { message: 'La fecha de inicio debe ser una fecha válida (ISO)' })
   @IsNotEmpty({ message: 'La fecha de inicio es obligatoria' })
-  inicio: string;  // "2026-05-11T20:00:00-03:00"
+  inicio: string;
 
   @IsDateString({}, { message: 'La fecha de fin debe ser una fecha válida (ISO)' })
   @IsNotEmpty({ message: 'La fecha de fin es obligatoria' })
-  fin: string;  // "2026-05-11T20:30:00-03:00"
+  fin: string;
 
   @IsInt({ message: 'La duración debe ser un número entero' })
   @Min(1, { message: 'La duración debe ser mayor a 0 minutos' })
   @IsNotEmpty({ message: 'La duración es obligatoria' })
   duracionMinutos: number;
 
-  // ===== ESTADO (opcional, por defecto 'PENDIENTE') =====
+  // ===== ESTADO (opcional) =====
   
   @IsString({ message: 'El estado debe ser texto' })
   @IsOptional()
   @IsIn(['PENDIENTE', 'CONFIRMADO', 'CANCELADO', 'REPROGRAMADO', 'ATENDIDO', 'NO_SHOW', 'BLOQUEADO'])
   estado?: string;
 
-  // ===== PRECIO (opcional por ahora) =====
+  // ===== PRECIO (opcional) =====
   
   @IsNumber({}, { message: 'El precio debe ser un número' })
   @IsOptional()
@@ -52,6 +52,12 @@ export class CreateTurnoDto {
   @IsOptional()
   @IsIn(['ARS', 'USD', 'EUR'])
   moneda?: string;
+
+  // ===== OBSERVACIONES (opcional) =====
+  
+  @IsString({ message: 'Las observaciones deben ser texto' })
+  @IsOptional()
+  observaciones?: string;
 
   // ===== DATOS DEL USUARIO (para crear o buscar) =====
   
