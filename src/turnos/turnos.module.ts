@@ -4,7 +4,7 @@ import { TurnosService } from './turnos.service';
 import { TurnosController } from './turnos.controller';
 import { Turno } from './entities/turno.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
-import { NegociosUsuariosRoles } from '../negocios-usuarios-roles/entities/negocios-usuarios-rol.entity';
+import { NegocioUsuarioRol } from '../negocios-usuarios-roles/entities/negocio-usuario-rol.entity';
 import { Rol } from '../roles/entities/rol.entity';
 
 @Module({
@@ -12,7 +12,7 @@ import { Rol } from '../roles/entities/rol.entity';
     TypeOrmModule.forFeature([
       Turno,
       Usuario,
-      NegociosUsuariosRoles,
+      NegocioUsuarioRol,
       Rol,
     ]),
   ],
