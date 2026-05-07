@@ -1,17 +1,20 @@
 // src/negocios/negocios.service.ts
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, forwardRef, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { Negocio } from './entities/negocio.entity';
 import { CreateNegocioDto } from './dto/create-negocio.dto';
 import { UpdateNegocioDto } from './dto/update-negocio.dto';
 import { parsePhoneNumber } from 'libphonenumber-js';
+import { CentroService } from '../centro/centro.service';
 
 @Injectable()
 export class NegociosService {
   constructor(
     @InjectRepository(Negocio)
     private readonly negociosRepository: Repository<Negocio>,
+    @Inject(forwardRef(() => CentroService))
+    private readonly centroService: CentroService,
   ) {}
 
   // ===== OBTENER TIMEZONE DESDE COORDENADAS (TimezoneDB) =====
@@ -147,7 +150,6 @@ export class NegociosService {
 
     this.validarDireccion(createNegocioDto.domicilio);
 
-    // 🔹 OBTENER TIMEZONE DESDE LAS COORDENADAS
     const timezone = await this.obtenerTimezoneDesdeCoordenadas(
       createNegocioDto.domicilio.latitude,
       createNegocioDto.domicilio.longitude
@@ -181,7 +183,6 @@ export class NegociosService {
   async update(id: number, updateNegocioDto: UpdateNegocioDto, usuario?: string): Promise<Negocio> {
     const negocioExistente = await this.findOne(id);
 
-    // Si se actualizan campos de WhatsApp, validar nuevamente
     if (updateNegocioDto.country_code || updateNegocioDto.national_number) {
       const country_code = updateNegocioDto.country_code ?? negocioExistente.country_code;
       const national_number = updateNegocioDto.national_number ?? negocioExistente.national_number;
@@ -190,11 +191,9 @@ export class NegociosService {
       negocioExistente.whatsapp_e164 = whatsappE164;
     }
 
-    // Si se actualiza el domicilio, validar y recalcular timezone
     if (updateNegocioDto.domicilio) {
       this.validarDireccion(updateNegocioDto.domicilio);
       
-      // 🔹 RECALCULAR TIMEZONE SI CAMBIA LA DIRECCIÓN
       const nuevoTimezone = await this.obtenerTimezoneDesdeCoordenadas(
         updateNegocioDto.domicilio.latitude,
         updateNegocioDto.domicilio.longitude
@@ -213,7 +212,6 @@ export class NegociosService {
       negocioExistente.formatted_address = updateNegocioDto.domicilio.formatted_address;
     }
 
-    // Actualizar otros campos
     if (updateNegocioDto.nombre) {
       negocioExistente.nombre = updateNegocioDto.nombre.toUpperCase();
     }
@@ -224,7 +222,6 @@ export class NegociosService {
       negocioExistente.national_number = updateNegocioDto.national_number;
     }
 
-    // Para reactivar
     if (updateNegocioDto.fecha_baja === null) {
       (negocioExistente as any).fecha_baja = null;
       (negocioExistente as any).usuario_baja = null;
@@ -237,12 +234,29 @@ export class NegociosService {
     return this.negociosRepository.save(negocioExistente);
   }
 
+  // ============================================================
+  // MÉTODO softDelete MODIFICADO: Desactiva en cascada centros, relaciones y agendas
+  // ============================================================
   async softDelete(id: number, usuario?: string): Promise<void> {
     const negocioExistente = await this.findOne(id);
+    
+    // 🔹 1. Buscar todos los centros activos de este negocio
+    const centros = await this.centroService.findByNegocio(id);
+    console.log(`[Negocio.softDelete] Desactivando ${centros.length} centros del negocio ${negocioExistente.nombre}`);
+    
+    // 🔹 2. Desactivar cada centro (esto activará su propia cascada)
+    for (const centro of centros) {
+      if (!centro.fecha_baja) {
+        await this.centroService.softDelete(centro.id, usuario);
+      }
+    }
+    
+    // 🔹 3. Desactivar el negocio
     negocioExistente.fecha_baja = new Date();
     negocioExistente.usuario_baja = usuario || 'demo';
-
+    
     await this.negociosRepository.save(negocioExistente);
+    console.log(`[Negocio.softDelete] Negocio ${negocioExistente.nombre} desactivado correctamente`);
   }
 
   async debugStructure(): Promise<any> {
