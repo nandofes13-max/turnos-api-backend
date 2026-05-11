@@ -9,7 +9,7 @@ export class TurnosController {
   constructor(private readonly turnosService: TurnosService) {}
 
   // ============================================================
-  // LISTAR TURNOS CON FILTROS (NUEVO)
+  // LISTAR TURNOS CON FILTROS
   // ============================================================
   @Get()
   async findAll(
@@ -22,7 +22,7 @@ export class TurnosController {
     @Query('centroId') centroId?: string,
     @Query('canalOrigen') canalOrigen?: string,
     @Query('asistio') asistio?: string,
-    @Query('estado') estado?: string,
+    @Query('estadoTurnoId') estadoTurnoId?: string,  // 👈 CAMBIADO
     @Query('estadoPago') estadoPago?: string,
   ): Promise<Turno[]> {
     return this.turnosService.findAll({
@@ -35,7 +35,7 @@ export class TurnosController {
       centroId: centroId ? parseInt(centroId, 10) : undefined,
       canalOrigen,
       asistio: asistio ? asistio === 'true' : undefined,
-      estado,
+      estadoTurnoId: estadoTurnoId ? parseInt(estadoTurnoId, 10) : undefined,  // 👈 CAMBIADO
       estadoPago,
     });
   }
