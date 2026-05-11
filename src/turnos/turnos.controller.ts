@@ -8,6 +8,38 @@ import { Turno } from './entities/turno.entity';
 export class TurnosController {
   constructor(private readonly turnosService: TurnosService) {}
 
+  // ============================================================
+  // LISTAR TURNOS CON FILTROS (NUEVO)
+  // ============================================================
+  @Get()
+  async findAll(
+    @Query('usuarioId') usuarioId?: string,
+    @Query('negocioId') negocioId?: string,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+    @Query('profesionalId') profesionalId?: string,
+    @Query('especialidadId') especialidadId?: string,
+    @Query('centroId') centroId?: string,
+    @Query('canalOrigen') canalOrigen?: string,
+    @Query('asistio') asistio?: string,
+    @Query('estado') estado?: string,
+    @Query('estadoPago') estadoPago?: string,
+  ): Promise<Turno[]> {
+    return this.turnosService.findAll({
+      usuarioId: usuarioId ? parseInt(usuarioId, 10) : undefined,
+      negocioId: negocioId ? parseInt(negocioId, 10) : undefined,
+      desde,
+      hasta,
+      profesionalId: profesionalId ? parseInt(profesionalId, 10) : undefined,
+      especialidadId: especialidadId ? parseInt(especialidadId, 10) : undefined,
+      centroId: centroId ? parseInt(centroId, 10) : undefined,
+      canalOrigen,
+      asistio: asistio ? asistio === 'true' : undefined,
+      estado,
+      estadoPago,
+    });
+  }
+
   @Post()
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   async create(@Body() createTurnoDto: CreateTurnoDto): Promise<{ success: boolean; turno: Turno; message: string }> {
