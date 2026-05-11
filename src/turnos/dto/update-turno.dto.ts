@@ -16,10 +16,15 @@ export class UpdateTurnoDto extends PartialType(CreateTurnoDto) {
   @Min(1, { message: 'La duración debe ser mayor a 0 minutos' })
   duracionMinutos?: number;
 
+  // 🔹 NUEVO: Para actualizar el estado por ID (reemplaza al estado string)
   @IsOptional()
-  @IsString({ message: 'El estado debe ser texto' })
-  @IsIn(['PENDIENTE', 'CONFIRMADO', 'CANCELADO', 'REPROGRAMADO', 'ATENDIDO', 'NO_SHOW', 'BLOQUEADO'])
-  estado?: string;
+  @IsInt({ message: 'El ID del estado debe ser un número entero' })
+  estadoTurnoId?: number;
+
+  // @IsOptional()
+  // @IsString({ message: 'El estado debe ser texto' })
+  // @IsIn(['OCUPADO', 'CANCELADO'])
+  // estado?: string;  // Ya no se usa, se reemplaza por estadoTurnoId
 
   @IsOptional()
   @IsBoolean({ message: 'confirmado debe ser verdadero o falso' })
