@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, Not } from 'typeorm';
+import { Repository, IsNull, Not, In } from 'typeorm';
 import { Turno } from './entities/turno.entity';
 import { CreateTurnoDto } from './dto/create-turno.dto';
 import { UpdateTurnoDto } from './dto/update-turno.dto';
@@ -20,6 +20,95 @@ export class TurnosService {
     @InjectRepository(Rol)
     private readonly rolRepository: Repository<Rol>,
   ) {}
+
+  // ============================================================
+  // NUEVO: LISTAR TURNOS CON FILTROS
+  // ============================================================
+  async findAll(filtros: {
+    usuarioId?: number;
+    negocioId?: number;
+    desde?: string;
+    hasta?: string;
+    profesionalId?: number;
+    especialidadId?: number;
+    centroId?: number;
+    canalOrigen?: string;
+    asistio?: boolean;
+    estado?: string;
+    estadoPago?: string;
+  }): Promise<Turno[]> {
+    const queryBuilder = this.turnoRepository.createQueryBuilder('t')
+      .leftJoinAndSelect('t.usuario', 'usuario')
+      .leftJoinAndSelect('t.profesionalCentro', 'pc')
+      .leftJoinAndSelect('pc.profesional', 'profesional')
+      .leftJoinAndSelect('pc.especialidad', 'especialidad')
+      .leftJoinAndSelect('pc.centro', 'centro')
+      .leftJoinAndSelect('centro.negocio', 'negocio')
+      .where('t.fecha_baja IS NULL');
+
+    // 🔹 FILTRO POR USUARIO (según negocios que tiene asignados)
+    if (filtros.usuarioId) {
+      const negociosPermitidos = await this.negocioUsuarioRolRepository.find({
+        where: { usuarioId: filtros.usuarioId, fecha_baja: IsNull() },
+        select: ['negocioId'],
+      });
+      const ids = negociosPermitidos.map(n => n.negocioId);
+      if (ids.length === 0) {
+        return []; // No tiene acceso a ningún negocio
+      }
+      queryBuilder.andWhere('negocio.id IN (:...ids)', { ids });
+    }
+
+    // 🔹 FILTRO POR NEGOCIO
+    if (filtros.negocioId) {
+      queryBuilder.andWhere('negocio.id = :negocioId', { negocioId: filtros.negocioId });
+    }
+
+    // 🔹 FILTRO POR FECHAS
+    if (filtros.desde) {
+      queryBuilder.andWhere('t.inicio >= :desde', { desde: filtros.desde });
+    }
+    if (filtros.hasta) {
+      queryBuilder.andWhere('t.inicio <= :hasta', { hasta: filtros.hasta });
+    }
+
+    // 🔹 FILTRO POR PROFESIONAL
+    if (filtros.profesionalId) {
+      queryBuilder.andWhere('profesional.id = :profesionalId', { profesionalId: filtros.profesionalId });
+    }
+
+    // 🔹 FILTRO POR ESPECIALIDAD
+    if (filtros.especialidadId) {
+      queryBuilder.andWhere('especialidad.id = :especialidadId', { especialidadId: filtros.especialidadId });
+    }
+
+    // 🔹 FILTRO POR CENTRO
+    if (filtros.centroId) {
+      queryBuilder.andWhere('centro.id = :centroId', { centroId: filtros.centroId });
+    }
+
+    // 🔹 FILTRO POR CANAL DE ORIGEN
+    if (filtros.canalOrigen) {
+      queryBuilder.andWhere('t.canal_origen = :canalOrigen', { canalOrigen: filtros.canalOrigen });
+    }
+
+    // 🔹 FILTRO POR ASISTENCIA
+    if (filtros.asistio !== undefined) {
+      queryBuilder.andWhere('t.asistio = :asistio', { asistio: filtros.asistio });
+    }
+
+    // 🔹 FILTRO POR ESTADO DEL TURNO
+    if (filtros.estado) {
+      queryBuilder.andWhere('t.estado = :estado', { estado: filtros.estado });
+    }
+
+    // 🔹 FILTRO POR ESTADO DE PAGO pendiente (requiere usar estado_pago_id)
+    // Por ahora, si viene estadoPago, se puede implementar después.
+
+    queryBuilder.orderBy('t.inicio', 'DESC');
+
+    return queryBuilder.getMany();
+  }
 
   private async buscarOCrearUsuario(email: string, apellido: string, nombre: string, telefono: string): Promise<Usuario> {
     let usuario = await this.usuarioRepository.findOne({
