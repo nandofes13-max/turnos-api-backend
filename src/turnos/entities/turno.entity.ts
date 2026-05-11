@@ -5,10 +5,10 @@ import { Centro } from '../../centro/entities/centro.entity';
 import { ProfesionalCentro } from '../../profesional-centro/entities/profesional-centro.entity';
 import { Especialidad } from '../../especialidades/entities/especialidad.entity';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
+import { NegocioEstadoTurno } from '../../negocios-estados-turno/entities/negocio-estado-turno.entity';
 
 @Entity('turnos')
 @Index(['profesionalCentroId', 'inicio'])
-@Check(`estado IN ('PENDIENTE', 'CONFIRMADO', 'CANCELADO', 'REPROGRAMADO', 'ATENDIDO', 'NO_SHOW', 'BLOQUEADO')`)
 @Check(`moneda IN ('ARS', 'USD', 'EUR')`)
 export class Turno extends BaseEntityAuditable {
   @Column({ name: 'negocio_id' })
@@ -57,8 +57,17 @@ export class Turno extends BaseEntityAuditable {
   @Column({ name: 'duracion_minutos', type: 'int' })
   duracionMinutos: number;
 
-  @Column({ type: 'varchar', length: 30, default: 'PENDIENTE' })
-  estado: string;
+  // 🔹 NUEVO: Relación con la tabla de estados (reemplaza columna estado)
+  @Column({ name: 'estado_turno_id', nullable: true })
+  estadoTurnoId: number | null;
+
+  @ManyToOne(() => NegocioEstadoTurno)
+  @JoinColumn({ name: 'estado_turno_id' })
+  estadoTurno: NegocioEstadoTurno;
+
+  // 🔹 OPCIONAL: Mantener estado por compatibilidad temporal (después se elimina)
+  // @Column({ type: 'varchar', length: 30, nullable: true })
+  // estado: string;
 
   @Column({ name: 'precio_reserva', type: 'decimal', precision: 10, scale: 2, nullable: true })
   precioReserva: number | null;
