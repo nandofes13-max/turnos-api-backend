@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, Not, In } from 'typeorm';
+import { Repository, IsNull, Not, In, ILike } from 'typeorm';
 import { Turno } from './entities/turno.entity';
 import { CreateTurnoDto } from './dto/create-turno.dto';
 import { UpdateTurnoDto } from './dto/update-turno.dto';
@@ -43,6 +43,7 @@ export class TurnosService {
     asistio?: boolean;
     estadoTurnoId?: number;
     estadoPago?: string;
+    pacienteSearch?: string;  // 👈 NUEVO
   }): Promise<Turno[]> {
     const queryBuilder = this.turnoRepository.createQueryBuilder('t')
       .leftJoinAndSelect('t.usuario', 'usuario')
@@ -121,6 +122,15 @@ export class TurnosService {
     // 🔹 FILTRO POR ESTADO DEL TURNO (usando estadoTurnoId)
     if (filtros.estadoTurnoId) {
       queryBuilder.andWhere('t.estado_turno_id = :estadoTurnoId', { estadoTurnoId: filtros.estadoTurnoId });
+    }
+
+    // 🔹 NUEVO: BÚSQUEDA POR PACIENTE (nombre, apellido, email, documento)
+    if (filtros.pacienteSearch && filtros.pacienteSearch.trim()) {
+      const searchTerm = `%${filtros.pacienteSearch.trim()}%`;
+      queryBuilder.andWhere(
+        '(usuario.nombre ILIKE :search OR usuario.apellido ILIKE :search OR usuario.email ILIKE :search OR CAST(usuario.documento AS TEXT) ILIKE :search)',
+        { search: searchTerm }
+      );
     }
 
     queryBuilder.orderBy('t.inicio', 'DESC');
@@ -259,7 +269,6 @@ export class TurnosService {
     await this.asignarRolPaciente(usuario.id, createTurnoDto.negocioId);
     await this.validarDisponibilidad(createTurnoDto.profesionalCentroId, inicio, fin);
 
-    // 🔹 Obtener el ID del estado OCUPADO para este negocio
     const estadoOcupadoId = await this.obtenerEstadoOcupadoId(createTurnoDto.negocioId);
 
     const turno = new Turno();
