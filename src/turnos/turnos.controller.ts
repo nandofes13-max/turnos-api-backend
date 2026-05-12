@@ -25,6 +25,7 @@ export class TurnosController {
     @Query('asistio') asistio?: string,
     @Query('estadoTurnoId') estadoTurnoId?: string,
     @Query('estadoPago') estadoPago?: string,
+    @Query('pacienteSearch') pacienteSearch?: string,  // 👈 NUEVO
   ): Promise<Turno[]> {
     return this.turnosService.findAll({
       usuarioId: usuarioId ? parseInt(usuarioId, 10) : undefined,
@@ -39,6 +40,7 @@ export class TurnosController {
       asistio: asistio ? asistio === 'true' : undefined,
       estadoTurnoId: estadoTurnoId ? parseInt(estadoTurnoId, 10) : undefined,
       estadoPago,
+      pacienteSearch,  // 👈 NUEVO
     });
   }
 
