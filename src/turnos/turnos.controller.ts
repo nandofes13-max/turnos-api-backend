@@ -15,6 +15,7 @@ export class TurnosController {
   async findAll(
     @Query('usuarioId') usuarioId?: string,
     @Query('negocioId') negocioId?: string,
+    @Query('actividadId') actividadId?: string,
     @Query('desde') desde?: string,
     @Query('hasta') hasta?: string,
     @Query('profesionalId') profesionalId?: string,
@@ -22,12 +23,13 @@ export class TurnosController {
     @Query('centroId') centroId?: string,
     @Query('canalOrigen') canalOrigen?: string,
     @Query('asistio') asistio?: string,
-    @Query('estadoTurnoId') estadoTurnoId?: string,  // 👈 CAMBIADO
+    @Query('estadoTurnoId') estadoTurnoId?: string,
     @Query('estadoPago') estadoPago?: string,
   ): Promise<Turno[]> {
     return this.turnosService.findAll({
       usuarioId: usuarioId ? parseInt(usuarioId, 10) : undefined,
       negocioId: negocioId ? parseInt(negocioId, 10) : undefined,
+      actividadId: actividadId ? parseInt(actividadId, 10) : undefined,
       desde,
       hasta,
       profesionalId: profesionalId ? parseInt(profesionalId, 10) : undefined,
@@ -35,7 +37,7 @@ export class TurnosController {
       centroId: centroId ? parseInt(centroId, 10) : undefined,
       canalOrigen,
       asistio: asistio ? asistio === 'true' : undefined,
-      estadoTurnoId: estadoTurnoId ? parseInt(estadoTurnoId, 10) : undefined,  // 👈 CAMBIADO
+      estadoTurnoId: estadoTurnoId ? parseInt(estadoTurnoId, 10) : undefined,
       estadoPago,
     });
   }
