@@ -8,6 +8,7 @@ import { Usuario } from '../usuarios/entities/usuario.entity';
 import { NegocioUsuarioRol } from '../negocios-usuarios-roles/entities/negocio-usuario-rol.entity';
 import { Rol } from '../roles/entities/rol.entity';
 import { NegocioEstadoTurno } from '../negocios-estados-turno/entities/negocio-estado-turno.entity';
+import { NegocioActividad } from '../negocio-actividades/entities/negocio-actividad.entity';
 
 @Injectable()
 export class TurnosService {
@@ -22,6 +23,8 @@ export class TurnosService {
     private readonly rolRepository: Repository<Rol>,
     @InjectRepository(NegocioEstadoTurno)
     private readonly estadoTurnoRepository: Repository<NegocioEstadoTurno>,
+    @InjectRepository(NegocioActividad)
+    private readonly negocioActividadRepository: Repository<NegocioActividad>,
   ) {}
 
   // ============================================================
@@ -30,6 +33,7 @@ export class TurnosService {
   async findAll(filtros: {
     usuarioId?: number;
     negocioId?: number;
+    actividadId?: number;
     desde?: string;
     hasta?: string;
     profesionalId?: number;
@@ -66,6 +70,19 @@ export class TurnosService {
     // 🔹 FILTRO POR NEGOCIO
     if (filtros.negocioId) {
       queryBuilder.andWhere('negocio.id = :negocioId', { negocioId: filtros.negocioId });
+    }
+
+    // 🔹 FILTRO POR ACTIVIDAD (negocios que la ofrecen)
+    if (filtros.actividadId) {
+      const negociosConActividad = await this.negocioActividadRepository.find({
+        where: { actividadId: filtros.actividadId, fecha_baja: IsNull() },
+        select: ['negocioId'],
+      });
+      const negocioIds = negociosConActividad.map(n => n.negocioId);
+      if (negocioIds.length === 0) {
+        return [];
+      }
+      queryBuilder.andWhere('negocio.id IN (:...negocioIds)', { negocioIds });
     }
 
     // 🔹 FILTRO POR FECHAS
@@ -254,7 +271,7 @@ export class TurnosService {
     turno.inicio = inicio;
     turno.fin = fin;
     turno.duracionMinutos = createTurnoDto.duracionMinutos;
-    turno.estadoTurnoId = estadoOcupadoId;  // 🔹 Usar FK en lugar de string
+    turno.estadoTurnoId = estadoOcupadoId;
     turno.precioReserva = createTurnoDto.precioReserva ?? null;
     turno.moneda = createTurnoDto.moneda || 'ARS';
     turno.canalOrigen = 'WEB';
@@ -296,7 +313,6 @@ export class TurnosService {
     if (updateTurnoDto.precioReserva) turno.precioReserva = updateTurnoDto.precioReserva;
     if (updateTurnoDto.moneda) turno.moneda = updateTurnoDto.moneda;
 
-    // 🔹 Si se actualiza el estado (por ID)
     if (updateTurnoDto.estadoTurnoId) {
       const estadoExistente = await this.estadoTurnoRepository.findOne({
         where: { id: updateTurnoDto.estadoTurnoId, fecha_baja: IsNull() },
@@ -338,12 +354,10 @@ export class TurnosService {
       throw new NotFoundException(`Turno con ID ${id} no encontrado`);
     }
 
-    // Verificar si ya está cancelado (por nombre del estado)
     if (turno.estadoTurno?.nombre === 'CANCELADO') {
       throw new BadRequestException('El turno ya está cancelado');
     }
 
-    // Buscar el ID del estado CANCELADO
     const estadoCancelado = await this.estadoTurnoRepository.findOne({
       where: { negocioId: turno.negocioId, nombre: 'CANCELADO', fecha_baja: IsNull() },
     });
@@ -370,7 +384,6 @@ export class TurnosService {
       throw new NotFoundException(`Turno con ID ${id} no encontrado`);
     }
 
-    // Esta lógica dependerá de tus estados de pago, por ahora se mantiene
     turno.confirmado = true;
     turno.confirmadoAt = new Date();
     turno.usuario_modificacion = usuarioConfirmador;
