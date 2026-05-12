@@ -7,6 +7,7 @@ import { Usuario } from '../usuarios/entities/usuario.entity';
 import { NegocioUsuarioRol } from '../negocios-usuarios-roles/entities/negocio-usuario-rol.entity';
 import { Rol } from '../roles/entities/rol.entity';
 import { NegocioEstadoTurno } from '../negocios-estados-turno/entities/negocio-estado-turno.entity';
+import { NegocioActividad } from '../negocio-actividades/entities/negocio-actividad.entity';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { NegocioEstadoTurno } from '../negocios-estados-turno/entities/negocio-e
       NegocioUsuarioRol,
       Rol,
       NegocioEstadoTurno,
+      NegocioActividad,
     ]),
   ],
   controllers: [TurnosController],
