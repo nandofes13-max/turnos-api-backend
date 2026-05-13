@@ -27,10 +27,6 @@ export class UpdateTurnoDto extends PartialType(CreateTurnoDto) {
   // estado?: string;  // Ya no se usa, se reemplaza por estadoTurnoId
 
   @IsOptional()
-  @IsBoolean({ message: 'confirmado debe ser verdadero o falso' })
-  confirmado?: boolean;
-
-  @IsOptional()
   @IsString({ message: 'El motivo de cancelación debe ser texto' })
   motivoCancelacion?: string;
 
