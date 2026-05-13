@@ -104,4 +104,20 @@ export class TurnosController {
       return { disponible: false };
     }
   }
+
+    // ============================================================
+  // NUEVO ENDPOINT: Obtener profesionales por centro y especialidad
+  // ============================================================
+  @Get('profesionales-por-centro-especialidad')
+  async getProfesionalesPorCentroEspecialidad(
+    @Query('centroId') centroId: string,
+    @Query('especialidadId') especialidadId: string,
+  ): Promise<any[]> {
+    console.log(`[TurnosController] profesionales-por-centro-especialidad - centroId: ${centroId}, especialidadId: ${especialidadId}`);
+    return this.turnosService.findProfesionalesPorCentroEspecialidad(
+      Number(centroId),
+      Number(especialidadId),
+    );
+  }
 }
+
