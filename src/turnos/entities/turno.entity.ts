@@ -58,7 +58,7 @@ export class Turno extends BaseEntityAuditable {
   @Column({ name: 'duracion_minutos', type: 'int' })
   duracionMinutos: number;
 
-  // 🔹 NUEVO: Relación con la tabla de estados (reemplaza columna estado)
+  // 🔹 Relación con la tabla de estados de turno
   @Column({ name: 'estado_turno_id', nullable: true })
   estadoTurnoId: number | null;
 
@@ -66,19 +66,19 @@ export class Turno extends BaseEntityAuditable {
   @JoinColumn({ name: 'estado_turno_id' })
   estadoTurno: NegocioEstadoTurno;
 
-  // 🔹 OPCIONAL: Mantener estado por compatibilidad temporal (después se elimina)
-  // @Column({ type: 'varchar', length: 30, nullable: true })
-  // estado: string;
-
   @Column({ name: 'precio_reserva', type: 'decimal', precision: 10, scale: 2, nullable: true })
   precioReserva: number | null;
 
   @Column({ type: 'varchar', length: 3, default: 'ARS', nullable: true })
   moneda: string | null;
 
-  // 🔹 NUEVO: Estado de pago
+  // 🔹 Relación con la tabla de estados de pago
   @Column({ name: 'estado_pago_id', nullable: true })
   estadoPagoId: number | null;
+
+  @ManyToOne(() => NegocioEstadoPago)
+  @JoinColumn({ name: 'estado_pago_id' })
+  estadoPago: NegocioEstadoPago;
 
   @Column({ name: 'cancelado_at', type: 'timestamp', nullable: true })
   canceladoAt: Date | null;
