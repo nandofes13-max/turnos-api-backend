@@ -6,6 +6,7 @@ import { ProfesionalCentro } from '../../profesional-centro/entities/profesional
 import { Especialidad } from '../../especialidades/entities/especialidad.entity';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { NegocioEstadoTurno } from '../../negocios-estados-turno/entities/negocio-estado-turno.entity';
+import { NegocioEstadoPago } from '../../negocios-estados-pago/entities/negocio-estado-pago.entity';
 
 @Entity('turnos')
 @Index(['profesionalCentroId', 'inicio'])
@@ -74,6 +75,10 @@ export class Turno extends BaseEntityAuditable {
 
   @Column({ type: 'varchar', length: 3, default: 'ARS', nullable: true })
   moneda: string | null;
+
+  // 🔹 NUEVO: Estado de pago
+  @Column({ name: 'estado_pago_id', nullable: true })
+  estadoPagoId: number | null;
 
   @Column({ name: 'cancelado_at', type: 'timestamp', nullable: true })
   canceladoAt: Date | null;
