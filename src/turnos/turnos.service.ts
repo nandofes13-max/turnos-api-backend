@@ -383,23 +383,6 @@ export class TurnosService {
     return await this.turnoRepository.save(turno);
   }
 
-  async confirmar(id: number, usuarioConfirmador: string): Promise<Turno> {
-    const turno = await this.turnoRepository.findOne({
-      where: { id, fecha_baja: IsNull() },
-      relations: ['estadoTurno'],
-    });
-
-    if (!turno) {
-      throw new NotFoundException(`Turno con ID ${id} no encontrado`);
-    }
-
-    turno.confirmado = true;
-    turno.confirmadoAt = new Date();
-    turno.usuario_modificacion = usuarioConfirmador;
-
-    return await this.turnoRepository.save(turno);
-  }
-
   // ============================================================
   // NUEVO MÉTODO: Obtener profesionales por centro y especialidad
   // ============================================================
