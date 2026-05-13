@@ -75,12 +75,6 @@ export class Turno extends BaseEntityAuditable {
   @Column({ type: 'varchar', length: 3, default: 'ARS', nullable: true })
   moneda: string | null;
 
-  @Column({ default: false })
-  confirmado: boolean;
-
-  @Column({ name: 'confirmado_at', type: 'timestamp', nullable: true })
-  confirmadoAt: Date | null;
-
   @Column({ name: 'cancelado_at', type: 'timestamp', nullable: true })
   canceladoAt: Date | null;
 
