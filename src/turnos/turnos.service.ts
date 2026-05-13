@@ -43,7 +43,7 @@ export class TurnosService {
     asistio?: boolean;
     estadoTurnoId?: number;
     estadoPago?: string;
-    pacienteSearch?: string;  // 👈 NUEVO
+    pacienteSearch?: string;
   }): Promise<Turno[]> {
     const queryBuilder = this.turnoRepository.createQueryBuilder('t')
       .leftJoinAndSelect('t.usuario', 'usuario')
@@ -398,5 +398,41 @@ export class TurnosService {
     turno.usuario_modificacion = usuarioConfirmador;
 
     return await this.turnoRepository.save(turno);
+  }
+
+  // ============================================================
+  // NUEVO MÉTODO: Obtener profesionales por centro y especialidad
+  // ============================================================
+  async findProfesionalesPorCentroEspecialidad(
+    centroId: number,
+    especialidadId: number,
+  ): Promise<any[]> {
+    try {
+      console.log(`[TurnosService] Buscando profesionales para centroId: ${centroId}, especialidadId: ${especialidadId}`);
+      
+      const sql = `
+        SELECT DISTINCT 
+          p.id,
+          p.nombre,
+          p.documento,
+          p.foto,
+          p.email,
+          p.matricula
+        FROM profesional_centro pc
+        INNER JOIN profesional p ON p.id = pc.profesional_id AND p.fecha_baja IS NULL
+        WHERE pc.centro_id = $1
+          AND pc.especialidad_id = $2
+          AND pc.fecha_baja IS NULL
+        ORDER BY p.nombre ASC
+      `;
+      
+      const results = await this.turnoRepository.query(sql, [centroId, especialidadId]);
+      
+      console.log(`[TurnosService] Profesionales encontrados: ${results.length}`);
+      return results;
+    } catch (error) {
+      console.error('[TurnosService] Error en consulta de profesionales:', error);
+      throw new BadRequestException(`Error al obtener profesionales: ${error.message}`);
+    }
   }
 }
