@@ -74,14 +74,6 @@ export class TurnosController {
     return this.turnosService.cancelar(Number(id), motivo || 'No especificado', usuario || 'sistema');
   }
 
-  @Put(':id/confirmar')
-  async confirmar(
-    @Param('id') id: string,
-    @Query('usuario') usuario: string,
-  ): Promise<Turno> {
-    return this.turnosService.confirmar(Number(id), usuario || 'sistema');
-  }
-
   @Get('profesional-centro/:profesionalCentroId')
   async findByProfesionalCentro(@Param('profesionalCentroId') profesionalCentroId: string): Promise<Turno[]> {
     return this.turnosService.findByProfesionalCentro(Number(profesionalCentroId));
@@ -120,4 +112,3 @@ export class TurnosController {
     );
   }
 }
-
