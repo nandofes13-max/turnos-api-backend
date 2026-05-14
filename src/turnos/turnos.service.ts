@@ -322,6 +322,11 @@ export class TurnosService {
     if (updateTurnoDto.precioReserva) turno.precioReserva = updateTurnoDto.precioReserva;
     if (updateTurnoDto.moneda) turno.moneda = updateTurnoDto.moneda;
 
+    // 🔹 NUEVO: Procesar asistio (estaba faltando)
+    if (updateTurnoDto.asistio !== undefined) {
+      turno.asistio = updateTurnoDto.asistio;
+    }
+
     if (updateTurnoDto.estadoTurnoId) {
       const estadoExistente = await this.estadoTurnoRepository.findOne({
         where: { id: updateTurnoDto.estadoTurnoId, fecha_baja: IsNull() },
@@ -329,10 +334,28 @@ export class TurnosService {
       if (!estadoExistente) {
         throw new BadRequestException(`El estado con ID ${updateTurnoDto.estadoTurnoId} no existe o está inactivo`);
       }
-      turno.estadoTurnoId = updateTurnoDto.estadoTurnoId;
       
-      // 🔹 NUEVO: Recargar la relación estadoTurno para que la respuesta tenga el nombre correcto
+      const estadoAnterior = turno.estadoTurno?.nombre;
+      turno.estadoTurnoId = updateTurnoDto.estadoTurnoId;
       turno.estadoTurno = estadoExistente;
+      
+      // 🔹 NUEVO: Si se reactiva (cambia de CANCELADO a OCUPADO), limpiar campos de cancelación
+      if (estadoAnterior === 'CANCELADO' && estadoExistente.nombre === 'OCUPADO') {
+        turno.canceladoAt = null;
+        turno.canceladoPor = null;
+        turno.motivoCancelacion = null;
+      }
+    }
+
+    // 🔹 NUEVO: Procesar campos de cancelación (si vienen en la petición)
+    if (updateTurnoDto.canceladoAt) {
+      turno.canceladoAt = new Date(updateTurnoDto.canceladoAt);
+    }
+    if (updateTurnoDto.canceladoPor) {
+      turno.canceladoPor = updateTurnoDto.canceladoPor;
+    }
+    if (updateTurnoDto.motivoCancelacion) {
+      turno.motivoCancelacion = updateTurnoDto.motivoCancelacion;
     }
 
     turno.usuario_modificacion = usuarioModificador;
