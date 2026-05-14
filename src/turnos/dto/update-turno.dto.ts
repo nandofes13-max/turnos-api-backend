@@ -21,6 +21,11 @@ export class UpdateTurnoDto extends PartialType(CreateTurnoDto) {
   @IsInt({ message: 'El ID del estado debe ser un número entero' })
   estadoTurnoId?: number;
 
+  // 🔹 NUEVO: Campo asistio (estaba faltando)
+  @IsOptional()
+  @IsBoolean({ message: 'asistio debe ser verdadero o falso' })
+  asistio?: boolean;
+
   // 🔹 NUEVO: Campos de auditoría para cancelación
   @IsOptional()
   @IsDateString({}, { message: 'La fecha de cancelación debe ser una fecha válida (ISO)' })
