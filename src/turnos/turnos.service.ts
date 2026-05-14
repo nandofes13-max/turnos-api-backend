@@ -322,9 +322,17 @@ export class TurnosService {
     if (updateTurnoDto.precioReserva) turno.precioReserva = updateTurnoDto.precioReserva;
     if (updateTurnoDto.moneda) turno.moneda = updateTurnoDto.moneda;
 
-    // 🔹 NUEVO: Procesar asistio (estaba faltando)
+    // 🔹 Procesar asistio y actualizar llegada_at
     if (updateTurnoDto.asistio !== undefined) {
       turno.asistio = updateTurnoDto.asistio;
+      
+      // 🔹 NUEVO: Si se marca como asistió (true), guardar fecha/hora actual
+      if (turno.asistio === true) {
+        turno.llegadaAt = new Date();
+      } else {
+        // Si se marca como "No asistió", limpiar la fecha de llegada
+        turno.llegadaAt = null;
+      }
     }
 
     if (updateTurnoDto.estadoTurnoId) {
@@ -339,7 +347,7 @@ export class TurnosService {
       turno.estadoTurnoId = updateTurnoDto.estadoTurnoId;
       turno.estadoTurno = estadoExistente;
       
-      // 🔹 NUEVO: Si se reactiva (cambia de CANCELADO a OCUPADO), limpiar campos de cancelación
+      // 🔹 Si se reactiva (cambia de CANCELADO a OCUPADO), limpiar campos de cancelación
       if (estadoAnterior === 'CANCELADO' && estadoExistente.nombre === 'OCUPADO') {
         turno.canceladoAt = null;
         turno.canceladoPor = null;
@@ -347,7 +355,7 @@ export class TurnosService {
       }
     }
 
-    // 🔹 NUEVO: Procesar campos de cancelación (si vienen en la petición)
+    // 🔹 Procesar campos de cancelación (si vienen en la petición)
     if (updateTurnoDto.canceladoAt) {
       turno.canceladoAt = new Date(updateTurnoDto.canceladoAt);
     }
