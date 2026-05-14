@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, JoinColumn, Index, Check } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, Index, Check, AfterLoad } from 'typeorm';
 import { BaseEntityAuditable } from '../../entities/base.entity';
 import { Negocio } from '../../negocios/entities/negocio.entity';
 import { Centro } from '../../centro/entities/centro.entity';
@@ -103,4 +103,12 @@ export class Turno extends BaseEntityAuditable {
 
   @Column({ type: 'text', nullable: true })
   observaciones: string | null;
+
+  // 🔹 Campo virtual que devuelve el nombre del estado del turno
+  estado: string;
+
+  @AfterLoad()
+  setEstado() {
+    this.estado = this.estadoTurno?.nombre || 'SIN ESTADO';
+  }
 }
