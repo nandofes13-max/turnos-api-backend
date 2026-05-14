@@ -330,6 +330,9 @@ export class TurnosService {
         throw new BadRequestException(`El estado con ID ${updateTurnoDto.estadoTurnoId} no existe o está inactivo`);
       }
       turno.estadoTurnoId = updateTurnoDto.estadoTurnoId;
+      
+      // 🔹 NUEVO: Recargar la relación estadoTurno para que la respuesta tenga el nombre correcto
+      turno.estadoTurno = estadoExistente;
     }
 
     turno.usuario_modificacion = usuarioModificador;
@@ -375,6 +378,7 @@ export class TurnosService {
     }
 
     turno.estadoTurnoId = estadoCancelado.id;
+    turno.estadoTurno = estadoCancelado;
     turno.canceladoAt = new Date();
     turno.canceladoPor = usuarioCancelador;
     turno.motivoCancelacion = motivo;
