@@ -28,7 +28,7 @@ export class TurnosService {
   ) {}
 
   // ============================================================
-  // LISTAR TURNOS CON FILTROS
+  // LISTAR TURNOS CON FILTROS (TODOS, OCUPADOS Y CANCELADOS)
   // ============================================================
   async findAll(filtros: {
     usuarioId?: number;
@@ -52,8 +52,8 @@ export class TurnosService {
       .leftJoinAndSelect('pc.especialidad', 'especialidad')
       .leftJoinAndSelect('pc.centro', 'centro')
       .leftJoinAndSelect('centro.negocio', 'negocio')
-      .leftJoinAndSelect('t.estadoTurno', 'estadoTurno')
-      .where('t.fecha_baja IS NULL');
+      .leftJoinAndSelect('t.estadoTurno', 'estadoTurno');
+      // 🔹 ELIMINADO: .where('t.fecha_baja IS NULL') - Ahora muestra todos los turnos (OCUPADOS y CANCELADOS)
 
     // 🔹 FILTRO POR USUARIO (según negocios que tiene asignados)
     if (filtros.usuarioId) {
@@ -225,7 +225,7 @@ export class TurnosService {
   ): Promise<void> {
     const whereCondition: any = {
       profesionalCentroId,
-      fecha_baja: IsNull(),
+      fecha_baja: IsNull(),  // 🔹 Solo verifica turnos activos (no cancelados)
       fecha_turno: fechaTurno,
       hora_inicio: horaInicio,
     };
@@ -293,7 +293,7 @@ export class TurnosService {
 
   async update(id: number, updateTurnoDto: UpdateTurnoDto, usuarioModificador: string): Promise<Turno> {
     const turno = await this.turnoRepository.findOne({
-      where: { id, fecha_baja: IsNull() },
+      where: { id },
       relations: ['estadoTurno'],
     });
 
@@ -352,7 +352,7 @@ export class TurnosService {
         turno.canceladoAt = null;
         turno.canceladoPor = null;
         turno.motivoCancelacion = null;
-        turno.fecha_baja = null as any; // 🔹 Solución temporal para error de TypeScript
+        turno.fecha_baja = null as any;
       }
       
       if (estadoExistente.nombre === 'CANCELADO') {
@@ -377,7 +377,7 @@ export class TurnosService {
 
   async findByUsuario(usuarioId: number): Promise<Turno[]> {
     return this.turnoRepository.find({
-      where: { usuarioId, fecha_baja: IsNull() },
+      where: { usuarioId },
       relations: ['negocio', 'centro', 'profesionalCentro', 'especialidad', 'estadoTurno'],
       order: { fechaTurno: 'DESC', horaInicio: 'DESC' },
     });
@@ -385,7 +385,7 @@ export class TurnosService {
 
   async findByProfesionalCentro(profesionalCentroId: number): Promise<Turno[]> {
     return this.turnoRepository.find({
-      where: { profesionalCentroId, fecha_baja: IsNull() },
+      where: { profesionalCentroId },
       relations: ['usuario', 'negocio', 'centro', 'estadoTurno'],
       order: { fechaTurno: 'ASC', horaInicio: 'ASC' },
     });
@@ -393,7 +393,7 @@ export class TurnosService {
 
   async cancelar(id: number, motivo: string, usuarioCancelador: string): Promise<Turno> {
     const turno = await this.turnoRepository.findOne({
-      where: { id, fecha_baja: IsNull() },
+      where: { id },
       relations: ['estadoTurno'],
     });
 
