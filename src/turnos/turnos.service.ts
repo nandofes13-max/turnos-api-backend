@@ -53,7 +53,6 @@ export class TurnosService {
       .leftJoinAndSelect('pc.centro', 'centro')
       .leftJoinAndSelect('centro.negocio', 'negocio')
       .leftJoinAndSelect('t.estadoTurno', 'estadoTurno');
-      // 🔹 ELIMINADO: .where('t.fecha_baja IS NULL') - Ahora muestra todos los turnos (OCUPADOS y CANCELADOS)
 
     // 🔹 FILTRO POR USUARIO (según negocios que tiene asignados)
     if (filtros.usuarioId) {
@@ -349,25 +348,12 @@ export class TurnosService {
       turno.estadoTurno = estadoExistente;
       
       if (estadoAnterior === 'CANCELADO' && estadoExistente.nombre === 'OCUPADO') {
-        turno.canceladoAt = null;
-        turno.canceladoPor = null;
-        turno.motivoCancelacion = null;
         turno.fecha_baja = null as any;
       }
       
       if (estadoExistente.nombre === 'CANCELADO') {
         turno.fecha_baja = new Date();
       }
-    }
-
-    if (updateTurnoDto.canceladoAt) {
-      turno.canceladoAt = new Date(updateTurnoDto.canceladoAt);
-    }
-    if (updateTurnoDto.canceladoPor) {
-      turno.canceladoPor = updateTurnoDto.canceladoPor;
-    }
-    if (updateTurnoDto.motivoCancelacion) {
-      turno.motivoCancelacion = updateTurnoDto.motivoCancelacion;
     }
 
     turno.usuario_modificacion = usuarioModificador;
@@ -414,9 +400,6 @@ export class TurnosService {
 
     turno.estadoTurnoId = estadoCancelado.id;
     turno.estadoTurno = estadoCancelado;
-    turno.canceladoAt = new Date();
-    turno.canceladoPor = usuarioCancelador;
-    turno.motivoCancelacion = motivo;
     turno.fecha_baja = new Date();
     turno.usuario_modificacion = usuarioCancelador;
 
