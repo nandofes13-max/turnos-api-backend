@@ -1,8 +1,14 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, Unique, Index, Check } from 'typeorm';
 import { BaseEntityAuditable } from '../../entities/base.entity';
 import { ProfesionalCentro } from '../../profesional-centro/entities/profesional-centro.entity';
 
 @Entity('agenda_disponibilidad')
+@Unique(['profesionalCentroId', 'diaSemana', 'horaDesde', 'horaHasta'])  // 🔹 Evita bloques duplicados
+@Index(['profesionalCentroId'])                                          // 🔹 Índice para búsquedas por profesional
+@Index(['diaSemana'])                                                    // 🔹 Índice para búsquedas por día
+@Index(['fechaDesde', 'fechaHasta'])                                     // 🔹 Índice para búsquedas por rango de fechas
+@Check(`hora_hasta > hora_desde`)                                        // 🔹 Valida que hora_fin sea mayor a hora_inicio
+@Check(`duracion_turno > 0`)                                             // 🔹 Valida que la duración sea positiva
 export class AgendaDisponibilidad extends BaseEntityAuditable {
   // ❌ ELIMINAR esta línea: id: number;
   // El id ya viene de BaseEntityAuditable
@@ -26,7 +32,7 @@ export class AgendaDisponibilidad extends BaseEntityAuditable {
   bufferMinutos: number;
 
   @Column({ name: 'timezone', type: 'varchar', length: 50, nullable: true })
-timezone: string;
+  timezone: string;
 
   @Column({ name: 'fecha_desde', type: 'date' })
   fechaDesde: Date;
