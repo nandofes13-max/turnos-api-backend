@@ -352,7 +352,7 @@ export class TurnosService {
         turno.canceladoAt = null;
         turno.canceladoPor = null;
         turno.motivoCancelacion = null;
-        turno.fecha_baja = null;
+        turno.fecha_baja = null as any; // 🔹 Solución temporal para error de TypeScript
       }
       
       if (estadoExistente.nombre === 'CANCELADO') {
@@ -379,7 +379,7 @@ export class TurnosService {
     return this.turnoRepository.find({
       where: { usuarioId, fecha_baja: IsNull() },
       relations: ['negocio', 'centro', 'profesionalCentro', 'especialidad', 'estadoTurno'],
-      order: { fecha_turno: 'DESC', hora_inicio: 'DESC' },
+      order: { fechaTurno: 'DESC', horaInicio: 'DESC' },
     });
   }
 
@@ -387,7 +387,7 @@ export class TurnosService {
     return this.turnoRepository.find({
       where: { profesionalCentroId, fecha_baja: IsNull() },
       relations: ['usuario', 'negocio', 'centro', 'estadoTurno'],
-      order: { fecha_turno: 'ASC', hora_inicio: 'ASC' },
+      order: { fechaTurno: 'ASC', horaInicio: 'ASC' },
     });
   }
 
