@@ -88,15 +88,6 @@ export class Turno extends BaseEntityAuditable {
   @JoinColumn({ name: 'estado_pago_id' })
   estadoPago: NegocioEstadoPago;
 
-  @Column({ name: 'cancelado_at', type: 'timestamp', nullable: true })
-  canceladoAt: Date | null;
-
-  @Column({ name: 'cancelado_por', type: 'varchar', length: 30, nullable: true })
-  canceladoPor: string | null;
-
-  @Column({ name: 'motivo_cancelacion', type: 'text', nullable: true })
-  motivoCancelacion: string | null;
-
   @Column({ name: 'reprogramado_desde_id', type: 'bigint', nullable: true })
   reprogramadoDesdeId: number | null;
 
