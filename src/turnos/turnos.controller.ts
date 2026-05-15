@@ -25,7 +25,7 @@ export class TurnosController {
     @Query('asistio') asistio?: string,
     @Query('estadoTurnoId') estadoTurnoId?: string,
     @Query('estadoPago') estadoPago?: string,
-    @Query('pacienteSearch') pacienteSearch?: string,  // 👈 NUEVO
+    @Query('pacienteSearch') pacienteSearch?: string,
   ): Promise<Turno[]> {
     return this.turnosService.findAll({
       usuarioId: usuarioId ? parseInt(usuarioId, 10) : undefined,
@@ -40,7 +40,7 @@ export class TurnosController {
       asistio: asistio ? asistio === 'true' : undefined,
       estadoTurnoId: estadoTurnoId ? parseInt(estadoTurnoId, 10) : undefined,
       estadoPago,
-      pacienteSearch,  // 👈 NUEVO
+      pacienteSearch,
     });
   }
 
@@ -62,7 +62,23 @@ export class TurnosController {
     @Body() updateTurnoDto: UpdateTurnoDto,
     @Query('usuario') usuario: string,
   ): Promise<Turno> {
-    return this.turnosService.update(Number(id), updateTurnoDto, usuario || 'sistema');
+    console.log('========================================');
+    console.log('[TurnosController] update - INICIO');
+    console.log(`   ID: ${id}`);
+    console.log(`   Usuario: ${usuario || 'sistema'}`);
+    console.log('   Body recibido:', JSON.stringify(updateTurnoDto, null, 2));
+    console.log('========================================');
+    
+    const resultado = await this.turnosService.update(Number(id), updateTurnoDto, usuario || 'sistema');
+    
+    console.log('[TurnosController] update - RESULTADO');
+    console.log('   EstadoTurnoId:', resultado.estadoTurnoId);
+    console.log('   Asistio:', resultado.asistio);
+    console.log('   CanceladoAt:', resultado.canceladoAt);
+    console.log('   CanceladoPor:', resultado.canceladoPor);
+    console.log('========================================');
+    
+    return resultado;
   }
 
   @Put(':id/cancelar')
