@@ -95,17 +95,22 @@ export class TurnosController {
     return this.turnosService.findByProfesionalCentro(Number(profesionalCentroId));
   }
 
+  // ============================================================
+  // ENDPOINT MODIFICADO: Verificar disponibilidad (nuevos parámetros)
+  // ============================================================
   @Get('disponibilidad')
   async checkDisponibilidad(
     @Query('profesionalCentroId') profesionalCentroId: string,
-    @Query('inicio') inicio: string,
-    @Query('fin') fin: string,
+    @Query('fechaTurno') fechaTurno: string,
+    @Query('horaInicio') horaInicio: string,
+    @Query('horaFin') horaFin: string,
   ): Promise<{ disponible: boolean }> {
     try {
       await this.turnosService.validarDisponibilidad(
         Number(profesionalCentroId),
-        new Date(inicio),
-        new Date(fin),
+        new Date(fechaTurno),
+        horaInicio,
+        horaFin,
       );
       return { disponible: true };
     } catch (error) {
@@ -113,7 +118,7 @@ export class TurnosController {
     }
   }
 
-    // ============================================================
+  // ============================================================
   // NUEVO ENDPOINT: Obtener profesionales por centro y especialidad
   // ============================================================
   @Get('profesionales-por-centro-especialidad')
