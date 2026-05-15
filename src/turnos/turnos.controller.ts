@@ -74,8 +74,6 @@ export class TurnosController {
     console.log('[TurnosController] update - RESULTADO');
     console.log('   EstadoTurnoId:', resultado.estadoTurnoId);
     console.log('   Asistio:', resultado.asistio);
-    console.log('   CanceladoAt:', resultado.canceladoAt);
-    console.log('   CanceladoPor:', resultado.canceladoPor);
     console.log('========================================');
     
     return resultado;
