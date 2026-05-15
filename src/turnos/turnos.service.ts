@@ -303,6 +303,11 @@ export class TurnosService {
       throw new NotFoundException(`Turno con ID ${id} no encontrado`);
     }
 
+    // 🔹 VALIDACIÓN: No se puede modificar asistio si el turno está CANCELADO
+    if (updateTurnoDto.asistio !== undefined && turno.estadoTurno?.nombre === 'CANCELADO') {
+      throw new BadRequestException('No se puede cambiar la asistencia de un turno cancelado');
+    }
+
     if (updateTurnoDto.inicio && updateTurnoDto.fin) {
       const nuevoInicio = new Date(updateTurnoDto.inicio);
       const nuevoFin = new Date(updateTurnoDto.fin);
@@ -326,7 +331,7 @@ export class TurnosService {
     if (updateTurnoDto.asistio !== undefined) {
       turno.asistio = updateTurnoDto.asistio;
       
-      // 🔹 NUEVO: Si se marca como asistió (true), guardar fecha/hora actual
+      // 🔹 Si se marca como asistió (true), guardar fecha/hora actual
       if (turno.asistio === true) {
         turno.llegadaAt = new Date();
       } else {
@@ -352,6 +357,12 @@ export class TurnosService {
         turno.canceladoAt = null;
         turno.canceladoPor = null;
         turno.motivoCancelacion = null;
+        turno.fecha_baja = null; // 🔹 También limpiar fecha_baja al reactivar
+      }
+      
+      // 🔹 Si se cancela (cambia a CANCELADO), actualizar fecha_baja
+      if (estadoExistente.nombre === 'CANCELADO') {
+        turno.fecha_baja = new Date();
       }
     }
 
@@ -413,6 +424,7 @@ export class TurnosService {
     turno.canceladoAt = new Date();
     turno.canceladoPor = usuarioCancelador;
     turno.motivoCancelacion = motivo;
+    turno.fecha_baja = new Date(); // 🔹 Soft delete
     turno.usuario_modificacion = usuarioCancelador;
 
     return await this.turnoRepository.save(turno);
