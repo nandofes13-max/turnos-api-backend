@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, JoinColumn, Index, Check, AfterLoad } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, Index, Check, AfterLoad, Unique } from 'typeorm';
 import { BaseEntityAuditable } from '../../entities/base.entity';
 import { Negocio } from '../../negocios/entities/negocio.entity';
 import { Centro } from '../../centro/entities/centro.entity';
@@ -9,7 +9,13 @@ import { NegocioEstadoTurno } from '../../negocios-estados-turno/entities/negoci
 import { NegocioEstadoPago } from '../../negocios-estados-pago/entities/negocio-estado-pago.entity';
 
 @Entity('turnos')
-
+@Unique(['profesionalCentroId', 'fechaTurno', 'horaInicio'])  // 🔹 Un profesional no puede tener dos turnos a la misma fecha/hora
+@Unique(['usuarioId', 'fechaTurno', 'horaInicio'])            // 🔹 Un paciente no puede tener dos turnos a la misma fecha/hora
+@Index(['profesionalCentroId'])                               // 🔹 Índice para búsquedas por profesional
+@Index(['fechaTurno'])                                        // 🔹 Índice para búsquedas por fecha
+@Index(['estadoTurnoId'])                                     // 🔹 Índice para búsquedas por estado
+@Index(['usuarioId'])                                         // 🔹 Índice para búsquedas por paciente
+@Index(['centroId'])                                          // 🔹 Índice para búsquedas por centro
 @Check(`moneda IN ('ARS', 'USD', 'EUR')`)
 export class Turno extends BaseEntityAuditable {
   @Column({ name: 'negocio_id' })
