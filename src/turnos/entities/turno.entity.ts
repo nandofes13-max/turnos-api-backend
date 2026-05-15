@@ -88,9 +88,6 @@ export class Turno extends BaseEntityAuditable {
   @JoinColumn({ name: 'estado_pago_id' })
   estadoPago: NegocioEstadoPago;
 
-  @Column({ name: 'reprogramado_desde_id', type: 'bigint', nullable: true })
-  reprogramadoDesdeId: number | null;
-
   @Column({ default: false })
   asistio: boolean;
 
