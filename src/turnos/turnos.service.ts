@@ -86,12 +86,12 @@ export class TurnosService {
       queryBuilder.andWhere('negocio.id IN (:...negocioIds)', { negocioIds });
     }
 
-    // 🔹 FILTRO POR FECHAS
+    // 🔹 FILTRO POR FECHAS (usando fecha_turno)
     if (filtros.desde) {
-      queryBuilder.andWhere('t.inicio >= :desde', { desde: filtros.desde });
+      queryBuilder.andWhere('t.fecha_turno >= :desde', { desde: filtros.desde });
     }
     if (filtros.hasta) {
-      queryBuilder.andWhere('t.inicio <= :hasta', { hasta: filtros.hasta });
+      queryBuilder.andWhere('t.fecha_turno <= :hasta', { hasta: filtros.hasta });
     }
 
     // 🔹 FILTRO POR PROFESIONAL
@@ -133,7 +133,7 @@ export class TurnosService {
       );
     }
 
-    queryBuilder.orderBy('t.inicio', 'DESC');
+    queryBuilder.orderBy('t.fecha_turno', 'DESC').addOrderBy('t.hora_inicio', 'DESC');
 
     return queryBuilder.getMany();
   }
@@ -218,13 +218,16 @@ export class TurnosService {
 
   async validarDisponibilidad(
     profesionalCentroId: number,
-    inicio: Date,
-    fin: Date,
+    fechaTurno: Date,
+    horaInicio: string,
+    horaFin: string,
     excludeId?: number,
   ): Promise<void> {
     const whereCondition: any = {
       profesionalCentroId,
       fecha_baja: IsNull(),
+      fecha_turno: fechaTurno,
+      hora_inicio: horaInicio,
     };
     
     if (excludeId) {
@@ -235,28 +238,17 @@ export class TurnosService {
       where: whereCondition,
     });
 
-    for (const turno of turnosExistentes) {
-      const haySolapamiento = (inicio < turno.fin && fin > turno.inicio);
-      if (haySolapamiento) {
-        throw new BadRequestException(
-          `El horario seleccionado (${inicio.toISOString()} - ${fin.toISOString()}) ` +
-          `está ocupado para este profesional.`
-        );
-      }
+    if (turnosExistentes.length > 0) {
+      throw new BadRequestException(
+        `El horario seleccionado (${fechaTurno.toISOString().split('T')[0]} ${horaInicio}) ya está ocupado para este profesional.`
+      );
     }
   }
 
   async create(createTurnoDto: CreateTurnoDto): Promise<Turno> {
-    const inicio = new Date(createTurnoDto.inicio);
-    const fin = new Date(createTurnoDto.fin);
-
-    if (fin <= inicio) {
-      throw new BadRequestException('La fecha/hora de fin debe ser posterior a la de inicio');
-    }
-
-    const duracionCalculada = Math.round((fin.getTime() - inicio.getTime()) / 60000);
-    if (duracionCalculada !== createTurnoDto.duracionMinutos) {
-      throw new BadRequestException('La duración no coincide con el rango horario');
+    // Validar que hora_fin sea mayor que hora_inicio
+    if (createTurnoDto.horaFin <= createTurnoDto.horaInicio) {
+      throw new BadRequestException('La hora de fin debe ser posterior a la hora de inicio');
     }
 
     const usuario = await this.buscarOCrearUsuario(
@@ -267,7 +259,12 @@ export class TurnosService {
     );
 
     await this.asignarRolPaciente(usuario.id, createTurnoDto.negocioId);
-    await this.validarDisponibilidad(createTurnoDto.profesionalCentroId, inicio, fin);
+    await this.validarDisponibilidad(
+      createTurnoDto.profesionalCentroId,
+      createTurnoDto.fechaTurno,
+      createTurnoDto.horaInicio,
+      createTurnoDto.horaFin,
+    );
 
     const estadoOcupadoId = await this.obtenerEstadoOcupadoId(createTurnoDto.negocioId);
 
@@ -277,8 +274,9 @@ export class TurnosService {
     turno.profesionalCentroId = createTurnoDto.profesionalCentroId;
     turno.especialidadId = createTurnoDto.especialidadId ?? null;
     turno.usuarioId = usuario.id;
-    turno.inicio = inicio;
-    turno.fin = fin;
+    turno.fechaTurno = createTurnoDto.fechaTurno;
+    turno.horaInicio = createTurnoDto.horaInicio;
+    turno.horaFin = createTurnoDto.horaFin;
     turno.duracionMinutos = createTurnoDto.duracionMinutos;
     turno.estadoTurnoId = estadoOcupadoId;
     turno.precioReserva = createTurnoDto.precioReserva ?? null;
@@ -288,7 +286,7 @@ export class TurnosService {
     turno.usuario_alta = usuario.email || 'sistema';
 
     const turnoGuardado = await this.turnoRepository.save(turno);
-    console.log(`[TURNO CREADO] ID: ${turnoGuardado.id} - Usuario: ${usuario.email} - ${inicio.toISOString()}`);
+    console.log(`[TURNO CREADO] ID: ${turnoGuardado.id} - Usuario: ${usuario.email} - ${turnoGuardado.fechaTurno} ${turnoGuardado.horaInicio}`);
 
     return turnoGuardado;
   }
@@ -308,18 +306,18 @@ export class TurnosService {
       throw new BadRequestException('No se puede cambiar la asistencia de un turno cancelado');
     }
 
-    if (updateTurnoDto.inicio && updateTurnoDto.fin) {
-      const nuevoInicio = new Date(updateTurnoDto.inicio);
-      const nuevoFin = new Date(updateTurnoDto.fin);
-      
-      if (nuevoFin <= nuevoInicio) {
-        throw new BadRequestException('La fecha/hora de fin debe ser posterior a la de inicio');
+    // 🔹 Actualizar fecha/hora si vienen
+    if (updateTurnoDto.fechaTurno) {
+      turno.fechaTurno = updateTurnoDto.fechaTurno;
+    }
+    if (updateTurnoDto.horaInicio) {
+      turno.horaInicio = updateTurnoDto.horaInicio;
+    }
+    if (updateTurnoDto.horaFin) {
+      if (updateTurnoDto.horaFin <= turno.horaInicio) {
+        throw new BadRequestException('La hora de fin debe ser posterior a la hora de inicio');
       }
-      
-      await this.validarDisponibilidad(turno.profesionalCentroId, nuevoInicio, nuevoFin, id);
-      
-      turno.inicio = nuevoInicio;
-      turno.fin = nuevoFin;
+      turno.horaFin = updateTurnoDto.horaFin;
     }
 
     if (updateTurnoDto.duracionMinutos) turno.duracionMinutos = updateTurnoDto.duracionMinutos;
@@ -331,11 +329,9 @@ export class TurnosService {
     if (updateTurnoDto.asistio !== undefined) {
       turno.asistio = updateTurnoDto.asistio;
       
-      // 🔹 Si se marca como asistió (true), guardar fecha/hora actual
       if (turno.asistio === true) {
         turno.llegadaAt = new Date();
       } else {
-        // Si se marca como "No asistió", limpiar la fecha de llegada
         turno.llegadaAt = null;
       }
     }
@@ -352,21 +348,18 @@ export class TurnosService {
       turno.estadoTurnoId = updateTurnoDto.estadoTurnoId;
       turno.estadoTurno = estadoExistente;
       
-      // 🔹 Si se reactiva (cambia de CANCELADO a OCUPADO), limpiar campos de cancelación
       if (estadoAnterior === 'CANCELADO' && estadoExistente.nombre === 'OCUPADO') {
         turno.canceladoAt = null;
         turno.canceladoPor = null;
         turno.motivoCancelacion = null;
-        turno.fecha_baja = null; // 🔹 También limpiar fecha_baja al reactivar
+        turno.fecha_baja = null;
       }
       
-      // 🔹 Si se cancela (cambia a CANCELADO), actualizar fecha_baja
       if (estadoExistente.nombre === 'CANCELADO') {
         turno.fecha_baja = new Date();
       }
     }
 
-    // 🔹 Procesar campos de cancelación (si vienen en la petición)
     if (updateTurnoDto.canceladoAt) {
       turno.canceladoAt = new Date(updateTurnoDto.canceladoAt);
     }
@@ -386,7 +379,7 @@ export class TurnosService {
     return this.turnoRepository.find({
       where: { usuarioId, fecha_baja: IsNull() },
       relations: ['negocio', 'centro', 'profesionalCentro', 'especialidad', 'estadoTurno'],
-      order: { inicio: 'DESC' },
+      order: { fecha_turno: 'DESC', hora_inicio: 'DESC' },
     });
   }
 
@@ -394,7 +387,7 @@ export class TurnosService {
     return this.turnoRepository.find({
       where: { profesionalCentroId, fecha_baja: IsNull() },
       relations: ['usuario', 'negocio', 'centro', 'estadoTurno'],
-      order: { inicio: 'ASC' },
+      order: { fecha_turno: 'ASC', hora_inicio: 'ASC' },
     });
   }
 
@@ -424,7 +417,7 @@ export class TurnosService {
     turno.canceladoAt = new Date();
     turno.canceladoPor = usuarioCancelador;
     turno.motivoCancelacion = motivo;
-    turno.fecha_baja = new Date(); // 🔹 Soft delete
+    turno.fecha_baja = new Date();
     turno.usuario_modificacion = usuarioCancelador;
 
     return await this.turnoRepository.save(turno);
