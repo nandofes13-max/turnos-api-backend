@@ -9,7 +9,7 @@ import { NegocioEstadoTurno } from '../../negocios-estados-turno/entities/negoci
 import { NegocioEstadoPago } from '../../negocios-estados-pago/entities/negocio-estado-pago.entity';
 
 @Entity('turnos')
-@Index(['profesionalCentroId', 'inicio'])
+@Index(['profesionalCentroId', 'fecha_turno', 'hora_inicio'])
 @Check(`moneda IN ('ARS', 'USD', 'EUR')`)
 export class Turno extends BaseEntityAuditable {
   @Column({ name: 'negocio_id' })
@@ -47,13 +47,15 @@ export class Turno extends BaseEntityAuditable {
   @JoinColumn({ name: 'usuario_id' })
   usuario: Usuario;
 
-  @Column({ type: 'timestamp' })
-  @Index()
-  inicio: Date;
+  // 🔹 NUEVOS CAMPOS DE HORARIO (compatibles con agenda_disponibilidad)
+  @Column({ name: 'fecha_turno', type: 'date' })
+  fechaTurno: Date;
 
-  @Column({ type: 'timestamp' })
-  @Index()
-  fin: Date;
+  @Column({ name: 'hora_inicio', type: 'time' })
+  horaInicio: string;
+
+  @Column({ name: 'hora_fin', type: 'time' })
+  horaFin: string;
 
   @Column({ name: 'duracion_minutos', type: 'int' })
   duracionMinutos: number;
