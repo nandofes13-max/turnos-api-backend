@@ -1,15 +1,22 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { CreateTurnoDto } from './create-turno.dto';
-import { IsOptional, IsString, IsDateString, IsInt, IsIn, Min, IsBoolean, IsNumber } from 'class-validator';
+import { IsOptional, IsString, IsDateString, IsInt, IsIn, Min, IsBoolean, IsNumber, IsDate } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class UpdateTurnoDto extends PartialType(CreateTurnoDto) {
+  // ===== NUEVOS CAMPOS DE HORARIO =====
   @IsOptional()
-  @IsDateString({}, { message: 'La fecha de inicio debe ser una fecha válida (ISO)' })
-  inicio?: string;
+  @IsDate({ message: 'La fecha del turno debe ser una fecha válida' })
+  @Type(() => Date)
+  fechaTurno?: Date;
 
   @IsOptional()
-  @IsDateString({}, { message: 'La fecha de fin debe ser una fecha válida (ISO)' })
-  fin?: string;
+  @IsString({ message: 'La hora de inicio debe ser un string' })
+  horaInicio?: string;
+
+  @IsOptional()
+  @IsString({ message: 'La hora de fin debe ser un string' })
+  horaFin?: string;
 
   @IsOptional()
   @IsInt({ message: 'La duración debe ser un número entero' })
@@ -21,12 +28,12 @@ export class UpdateTurnoDto extends PartialType(CreateTurnoDto) {
   @IsInt({ message: 'El ID del estado debe ser un número entero' })
   estadoTurnoId?: number;
 
-  // 🔹 NUEVO: Campo asistio (estaba faltando)
+  // 🔹 Campo asistio
   @IsOptional()
   @IsBoolean({ message: 'asistio debe ser verdadero o falso' })
   asistio?: boolean;
 
-  // 🔹 NUEVO: Campos de auditoría para cancelación
+  // 🔹 Campos de auditoría para cancelación
   @IsOptional()
   @IsDateString({}, { message: 'La fecha de cancelación debe ser una fecha válida (ISO)' })
   canceladoAt?: string;
