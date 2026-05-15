@@ -33,19 +33,7 @@ export class UpdateTurnoDto extends PartialType(CreateTurnoDto) {
   @IsBoolean({ message: 'asistio debe ser verdadero o falso' })
   asistio?: boolean;
 
-  // 🔹 Campos de auditoría para cancelación
-  @IsOptional()
-  @IsDateString({}, { message: 'La fecha de cancelación debe ser una fecha válida (ISO)' })
-  canceladoAt?: string;
-
-  @IsOptional()
-  @IsString({ message: 'El usuario que canceló debe ser texto' })
-  canceladoPor?: string;
-
-  @IsOptional()
-  @IsString({ message: 'El motivo de cancelación debe ser texto' })
-  motivoCancelacion?: string;
-
+  // 🔹 OBSERVACIONES (se mantiene)
   @IsOptional()
   @IsString({ message: 'Las observaciones deben ser texto' })
   observaciones?: string;
