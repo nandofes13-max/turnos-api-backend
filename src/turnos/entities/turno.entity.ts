@@ -9,7 +9,7 @@ import { NegocioEstadoTurno } from '../../negocios-estados-turno/entities/negoci
 import { NegocioEstadoPago } from '../../negocios-estados-pago/entities/negocio-estado-pago.entity';
 
 @Entity('turnos')
-@Index(['profesionalCentroId', 'fecha_turno', 'hora_inicio'])
+
 @Check(`moneda IN ('ARS', 'USD', 'EUR')`)
 export class Turno extends BaseEntityAuditable {
   @Column({ name: 'negocio_id' })
