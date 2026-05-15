@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsString, IsOptional, IsBoolean, IsDateString, IsIn, Min, IsInt } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsString, IsOptional, IsBoolean, IsDateString, IsIn, Min, IsInt, IsDate } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateTurnoDto {
@@ -20,15 +20,20 @@ export class CreateTurnoDto {
   @IsOptional()
   especialidadId?: number;
 
-  // ===== FECHA Y HORA =====
+  // ===== FECHA Y HORA (NUEVA ESTRUCTURA) =====
   
-  @IsDateString({}, { message: 'La fecha de inicio debe ser una fecha válida (ISO)' })
-  @IsNotEmpty({ message: 'La fecha de inicio es obligatoria' })
-  inicio: string;
+  @IsDate({ message: 'La fecha del turno debe ser una fecha válida' })
+  @IsNotEmpty({ message: 'La fecha del turno es obligatoria' })
+  @Type(() => Date)
+  fechaTurno: Date;
 
-  @IsDateString({}, { message: 'La fecha de fin debe ser una fecha válida (ISO)' })
-  @IsNotEmpty({ message: 'La fecha de fin es obligatoria' })
-  fin: string;
+  @IsString({ message: 'La hora de inicio debe ser un string' })
+  @IsNotEmpty({ message: 'La hora de inicio es obligatoria' })
+  horaInicio: string;
+
+  @IsString({ message: 'La hora de fin debe ser un string' })
+  @IsNotEmpty({ message: 'La hora de fin es obligatoria' })
+  horaFin: string;
 
   @IsInt({ message: 'La duración debe ser un número entero' })
   @Min(1, { message: 'La duración debe ser mayor a 0 minutos' })
