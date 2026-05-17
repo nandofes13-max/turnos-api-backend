@@ -347,7 +347,8 @@ export class TurnosService {
       turno.estadoTurnoId = updateTurnoDto.estadoTurnoId;
       turno.estadoTurno = estadoExistente;
       
-      if (estadoAnterior === 'CANCELADO' && estadoExistente.nombre === 'OCUPADO') {
+      // 🔹 Si se reactiva (cambia de CANCELADO a RESERVADO, id=1), limpiar fecha_baja
+      if (estadoAnterior === 'CANCELADO' && estadoExistente.id === 1) {
         turno.fecha_baja = null as any;
       }
       
