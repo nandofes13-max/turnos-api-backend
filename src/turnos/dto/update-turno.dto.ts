@@ -33,6 +33,11 @@ export class UpdateTurnoDto extends PartialType(CreateTurnoDto) {
   @IsBoolean({ message: 'asistio debe ser verdadero o falso' })
   asistio?: boolean;
 
+  // 🔹 Campo fecha_baja (para limpiar al reactivar)
+  @IsOptional()
+  @IsDateString({}, { message: 'La fecha de baja debe ser una fecha válida (ISO)' })
+  fecha_baja?: string | null;
+
   // 🔹 OBSERVACIONES (se mantiene)
   @IsOptional()
   @IsString({ message: 'Las observaciones deben ser texto' })
