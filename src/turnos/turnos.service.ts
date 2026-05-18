@@ -9,6 +9,7 @@ import { NegocioUsuarioRol } from '../negocios-usuarios-roles/entities/negocio-u
 import { Rol } from '../roles/entities/rol.entity';
 import { NegocioEstadoTurno } from '../negocios-estados-turno/entities/negocio-estado-turno.entity';
 import { NegocioActividad } from '../negocio-actividades/entities/negocio-actividad.entity';
+import { Centro } from '../centro/entities/centro.entity'; // 🔹 Para timezone
 
 @Injectable()
 export class TurnosService {
@@ -25,6 +26,8 @@ export class TurnosService {
     private readonly estadoTurnoRepository: Repository<NegocioEstadoTurno>,
     @InjectRepository(NegocioActividad)
     private readonly negocioActividadRepository: Repository<NegocioActividad>,
+    @InjectRepository(Centro)
+    private readonly centroRepository: Repository<Centro>,
   ) {}
 
   // ============================================================
@@ -44,7 +47,7 @@ export class TurnosService {
     estadoTurnoId?: number;
     estadoPago?: string;
     pacienteSearch?: string;
-  }): Promise<Turno[]> {
+  }): Promise<any[]> {  // 🔹 Cambiado de Promise<Turno[]> a Promise<any[]> para incluir ultimoMovimiento
     const queryBuilder = this.turnoRepository.createQueryBuilder('t')
       .leftJoinAndSelect('t.usuario', 'usuario')
       .leftJoinAndSelect('t.profesionalCentro', 'pc')
@@ -134,7 +137,66 @@ export class TurnosService {
 
     queryBuilder.orderBy('t.fecha_turno', 'DESC').addOrderBy('t.hora_inicio', 'DESC');
 
-    return queryBuilder.getMany();
+    const turnos = await queryBuilder.getMany();
+    
+    // 🔹 Calcular ultimoMovimiento para cada turno
+    const turnosConMovimiento = turnos.map(turno => {
+      let ultimoMovimiento = 'Sin información';
+      let fechaMovimiento: Date | null = null;
+      let usuarioMovimiento: string | null = null;
+      let tipoMovimiento: string | null = null;
+      
+      // 🔹 Obtener la zona horaria del centro (por defecto Argentina)
+      const timezone = turno.profesionalCentro?.centro?.timezone || 'America/Argentina/Buenos_Aires';
+      
+      // Prioridad 1: BAJA (si existe)
+      if (turno.fecha_baja && turno.usuario_baja) {
+        fechaMovimiento = turno.fecha_baja;
+        usuarioMovimiento = turno.usuario_baja;
+        tipoMovimiento = 'BAJA';
+      }
+      // Prioridad 2: MODIFICACIÓN (si es diferente a la fecha de alta)
+      else if (turno.fecha_modificacion && 
+               turno.usuario_modificacion &&
+               (!turno.fecha_alta || turno.fecha_modificacion.getTime() !== turno.fecha_alta.getTime())) {
+        fechaMovimiento = turno.fecha_modificacion;
+        usuarioMovimiento = turno.usuario_modificacion;
+        tipoMovimiento = 'MODIFICACIÓN';
+      }
+      // Prioridad 3: ALTA
+      else if (turno.usuario_alta) {
+        fechaMovimiento = turno.fecha_alta;
+        usuarioMovimiento = turno.usuario_alta;
+        tipoMovimiento = 'ALTA';
+      }
+      
+      if (fechaMovimiento && usuarioMovimiento && tipoMovimiento) {
+        const fechaFormateada = this.formatearFechaEnTimezone(fechaMovimiento, timezone);
+        ultimoMovimiento = `${usuarioMovimiento} - ${tipoMovimiento} - ${fechaFormateada}`;
+      }
+      
+      return {
+        ...turno,
+        ultimoMovimiento
+      };
+    });
+    
+    return turnosConMovimiento;
+  }
+
+  // ============================================================
+  // FUNCIÓN AUXILIAR: Formatear fecha en zona horaria específica
+  // ============================================================
+  private formatearFechaEnTimezone(fecha: Date, timezone: string): string {
+    return new Date(fecha).toLocaleString('es-AR', {
+      timeZone: timezone,
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).replace(',', '');
   }
 
   // ============================================================
