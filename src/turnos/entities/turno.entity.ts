@@ -103,6 +103,41 @@ export class Turno extends BaseEntityAuditable {
   // 🔹 Campo virtual que devuelve el nombre del estado del turno
   estado: string;
 
+  // 🔹 Getter para último movimiento (con zona horaria del centro)
+  get ultimoMovimiento(): string {
+    // Obtener la zona horaria del centro
+    const timezone = this.profesionalCentro?.centro?.timezone || 'America/Argentina/Buenos_Aires';
+    
+    // Prioridad 1: BAJA
+    if (this.fecha_baja && this.usuario_baja) {
+      return `${this.usuario_baja} - BAJA - ${this.formatearFechaConTimezone(this.fecha_baja, timezone)}`;
+    }
+    // Prioridad 2: MODIFICACIÓN (si es diferente a la fecha de alta)
+    else if (this.fecha_modificacion && 
+             this.usuario_modificacion &&
+             (!this.fecha_alta || this.fecha_modificacion.getTime() !== this.fecha_alta.getTime())) {
+      return `${this.usuario_modificacion} - MODIFICACIÓN - ${this.formatearFechaConTimezone(this.fecha_modificacion, timezone)}`;
+    }
+    // Prioridad 3: ALTA
+    else if (this.usuario_alta) {
+      return `${this.usuario_alta} - ALTA - ${this.formatearFechaConTimezone(this.fecha_alta, timezone)}`;
+    }
+    return 'Sin información';
+  }
+
+  // 🔹 Método privado para formatear fecha con zona horaria específica
+  private formatearFechaConTimezone(fecha: Date, timezone: string): string {
+    return new Date(fecha).toLocaleString('es-AR', {
+      timeZone: timezone,
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).replace(',', '');
+  }
+
   @AfterLoad()
   setEstado() {
     this.estado = this.estadoTurno?.nombre || 'SIN ESTADO';
