@@ -73,19 +73,28 @@ export class TurnosService {
       queryBuilder.andWhere('negocio.id = :negocioId', { negocioId: filtros.negocioId });
     }
 
+    // ✅ CORREGIDO: Filtrar por actividadId usando las especialidades de esa actividad
     if (filtros.actividadId) {
-      const negociosConActividad = await this.negocioActividadRepository.find({
-        where: { actividadId: filtros.actividadId, fecha_baja: IsNull() },
-        select: ['negocioId'],
-      });
-      const negocioIds = negociosConActividad.map(n => n.negocioId);
-      if (negocioIds.length === 0) {
+      // Obtener las especialidades que pertenecen a esta actividad
+      const especialidadesDeActividad = await this.turnoRepository.query(
+        `SELECT ae.especialidad_id 
+         FROM actividad_especialidad ae
+         WHERE ae.actividad_id = $1 AND ae.fecha_baja IS NULL`,
+        [filtros.actividadId]
+      );
+      
+      const especialidadIds = especialidadesDeActividad.map((e: any) => e.especialidad_id);
+      
+      if (especialidadIds.length === 0) {
+        // Si la actividad no tiene especialidades, no hay turnos que mostrar
         return [];
       }
-      queryBuilder.andWhere('negocio.id IN (:...negocioIds)', { negocioIds });
+      
+      // Filtrar turnos por las especialidades de la actividad seleccionada
+      queryBuilder.andWhere('t.especialidadId IN (:...especialidadIds)', { especialidadIds });
     }
 
-    // ✅ CORREGIDO: usar fechaTurno (camelCase)
+    // Filtrar por fechas
     if (filtros.desde) {
       queryBuilder.andWhere('t.fechaTurno >= :desde', { desde: filtros.desde });
     }
@@ -125,7 +134,6 @@ export class TurnosService {
       );
     }
 
-    // ✅ CORREGIDO: usar fechaTurno y horaInicio (camelCase)
     queryBuilder.orderBy('t.fechaTurno', 'DESC').addOrderBy('t.horaInicio', 'DESC');
 
     const turnos = await queryBuilder.getMany();
@@ -182,10 +190,7 @@ export class TurnosService {
     }).replace(',', '');
   }
 
-  // ✅ CORREGIDO: usar RESERVADO con ID fijo 1
   private async obtenerEstadoReservadoId(negocioId: number): Promise<number> {
-    // Para el negocio DEMO (id=6), el estado RESERVADO tiene id=1
-    // Si en el futuro hay más negocios, se puede buscar por nombre
     return 1;
   }
 
@@ -254,7 +259,6 @@ export class TurnosService {
     }
   }
 
-  // ✅ CORREGIDO: usar camelCase en las propiedades
   async validarDisponibilidad(
     profesionalCentroId: number,
     fechaTurno: Date,
@@ -265,8 +269,8 @@ export class TurnosService {
     const whereCondition: any = {
       profesionalCentroId,
       fecha_baja: IsNull(),
-      fechaTurno: fechaTurno,      // ✅ CORREGIDO: camelCase
-      horaInicio: horaInicio,      // ✅ CORREGIDO: camelCase
+      fechaTurno: fechaTurno,
+      horaInicio: horaInicio,
     };
     
     if (excludeId) {
@@ -304,7 +308,6 @@ export class TurnosService {
       createTurnoDto.horaFin,
     );
 
-    // ✅ CORREGIDO: usar obtenerEstadoReservadoId en lugar de obtenerEstadoOcupadoId
     const estadoReservadoId = await this.obtenerEstadoReservadoId(createTurnoDto.negocioId);
 
     const turno = new Turno();
