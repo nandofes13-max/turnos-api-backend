@@ -30,9 +30,6 @@ export class TurnosService {
     private readonly centroRepository: Repository<Centro>,
   ) {}
 
-  // ============================================================
-  // LISTAR TURNOS CON FILTROS
-  // ============================================================
   async findAll(filtros: {
     usuarioId?: number;
     negocioId?: number;
@@ -73,9 +70,7 @@ export class TurnosService {
       queryBuilder.andWhere('negocio.id = :negocioId', { negocioId: filtros.negocioId });
     }
 
-    // ✅ CORREGIDO: Filtrar por actividadId usando las especialidades de esa actividad
     if (filtros.actividadId) {
-      // Obtener las especialidades que pertenecen a esta actividad
       const especialidadesDeActividad = await this.turnoRepository.query(
         `SELECT ae.especialidad_id 
          FROM actividad_especialidad ae
@@ -86,15 +81,12 @@ export class TurnosService {
       const especialidadIds = especialidadesDeActividad.map((e: any) => e.especialidad_id);
       
       if (especialidadIds.length === 0) {
-        // Si la actividad no tiene especialidades, no hay turnos que mostrar
         return [];
       }
       
-      // Filtrar turnos por las especialidades de la actividad seleccionada
       queryBuilder.andWhere('t.especialidadId IN (:...especialidadIds)', { especialidadIds });
     }
 
-    // Filtrar por fechas
     if (filtros.desde) {
       queryBuilder.andWhere('t.fechaTurno >= :desde', { desde: filtros.desde });
     }
@@ -144,7 +136,7 @@ export class TurnosService {
       let usuarioMovimiento: string | null = null;
       let tipoMovimiento: string | null = null;
       
-      const timezone = turno.profesionalCentro?.centro?.timezone || 'America/Argentina/Buenos_Aires';
+      const timezone = turno.timezone || turno.profesionalCentro?.centro?.timezone || 'America/Argentina/Buenos_Aires';
       
       if (turno.fecha_baja && turno.usuario_baja) {
         fechaMovimiento = turno.fecha_baja;
@@ -293,6 +285,15 @@ export class TurnosService {
       throw new BadRequestException('La hora de fin debe ser posterior a la hora de inicio');
     }
 
+    // ✅ Obtener el centro para guardar su timezone
+    const centro = await this.centroRepository.findOne({
+      where: { id: createTurnoDto.centroId },
+    });
+
+    if (!centro) {
+      throw new BadRequestException('El centro seleccionado no existe');
+    }
+
     const usuario = await this.buscarOCrearUsuario(
       createTurnoDto.email,
       createTurnoDto.apellido,
@@ -326,9 +327,12 @@ export class TurnosService {
     turno.canalOrigen = 'WEB';
     turno.observaciones = createTurnoDto.observaciones ?? null;
     turno.usuario_alta = usuario.email || 'sistema';
+    
+    // ✅ Guardar la zona horaria del centro en el turno
+    turno.timezone = centro.timezone || 'America/Argentina/Buenos_Aires';
 
     const turnoGuardado = await this.turnoRepository.save(turno);
-    console.log(`[TURNO CREADO] ID: ${turnoGuardado.id} - Usuario: ${usuario.email} - ${turnoGuardado.fechaTurno} ${turnoGuardado.horaInicio}`);
+    console.log(`[TURNO CREADO] ID: ${turnoGuardado.id} - Usuario: ${usuario.email} - ${turnoGuardado.fechaTurno} ${turnoGuardado.horaInicio} - Timezone: ${turnoGuardado.timezone}`);
 
     return turnoGuardado;
   }
