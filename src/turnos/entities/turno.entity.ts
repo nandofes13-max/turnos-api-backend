@@ -9,13 +9,13 @@ import { NegocioEstadoTurno } from '../../negocios-estados-turno/entities/negoci
 import { NegocioEstadoPago } from '../../negocios-estados-pago/entities/negocio-estado-pago.entity';
 
 @Entity('turnos')
-@Unique(['profesionalCentroId', 'fechaTurno', 'horaInicio'])  // 🔹 Un profesional no puede tener dos turnos a la misma fecha/hora
-@Unique(['usuarioId', 'fechaTurno', 'horaInicio'])            // 🔹 Un paciente no puede tener dos turnos a la misma fecha/hora
-@Index(['profesionalCentroId'])                               // 🔹 Índice para búsquedas por profesional
-@Index(['fechaTurno'])                                        // 🔹 Índice para búsquedas por fecha
-@Index(['estadoTurnoId'])                                     // 🔹 Índice para búsquedas por estado
-@Index(['usuarioId'])                                         // 🔹 Índice para búsquedas por paciente
-@Index(['centroId'])                                          // 🔹 Índice para búsquedas por centro
+@Unique(['profesionalCentroId', 'fechaTurno', 'horaInicio'])
+@Unique(['usuarioId', 'fechaTurno', 'horaInicio'])
+@Index(['profesionalCentroId'])
+@Index(['fechaTurno'])
+@Index(['estadoTurnoId'])
+@Index(['usuarioId'])
+@Index(['centroId'])
 @Check(`moneda IN ('ARS', 'USD', 'EUR')`)
 export class Turno extends BaseEntityAuditable {
   @Column({ name: 'negocio_id' })
@@ -53,7 +53,6 @@ export class Turno extends BaseEntityAuditable {
   @JoinColumn({ name: 'usuario_id' })
   usuario: Usuario;
 
-  // 🔹 NUEVOS CAMPOS DE HORARIO (compatibles con agenda_disponibilidad)
   @Column({ name: 'fecha_turno', type: 'date' })
   fechaTurno: Date;
 
@@ -66,7 +65,6 @@ export class Turno extends BaseEntityAuditable {
   @Column({ name: 'duracion_minutos', type: 'int' })
   duracionMinutos: number;
 
-  // 🔹 Relación con la tabla de estados de turno
   @Column({ name: 'estado_turno_id', nullable: true })
   estadoTurnoId: number | null;
 
@@ -80,7 +78,6 @@ export class Turno extends BaseEntityAuditable {
   @Column({ type: 'varchar', length: 3, default: 'ARS', nullable: true })
   moneda: string | null;
 
-  // 🔹 Relación con la tabla de estados de pago
   @Column({ name: 'estado_pago_id', nullable: true })
   estadoPagoId: number | null;
 
@@ -100,32 +97,29 @@ export class Turno extends BaseEntityAuditable {
   @Column({ type: 'text', nullable: true })
   observaciones: string | null;
 
-  // 🔹 Campo virtual que devuelve el nombre del estado del turno
+  // ✅ NUEVO: Campo zona horaria del turno
+  @Column({ name: 'timezone', length: 50, nullable: true, default: 'America/Argentina/Buenos_Aires' })
+  timezone: string;
+
   estado: string;
 
-  // 🔹 Getter para último movimiento (con zona horaria del centro)
   get ultimoMovimiento(): string {
-    // Obtener la zona horaria del centro
-    const timezone = this.profesionalCentro?.centro?.timezone || 'America/Argentina/Buenos_Aires';
+    const timezone = this.profesionalCentro?.centro?.timezone || this.timezone || 'America/Argentina/Buenos_Aires';
     
-    // Prioridad 1: BAJA
     if (this.fecha_baja && this.usuario_baja) {
       return `${this.usuario_baja} - BAJA - ${this.formatearFechaConTimezone(this.fecha_baja, timezone)}`;
     }
-    // Prioridad 2: MODIFICACIÓN (si es diferente a la fecha de alta)
     else if (this.fecha_modificacion && 
              this.usuario_modificacion &&
              (!this.fecha_alta || this.fecha_modificacion.getTime() !== this.fecha_alta.getTime())) {
       return `${this.usuario_modificacion} - MODIFICACIÓN - ${this.formatearFechaConTimezone(this.fecha_modificacion, timezone)}`;
     }
-    // Prioridad 3: ALTA
     else if (this.usuario_alta) {
       return `${this.usuario_alta} - ALTA - ${this.formatearFechaConTimezone(this.fecha_alta, timezone)}`;
     }
     return 'Sin información';
   }
 
-  // 🔹 Método privado para formatear fecha con zona horaria específica
   private formatearFechaConTimezone(fecha: Date, timezone: string): string {
     return new Date(fecha).toLocaleString('es-AR', {
       timeZone: timezone,
