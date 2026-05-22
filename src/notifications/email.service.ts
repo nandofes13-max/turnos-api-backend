@@ -5,7 +5,7 @@ import { Centro } from '../centro/entities/centro.entity';
 
 @Injectable()
 export class EmailService {
-  private apiKey: string;
+  private apiKey: string | undefined;
 
   constructor() {
     this.apiKey = process.env.KEPLARS_API_KEY;
@@ -38,6 +38,11 @@ export class EmailService {
   }
 
   async enviarEmailConfirmacion(turno: Turno, usuario: Usuario, centro: Centro): Promise<void> {
+    if (!this.apiKey) {
+      console.warn('⚠️ No se envió email de confirmación: KEPLARS_API_KEY no configurada');
+      return;
+    }
+
     const especialidadNombre = turno.profesionalCentro?.especialidad?.nombre || 'No especificada';
     const profesionalNombre = turno.profesionalCentro?.profesional?.nombre || 'No especificado';
 
@@ -108,6 +113,11 @@ export class EmailService {
   }
 
   async enviarEmailCancelacion(turno: Turno, usuario: Usuario, centro: Centro): Promise<void> {
+    if (!this.apiKey) {
+      console.warn('⚠️ No se envió email de cancelación: KEPLARS_API_KEY no configurada');
+      return;
+    }
+
     const especialidadNombre = turno.profesionalCentro?.especialidad?.nombre || 'No especificada';
     const profesionalNombre = turno.profesionalCentro?.profesional?.nombre || 'No especificado';
 
