@@ -38,6 +38,10 @@ export class EmailService {
   }
 
   async enviarEmailConfirmacion(turno: Turno, usuario: Usuario, centro: Centro): Promise<void> {
+    // Obtener especialidad desde profesionalCentro
+    const especialidadNombre = turno.profesionalCentro?.especialidad?.nombre || 'No especificada';
+    const profesionalNombre = turno.profesionalCentro?.profesional?.nombre || 'No especificado';
+
     const fechaHoraFormateada = this.formatearFecha(
       turno.fechaTurno,
       turno.horaInicio,
@@ -48,6 +52,11 @@ export class EmailService {
       ? `<strong>🔗 Videollamada:</strong> <a href="${turno.videollamadaUrl}">${turno.videollamadaUrl}</a>`
       : `<strong>📍 Dirección:</strong> ${this.formatearDireccion(centro)}`;
 
+    // ✅ WhatsApp del centro (si existe)
+    const whatsappCentro = centro.whatsapp_e164 
+      ? `<p><strong>📱 WhatsApp Centro:</strong> <a href="https://wa.me/${centro.whatsapp_e164}">${centro.whatsapp_e164}</a></p>`
+      : '';
+
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #4CAF50;">✅ Turno confirmado</h2>
@@ -55,9 +64,10 @@ export class EmailService {
         <p>Tu turno ha sido reservado con éxito. A continuación los detalles:</p>
         
         <div style="background-color: #f5f5f5; padding: 15px; border-radius: 8px; margin: 15px 0;">
-          <p><strong>👨‍⚕️ Profesional:</strong> ${turno.profesionalCentro?.profesional?.nombre || 'No especificado'}</p>
-          <p><strong>📋 Especialidad:</strong> ${turno.especialidad?.nombre || 'No especificada'}</p>
+          <p><strong>👨‍⚕️ Profesional:</strong> ${profesionalNombre}</p>
+          <p><strong>📋 Especialidad:</strong> ${especialidadNombre}</p>
           <p><strong>🏥 Centro:</strong> ${centro.nombre}</p>
+          ${whatsappCentro}
           <p><strong>📅 Fecha y hora:</strong> ${fechaHoraFormateada}</p>
           ${ubicacion}
         </div>
@@ -87,6 +97,9 @@ export class EmailService {
   }
 
   async enviarEmailCancelacion(turno: Turno, usuario: Usuario, centro: Centro): Promise<void> {
+    const especialidadNombre = turno.profesionalCentro?.especialidad?.nombre || 'No especificada';
+    const profesionalNombre = turno.profesionalCentro?.profesional?.nombre || 'No especificado';
+
     const fechaHoraFormateada = this.formatearFecha(
       turno.fechaTurno,
       turno.horaInicio,
@@ -100,8 +113,8 @@ export class EmailService {
         <p>Lamentamos informarte que tu turno ha sido <strong>CANCELADO</strong>.</p>
         
         <div style="background-color: #f5f5f5; padding: 15px; border-radius: 8px; margin: 15px 0;">
-          <p><strong>👨‍⚕️ Profesional:</strong> ${turno.profesionalCentro?.profesional?.nombre || 'No especificado'}</p>
-          <p><strong>📋 Especialidad:</strong> ${turno.especialidad?.nombre || 'No especificada'}</p>
+          <p><strong>👨‍⚕️ Profesional:</strong> ${profesionalNombre}</p>
+          <p><strong>📋 Especialidad:</strong> ${especialidadNombre}</p>
           <p><strong>🏥 Centro:</strong> ${centro.nombre}</p>
           <p><strong>📅 Fecha y hora:</strong> ${fechaHoraFormateada}</p>
         </div>
