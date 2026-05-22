@@ -1,19 +1,23 @@
 import { Injectable } from '@nestjs/common';
-import { Resend } from 'resend';
+import * as Brevo from '@getbrevo/brevo';
 import { Turno } from '../turnos/entities/turno.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Centro } from '../centro/entities/centro.entity';
 
 @Injectable()
 export class EmailService {
-  private resend: Resend;
+  private brevoApi: Brevo.TransactionalEmailsApi;
 
   constructor() {
-    const apiKey = process.env.RESEND_API_KEY;
+    const apiKey = process.env.BREVO_API_KEY;
     if (!apiKey) {
-      console.warn('⚠️ RESEND_API_KEY no configurada. Los emails no se enviarán.');
+      console.warn('⚠️ BREVO_API_KEY no configurada. Los emails no se enviarán.');
     }
-    this.resend = new Resend(apiKey || '');
+    
+    // Configurar cliente de Brevo
+    this.brevoApi = new Brevo.TransactionalEmailsApi();
+    this.brevoApi.setApiKey(Brevo.TransactionalEmailsApiApiKeys.apiKey, apiKey || '');
+    console.log('📧 Brevo API configurada correctamente');
   }
 
   private formatearFecha(fechaStr: Date, horaStr: string, timezone: string): string {
@@ -38,7 +42,6 @@ export class EmailService {
   }
 
   async enviarEmailConfirmacion(turno: Turno, usuario: Usuario, centro: Centro): Promise<void> {
-    // Obtener especialidad desde profesionalCentro
     const especialidadNombre = turno.profesionalCentro?.especialidad?.nombre || 'No especificada';
     const profesionalNombre = turno.profesionalCentro?.profesional?.nombre || 'No especificado';
 
@@ -52,7 +55,6 @@ export class EmailService {
       ? `<strong>🔗 Videollamada:</strong> <a href="${turno.videollamadaUrl}">${turno.videollamadaUrl}</a>`
       : `<strong>📍 Dirección:</strong> ${this.formatearDireccion(centro)}`;
 
-    // ✅ WhatsApp del centro (si existe)
     const whatsappCentro = centro.whatsapp_e164 
       ? `<p><strong>📱 WhatsApp Centro:</strong> <a href="https://wa.me/${centro.whatsapp_e164}">${centro.whatsapp_e164}</a></p>`
       : '';
@@ -83,12 +85,13 @@ export class EmailService {
     `;
 
     try {
-      await this.resend.emails.send({
-        from: 'Turnos PWA <onboarding@resend.dev>',
-        to: usuario.email,
-        subject: `✅ Turno confirmado - ${fechaHoraFormateada}`,
-        html,
-      });
+      const email = new Brevo.SendSmtpEmail();
+      email.to = [{ email: usuario.email, name: `${usuario.nombre} ${usuario.apellido}` }];
+      email.sender = { email: 'temporal@brevo.com', name: 'Turnos PWA' };
+      email.subject = `✅ Turno confirmado - ${fechaHoraFormateada}`;
+      email.htmlContent = html;
+
+      await this.brevoApi.sendTransacEmail(email);
       console.log(`📧 Email enviado a ${usuario.email} para turno ${turno.id}`);
     } catch (error) {
       console.error(`❌ Error enviando email a ${usuario.email}:`, error);
@@ -130,12 +133,13 @@ export class EmailService {
     `;
 
     try {
-      await this.resend.emails.send({
-        from: 'Turnos PWA <onboarding@resend.dev>',
-        to: usuario.email,
-        subject: `❌ Turno cancelado - ${fechaHoraFormateada}`,
-        html,
-      });
+      const email = new Brevo.SendSmtpEmail();
+      email.to = [{ email: usuario.email, name: `${usuario.nombre} ${usuario.apellido}` }];
+      email.sender = { email: 'temporal@brevo.com', name: 'Turnos PWA' };
+      email.subject = `❌ Turno cancelado - ${fechaHoraFormateada}`;
+      email.htmlContent = html;
+
+      await this.brevoApi.sendTransacEmail(email);
       console.log(`📧 Email de cancelación enviado a ${usuario.email} para turno ${turno.id}`);
     } catch (error) {
       console.error(`❌ Error enviando email de cancelación a ${usuario.email}:`, error);
