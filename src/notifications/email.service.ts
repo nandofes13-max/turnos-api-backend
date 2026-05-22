@@ -1,21 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import { Keplars } from 'keplars';
 import { Turno } from '../turnos/entities/turno.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Centro } from '../centro/entities/centro.entity';
 
 @Injectable()
 export class EmailService {
-  private keplarsClient: Keplars;
+  private apiKey: string;
 
   constructor() {
-    const apiKey = process.env.KEPLARS_API_KEY;
-    if (!apiKey) {
+    this.apiKey = process.env.KEPLARS_API_KEY;
+    if (!this.apiKey) {
       console.warn('⚠️ KEPLARS_API_KEY no configurada. Los emails no se enviarán.');
+    } else {
+      console.log('📧 Keplars API configurada correctamente');
     }
-    // Inicializar el cliente de Keplars con tu API Key
-    this.keplarsClient = new Keplars(apiKey);
-    console.log('📧 Keplars API configurada correctamente');
   }
 
   private formatearFecha(fechaStr: Date, horaStr: string, timezone: string): string {
@@ -83,12 +81,25 @@ export class EmailService {
     `;
 
     try {
-      await this.keplarsClient.sendEmail({
-        from: 'tucorreo@gmail.com', // El correo que autorizaste en Keplars
-        to: usuario.email,
-        subject: `✅ Turno confirmado - ${fechaHoraFormateada}`,
-        htmlContent: html,
+      const response = await fetch('https://api.keplars.com/v1/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          from: 'tucorreo@gmail.com', // Reemplazá con el email que autorizaste en Keplars
+          to: usuario.email,
+          subject: `✅ Turno confirmado - ${fechaHoraFormateada}`,
+          html: html,
+        }),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Keplars API error: ${JSON.stringify(errorData)}`);
+      }
+
       console.log(`📧 Email enviado a ${usuario.email} para turno ${turno.id}`);
     } catch (error) {
       console.error(`❌ Error enviando email a ${usuario.email}:`, error);
@@ -130,12 +141,25 @@ export class EmailService {
     `;
 
     try {
-      await this.keplarsClient.sendEmail({
-        from: 'tucorreo@gmail.com', // El correo que autorizaste en Keplars
-        to: usuario.email,
-        subject: `❌ Turno cancelado - ${fechaHoraFormateada}`,
-        htmlContent: html,
+      const response = await fetch('https://api.keplars.com/v1/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          from: 'tucorreo@gmail.com', // Reemplazá con el email que autorizaste en Keplars
+          to: usuario.email,
+          subject: `❌ Turno cancelado - ${fechaHoraFormateada}`,
+          html: html,
+        }),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Keplars API error: ${JSON.stringify(errorData)}`);
+      }
+
       console.log(`📧 Email de cancelación enviado a ${usuario.email} para turno ${turno.id}`);
     } catch (error) {
       console.error(`❌ Error enviando email de cancelación a ${usuario.email}:`, error);
