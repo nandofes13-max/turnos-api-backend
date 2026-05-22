@@ -46,11 +46,17 @@ export class TurnosController {
 
   @Post()
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
-  async create(@Body() createTurnoDto: CreateTurnoDto): Promise<{ success: boolean; turno: Turno; message: string }> {
+  async create(@Body() createTurnoDto: CreateTurnoDto): Promise<{ 
+    success: boolean; 
+    turno: Turno; 
+    videollamadaUrl?: string;
+    message: string 
+  }> {
     const turno = await this.turnosService.create(createTurnoDto);
     return {
       success: true,
       turno,
+      videollamadaUrl: turno.videollamadaUrl || undefined,
       message: `Turno reservado con éxito. Se ha enviado la confirmación a ${createTurnoDto.email}`,
     };
   }
@@ -94,7 +100,7 @@ export class TurnosController {
   }
 
   // ============================================================
-  // ENDPOINT MODIFICADO: Verificar disponibilidad (nuevos parámetros)
+  // ENDPOINT MODIFICADO: Verificar disponibilidad
   // ============================================================
   @Get('disponibilidad')
   async checkDisponibilidad(
