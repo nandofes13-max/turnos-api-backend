@@ -72,29 +72,12 @@ export class EmailService {
       </div>
     `;
 
-    const text = `
-      ✅ Turno confirmado
-      
-      Hola ${usuario.nombre} ${usuario.apellido},
-      
-      Tu turno ha sido reservado con éxito.
-      
-      Profesional: ${turno.profesionalCentro?.profesional?.nombre || 'No especificado'}
-      Especialidad: ${turno.especialidad?.nombre || 'No especificada'}
-      Centro: ${centro.nombre}
-      Fecha y hora: ${fechaHoraFormateada}
-      ${centro.es_virtual ? `Videollamada: ${turno.videollamadaUrl}` : `Dirección: ${this.formatearDireccion(centro)}`}
-      
-      Si tenés alguna duda, comunicate con el centro.
-    `;
-
     try {
       await this.resend.emails.send({
         from: 'Turnos PWA <onboarding@resend.dev>',
         to: usuario.email,
         subject: `✅ Turno confirmado - ${fechaHoraFormateada}`,
         html,
-        text,
       });
       console.log(`📧 Email enviado a ${usuario.email} para turno ${turno.id}`);
     } catch (error) {
@@ -133,28 +116,12 @@ export class EmailService {
       </div>
     `;
 
-    const text = `
-      ❌ Turno cancelado
-      
-      Hola ${usuario.nombre} ${usuario.apellido},
-      
-      Lamentamos informarte que tu turno ha sido CANCELADO.
-      
-      Profesional: ${turno.profesionalCentro?.profesional?.nombre || 'No especificado'}
-      Especialidad: ${turno.especialidad?.nombre || 'No especificada'}
-      Centro: ${centro.nombre}
-      Fecha y hora: ${fechaHoraFormateada}
-      
-      Si no solicitaste esta cancelación, comunicate con el centro.
-    `;
-
     try {
       await this.resend.emails.send({
         from: 'Turnos PWA <onboarding@resend.dev>',
         to: usuario.email,
         subject: `❌ Turno cancelado - ${fechaHoraFormateada}`,
         html,
-        text,
       });
       console.log(`📧 Email de cancelación enviado a ${usuario.email} para turno ${turno.id}`);
     } catch (error) {
