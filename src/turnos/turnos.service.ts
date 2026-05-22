@@ -283,12 +283,25 @@ export class TurnosService {
     }
   }
 
-  // ✅ Generar URL de videollamada con Jitsi
   private generarUrlVideollamada(turnoId: number, profesionalId: number): string {
     const timestamp = Date.now();
     const roomId = `Turno_${turnoId}_Prof_${profesionalId}_${timestamp}`;
-    // Parámetros para mejorar experiencia: sin pantalla de pre-unión
     return `https://meet.jit.si/${roomId}#config.prejoinPageEnabled=false`;
+  }
+
+  // ✅ Método para recargar turno con relaciones
+  private async recargarTurnoConRelaciones(id: number): Promise<Turno> {
+    return this.turnoRepository.findOne({
+      where: { id },
+      relations: [
+        'usuario',
+        'profesionalCentro',
+        'profesionalCentro.profesional',
+        'profesionalCentro.especialidad',
+        'centro',
+        'estadoTurno'
+      ],
+    });
   }
 
   async create(createTurnoDto: CreateTurnoDto): Promise<Turno> {
@@ -322,13 +335,12 @@ export class TurnosService {
 
     const estadoReservadoId = await this.obtenerEstadoReservadoId(createTurnoDto.negocioId);
 
-    // Obtener el profesionalId para la URL de videollamada
-    const profesionalCentro = await this.turnoRepository.manager
-      .createQueryBuilder()
-      .select('pc.profesionalId')
-      .from('profesional_centro', 'pc')
-      .where('pc.id = :id', { id: createTurnoDto.profesionalCentroId })
-      .getRawOne();
+    // ✅ Obtener profesionalId para URL de videollamada
+    const profesionalIdResult = await this.turnoRepository.query(
+      `SELECT profesional_id FROM profesional_centro WHERE id = $1`,
+      [createTurnoDto.profesionalCentroId]
+    );
+    const profesionalId = profesionalIdResult[0]?.profesional_id;
 
     const turno = new Turno();
     turno.negocioId = createTurnoDto.negocioId;
@@ -349,27 +361,25 @@ export class TurnosService {
     turno.timezone = centro.timezone || 'America/Argentina/Buenos_Aires';
     turno.emailEnviado = false;
 
-    // Guardar el turno para obtener el ID
     const turnoGuardado = await this.turnoRepository.save(turno);
 
     // ✅ Generar URL de videollamada (solo para centros virtuales)
-    if (centro.es_virtual && profesionalCentro?.profesionalId) {
-      turnoGuardado.videollamadaUrl = this.generarUrlVideollamada(
-        turnoGuardado.id,
-        profesionalCentro.profesionalId
-      );
+    if (centro.es_virtual && profesionalId) {
+      turnoGuardado.videollamadaUrl = this.generarUrlVideollamada(turnoGuardado.id, profesionalId);
       await this.turnoRepository.save(turnoGuardado);
     }
 
+    // ✅ Recargar turno con todas las relaciones para el email
+    const turnoConRelaciones = await this.recargarTurnoConRelaciones(turnoGuardado.id);
+
     // ✅ Enviar email de confirmación
     try {
-      await this.notificationsService.enviarEmailConfirmacion(turnoGuardado, usuario, centro);
+      await this.notificationsService.enviarEmailConfirmacion(turnoConRelaciones, usuario, centro);
       turnoGuardado.emailEnviado = true;
       await this.turnoRepository.save(turnoGuardado);
       console.log(`[EMAIL ENVIADO] Turno ID: ${turnoGuardado.id} - Email: ${usuario.email}`);
     } catch (error) {
       console.error(`[ERROR EMAIL] No se pudo enviar email para turno ${turnoGuardado.id}:`, error.message);
-      // No falla la reserva si el email falla
     }
 
     console.log(`[TURNO CREADO] ID: ${turnoGuardado.id} - Usuario: ${usuario.email} - ${turnoGuardado.fechaTurno} ${turnoGuardado.horaInicio} - Timezone: ${turnoGuardado.timezone}`);
@@ -438,10 +448,12 @@ export class TurnosService {
       if (estadoExistente.nombre === 'CANCELADO') {
         turno.fecha_baja = new Date();
         
-        // ✅ Enviar email de cancelación
+        // ✅ Recargar turno con relaciones para el email
+        const turnoConRelaciones = await this.recargarTurnoConRelaciones(id);
+        
         try {
-          await this.notificationsService.enviarEmailCancelacion(turno, turno.usuario, turno.centro);
-          console.log(`[EMAIL CANCELACION ENVIADO] Turno ID: ${turno.id} - Email: ${turno.usuario.email}`);
+          await this.notificationsService.enviarEmailCancelacion(turnoConRelaciones, turnoConRelaciones.usuario, turnoConRelaciones.centro);
+          console.log(`[EMAIL CANCELACION ENVIADO] Turno ID: ${turno.id}`);
         } catch (error) {
           console.error(`[ERROR EMAIL CANCELACION] Turno ${turno.id}:`, error.message);
         }
@@ -497,9 +509,11 @@ export class TurnosService {
 
     const turnoGuardado = await this.turnoRepository.save(turno);
 
-    // ✅ Enviar email de cancelación
+    // ✅ Recargar turno con relaciones para el email
+    const turnoConRelaciones = await this.recargarTurnoConRelaciones(id);
+
     try {
-      await this.notificationsService.enviarEmailCancelacion(turnoGuardado, turnoGuardado.usuario, turnoGuardado.centro);
+      await this.notificationsService.enviarEmailCancelacion(turnoConRelaciones, turnoConRelaciones.usuario, turnoConRelaciones.centro);
       console.log(`[EMAIL CANCELACION ENVIADO] Turno ID: ${turnoGuardado.id}`);
     } catch (error) {
       console.error(`[ERROR EMAIL CANCELACION] Turno ${turnoGuardado.id}:`, error.message);
