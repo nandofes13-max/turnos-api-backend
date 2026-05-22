@@ -8,7 +8,8 @@ import { NegocioUsuarioRol } from '../negocios-usuarios-roles/entities/negocio-u
 import { Rol } from '../roles/entities/rol.entity';
 import { NegocioEstadoTurno } from '../negocios-estados-turno/entities/negocio-estado-turno.entity';
 import { NegocioActividad } from '../negocio-actividades/entities/negocio-actividad.entity';
-import { Centro } from '../centro/entities/centro.entity';  // 🔹 AGREGAR
+import { Centro } from '../centro/entities/centro.entity';
+import { NotificationsModule } from '../notifications/notifications.module';  // ✅ Importar el módulo
 
 @Module({
   imports: [
@@ -19,9 +20,9 @@ import { Centro } from '../centro/entities/centro.entity';  // 🔹 AGREGAR
       Rol,
       NegocioEstadoTurno,
       NegocioActividad,
-      Centro,  // 🔹 AGREGAR
+      Centro,
     ]),
-    NotificationsModule,  // ✅ Agregar esta línea
+    NotificationsModule,  // ✅ Agregar a imports
   ],
   controllers: [TurnosController],
   providers: [TurnosService],
