@@ -289,9 +289,9 @@ export class TurnosService {
     return `https://meet.jit.si/${roomId}#config.prejoinPageEnabled=false`;
   }
 
-  // ✅ Método para recargar turno con relaciones
+  // ✅ Método para recargar turno con relaciones (corregido)
   private async recargarTurnoConRelaciones(id: number): Promise<Turno> {
-    return this.turnoRepository.findOne({
+    const turno = await this.turnoRepository.findOne({
       where: { id },
       relations: [
         'usuario',
@@ -302,6 +302,12 @@ export class TurnosService {
         'estadoTurno'
       ],
     });
+    
+    if (!turno) {
+      throw new NotFoundException(`Turno con ID ${id} no encontrado al recargar relaciones`);
+    }
+    
+    return turno;
   }
 
   async create(createTurnoDto: CreateTurnoDto): Promise<Turno> {
