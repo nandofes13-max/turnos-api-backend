@@ -1,23 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import * as Brevo from '@getbrevo/brevo';
 import { Turno } from '../turnos/entities/turno.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Centro } from '../centro/entities/centro.entity';
 
 @Injectable()
 export class EmailService {
-  private brevoApi: Brevo.TransactionalEmailsApi;
-
   constructor() {
-    const apiKey = process.env.BREVO_API_KEY;
+    const apiKey = process.env.MAILTRAP_API_KEY;
     if (!apiKey) {
-      console.warn('⚠️ BREVO_API_KEY no configurada. Los emails no se enviarán.');
+      console.warn('⚠️ MAILTRAP_API_KEY no configurada. Los emails no se enviarán.');
+    } else {
+      console.log('📧 Mailtrap API configurada correctamente');
     }
-    
-    // Configurar cliente de Brevo
-    this.brevoApi = new Brevo.TransactionalEmailsApi();
-    this.brevoApi.setApiKey(Brevo.TransactionalEmailsApiApiKeys.apiKey, apiKey || '');
-    console.log('📧 Brevo API configurada correctamente');
   }
 
   private formatearFecha(fechaStr: Date, horaStr: string, timezone: string): string {
@@ -84,14 +78,31 @@ export class EmailService {
       </div>
     `;
 
-    try {
-      const email = new Brevo.SendSmtpEmail();
-      email.to = [{ email: usuario.email, name: `${usuario.nombre} ${usuario.apellido}` }];
-      email.sender = { email: 'temporal@brevo.com', name: 'Turnos PWA' };
-      email.subject = `✅ Turno confirmado - ${fechaHoraFormateada}`;
-      email.htmlContent = html;
+    // ✅ Usar la API de Mailtrap
+    const mailtrapUrl = 'https://send.api.mailtrap.io/api/send';
+    const apiKey = process.env.MAILTRAP_API_KEY;
 
-      await this.brevoApi.sendTransacEmail(email);
+    try {
+      const response = await fetch(mailtrapUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Api-Token': apiKey,
+        },
+        body: JSON.stringify({
+          from: { email: 'hello@demomailtrap.com', name: 'Turnos PWA' },
+          to: [{ email: usuario.email, name: `${usuario.nombre} ${usuario.apellido}` }],
+          subject: `✅ Turno confirmado - ${fechaHoraFormateada}`,
+          html: html,
+          category: 'Confirmación de Turno',
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Mailtrap error: ${JSON.stringify(errorData)}`);
+      }
+
       console.log(`📧 Email enviado a ${usuario.email} para turno ${turno.id}`);
     } catch (error) {
       console.error(`❌ Error enviando email a ${usuario.email}:`, error);
@@ -132,14 +143,30 @@ export class EmailService {
       </div>
     `;
 
-    try {
-      const email = new Brevo.SendSmtpEmail();
-      email.to = [{ email: usuario.email, name: `${usuario.nombre} ${usuario.apellido}` }];
-      email.sender = { email: 'temporal@brevo.com', name: 'Turnos PWA' };
-      email.subject = `❌ Turno cancelado - ${fechaHoraFormateada}`;
-      email.htmlContent = html;
+    const mailtrapUrl = 'https://send.api.mailtrap.io/api/send';
+    const apiKey = process.env.MAILTRAP_API_KEY;
 
-      await this.brevoApi.sendTransacEmail(email);
+    try {
+      const response = await fetch(mailtrapUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Api-Token': apiKey,
+        },
+        body: JSON.stringify({
+          from: { email: 'hello@demomailtrap.com', name: 'Turnos PWA' },
+          to: [{ email: usuario.email, name: `${usuario.nombre} ${usuario.apellido}` }],
+          subject: `❌ Turno cancelado - ${fechaHoraFormateada}`,
+          html: html,
+          category: 'Cancelación de Turno',
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Mailtrap error: ${JSON.stringify(errorData)}`);
+      }
+
       console.log(`📧 Email de cancelación enviado a ${usuario.email} para turno ${turno.id}`);
     } catch (error) {
       console.error(`❌ Error enviando email de cancelación a ${usuario.email}:`, error);
