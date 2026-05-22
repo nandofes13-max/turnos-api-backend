@@ -291,24 +291,24 @@ export class TurnosService {
 
   // ✅ Método para recargar turno con relaciones (corregido)
   private async recargarTurnoConRelaciones(id: number): Promise<Turno> {
-    const turno = await this.turnoRepository.findOne({
-      where: { id },
-      relations: [
-        'usuario',
-        'profesionalCentro',
-        'profesionalCentro.profesional',
-        'profesionalCentro.especialidad',
-        'centro',
-        'estadoTurno'
-      ],
-    });
-    
-    if (!turno) {
-      throw new NotFoundException(`Turno con ID ${id} no encontrado al recargar relaciones`);
-    }
-    
-    return turno;
+  const turno = await this.turnoRepository.findOne({
+    where: { id },
+    relations: [
+      'usuario',
+      'profesionalCentro',
+      'profesionalCentro.profesional',
+      'profesionalCentro.especialidad',  // ✅ Especialidad desde profesionalCentro
+      'centro',
+      'estadoTurno'
+    ],
+  });
+  
+  if (!turno) {
+    throw new NotFoundException(`Turno con ID ${id} no encontrado al recargar relaciones`);
   }
+  
+  return turno;
+}
 
   async create(createTurnoDto: CreateTurnoDto): Promise<Turno> {
     if (createTurnoDto.horaFin <= createTurnoDto.horaInicio) {
