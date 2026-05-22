@@ -1,17 +1,21 @@
 import { Injectable } from '@nestjs/common';
+import { Keplars } from 'keplars';
 import { Turno } from '../turnos/entities/turno.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Centro } from '../centro/entities/centro.entity';
 
 @Injectable()
 export class EmailService {
+  private keplarsClient: Keplars;
+
   constructor() {
-    const apiKey = process.env.MAILTRAP_API_KEY;
+    const apiKey = process.env.KEPLARS_API_KEY;
     if (!apiKey) {
-      console.warn('⚠️ MAILTRAP_API_KEY no configurada. Los emails no se enviarán.');
-    } else {
-      console.log('📧 Mailtrap API configurada correctamente');
+      console.warn('⚠️ KEPLARS_API_KEY no configurada. Los emails no se enviarán.');
     }
+    // Inicializar el cliente de Keplars con tu API Key
+    this.keplarsClient = new Keplars(apiKey);
+    console.log('📧 Keplars API configurada correctamente');
   }
 
   private formatearFecha(fechaStr: Date, horaStr: string, timezone: string): string {
@@ -78,31 +82,13 @@ export class EmailService {
       </div>
     `;
 
-    // ✅ Usar la API de Mailtrap
-    const mailtrapUrl = 'https://send.api.mailtrap.io/api/send';
-    const apiKey = process.env.MAILTRAP_API_KEY;
-
     try {
-      const response = await fetch(mailtrapUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Api-Token': apiKey,
-        },
-        body: JSON.stringify({
-          from: { email: 'hello@demomailtrap.com', name: 'Turnos PWA' },
-          to: [{ email: usuario.email, name: `${usuario.nombre} ${usuario.apellido}` }],
-          subject: `✅ Turno confirmado - ${fechaHoraFormateada}`,
-          html: html,
-          category: 'Confirmación de Turno',
-        }),
+      await this.keplarsClient.sendEmail({
+        from: 'tucorreo@gmail.com', // El correo que autorizaste en Keplars
+        to: usuario.email,
+        subject: `✅ Turno confirmado - ${fechaHoraFormateada}`,
+        htmlContent: html,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Mailtrap error: ${JSON.stringify(errorData)}`);
-      }
-
       console.log(`📧 Email enviado a ${usuario.email} para turno ${turno.id}`);
     } catch (error) {
       console.error(`❌ Error enviando email a ${usuario.email}:`, error);
@@ -143,30 +129,13 @@ export class EmailService {
       </div>
     `;
 
-    const mailtrapUrl = 'https://send.api.mailtrap.io/api/send';
-    const apiKey = process.env.MAILTRAP_API_KEY;
-
     try {
-      const response = await fetch(mailtrapUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Api-Token': apiKey,
-        },
-        body: JSON.stringify({
-          from: { email: 'hello@demomailtrap.com', name: 'Turnos PWA' },
-          to: [{ email: usuario.email, name: `${usuario.nombre} ${usuario.apellido}` }],
-          subject: `❌ Turno cancelado - ${fechaHoraFormateada}`,
-          html: html,
-          category: 'Cancelación de Turno',
-        }),
+      await this.keplarsClient.sendEmail({
+        from: 'tucorreo@gmail.com', // El correo que autorizaste en Keplars
+        to: usuario.email,
+        subject: `❌ Turno cancelado - ${fechaHoraFormateada}`,
+        htmlContent: html,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Mailtrap error: ${JSON.stringify(errorData)}`);
-      }
-
       console.log(`📧 Email de cancelación enviado a ${usuario.email} para turno ${turno.id}`);
     } catch (error) {
       console.error(`❌ Error enviando email de cancelación a ${usuario.email}:`, error);
