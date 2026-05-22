@@ -101,6 +101,13 @@ export class Turno extends BaseEntityAuditable {
   @Column({ name: 'timezone', length: 50, nullable: true, default: 'America/Argentina/Buenos_Aires' })
   timezone: string;
 
+  // Agregar después de la línea 'timezone'
+@Column({ name: 'videollamada_url', type: 'varchar', length: 255, nullable: true })
+videollamadaUrl: string;
+
+@Column({ name: 'email_enviado', type: 'boolean', default: false })
+emailEnviado: boolean;
+
   estado: string;
 
   get ultimoMovimiento(): string {
