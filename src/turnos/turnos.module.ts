@@ -21,6 +21,7 @@ import { Centro } from '../centro/entities/centro.entity';  // 🔹 AGREGAR
       NegocioActividad,
       Centro,  // 🔹 AGREGAR
     ]),
+    NotificationsModule,  // ✅ Agregar esta línea
   ],
   controllers: [TurnosController],
   providers: [TurnosService],
