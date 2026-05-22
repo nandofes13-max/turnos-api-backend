@@ -95,7 +95,7 @@ export class EmailService {
         },
         body: JSON.stringify({
           to: [usuario.email], // ⚠️ Importante: Debe ser un array de strings
-          subject: `✅ Turno confirmado - ${fechaHoraFormateada}`,
+          subject: `[CONFIRMADO] Turno - ${fechaHoraFormateada}`,
           body: html, // ⚠️ Cambia de 'htmlContent' o 'html' a solo 'body'
         }),
       });
@@ -161,7 +161,7 @@ export class EmailService {
         },
         body: JSON.stringify({
           to: [usuario.email], // Array de strings
-          subject: `❌ Turno cancelado - ${fechaHoraFormateada}`,
+         subject: `[CANCELADO] Turno - ${fechaHoraFormateada}`,
           body: html, // 'body' en lugar de 'html'
         }),
       });
