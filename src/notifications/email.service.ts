@@ -86,26 +86,28 @@ export class EmailService {
     `;
 
     try {
-      const response = await fetch('https://api.keplars.com/v1/send', {
+      // 🔥 URL Y FORMATO CORREGIDOS según la documentación que me pasaste
+      const response = await fetch('https://api.keplars.com/api/v1/send-email/async', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          from: 'tucorreo@gmail.com', // Reemplazá con el email que autorizaste en Keplars
-          to: usuario.email,
+          to: [usuario.email], // ⚠️ Importante: Debe ser un array de strings
           subject: `✅ Turno confirmado - ${fechaHoraFormateada}`,
-          html: html,
+          body: html, // ⚠️ Cambia de 'htmlContent' o 'html' a solo 'body'
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error(`❌ Keplars API error (${response.status}):`, errorData);
         throw new Error(`Keplars API error: ${JSON.stringify(errorData)}`);
       }
 
-      console.log(`📧 Email enviado a ${usuario.email} para turno ${turno.id}`);
+      const data = await response.json();
+      console.log(`📧 Email enviado a ${usuario.email} para turno ${turno.id}. Respuesta:`, data);
     } catch (error) {
       console.error(`❌ Error enviando email a ${usuario.email}:`, error);
       throw error;
@@ -151,26 +153,27 @@ export class EmailService {
     `;
 
     try {
-      const response = await fetch('https://api.keplars.com/v1/send', {
+      const response = await fetch('https://api.keplars.com/api/v1/send-email/async', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          from: 'tucorreo@gmail.com', // Reemplazá con el email que autorizaste en Keplars
-          to: usuario.email,
+          to: [usuario.email], // Array de strings
           subject: `❌ Turno cancelado - ${fechaHoraFormateada}`,
-          html: html,
+          body: html, // 'body' en lugar de 'html'
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error(`❌ Keplars API error (${response.status}):`, errorData);
         throw new Error(`Keplars API error: ${JSON.stringify(errorData)}`);
       }
 
-      console.log(`📧 Email de cancelación enviado a ${usuario.email} para turno ${turno.id}`);
+      const data = await response.json();
+      console.log(`📧 Email de cancelación enviado a ${usuario.email} para turno ${turno.id}. Respuesta:`, data);
     } catch (error) {
       console.error(`❌ Error enviando email de cancelación a ${usuario.email}:`, error);
       throw error;
