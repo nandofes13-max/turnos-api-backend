@@ -6,6 +6,7 @@ import { ProfesionalEspecialidad } from '../profesional-especialidad/entities/pr
 import { Centro } from '../centro/entities/centro.entity';
 import { AgendaDisponibilidadService } from '../agenda-disponibilidad/agenda-disponibilidad.service';
 import { ProfesionalCentroService } from '../profesional-centro/profesional-centro.service';
+import { Turno } from '../turnos/entities/turno.entity'; // ✅ Agregado
 
 export interface DiaDisponible {
   fecha: string;
@@ -34,6 +35,8 @@ export class AgendaPublicaService {
     private readonly profesionalEspecialidadRepository: Repository<ProfesionalEspecialidad>,
     @InjectRepository(Centro)
     private readonly centroRepository: Repository<Centro>,
+    @InjectRepository(Turno) // ✅ Inyectar repositorio de Turnos
+    private readonly turnoRepository: Repository<Turno>,
     private readonly agendaDisponibilidadService: AgendaDisponibilidadService,
     private readonly profesionalCentroService: ProfesionalCentroService,
   ) {}
@@ -73,6 +76,24 @@ export class AgendaPublicaService {
     });
   }
 
+  // ✅ NUEVO: Obtener horarios ocupados de la tabla turnos
+  private async obtenerHorariosOcupados(
+    profesionalCentroId: number,
+    fecha: string,
+  ): Promise<string[]> {
+    const turnos = await this.turnoRepository.find({
+      where: {
+        profesionalCentroId: profesionalCentroId,
+        fechaTurno: this.fechaStrToDate(fecha),
+        fecha_baja: IsNull(), // Solo turnos activos (no cancelados)
+      },
+      select: ['horaInicio'],
+    });
+    
+    // Retornar solo las horas en formato HH:MM
+    return turnos.map(turno => turno.horaInicio.substring(0, 5));
+  }
+
   async getDiasDisponibles(
     centroId: number,
     especialidadId: number,
@@ -86,13 +107,11 @@ export class AgendaPublicaService {
       const timezone = centro?.timezone || 'America/Argentina/Buenos_Aires';
       
       const hoyStr = this.obtenerFechaActualEnTimezone(timezone);
-      // 🔹 CORRECCIÓN: Usar fechaStrToDate en lugar de new Date(hoyStr)
       const hoy = this.fechaStrToDate(hoyStr);
       
       console.log(`[DiasDisponibles] Centro ID ${centroId}, timezone: ${timezone}`);
       console.log(`[DiasDisponibles] Hoy en ${timezone}: ${hoyStr}`);
       
-      // 🔹 CORRECCIÓN: Usar fechaStrToDate en lugar de new Date(desde)
       const fechaInicio = this.fechaStrToDate(desde);
       const fechaFin = this.fechaStrToDate(hasta);
       
@@ -126,7 +145,6 @@ export class AgendaPublicaService {
 
       for (const fecha of diasEnRango) {
         const diaSemana = fecha.getDay();
-        // 🔹 CORRECCIÓN: Obtener fechaStr directamente del objeto Date (sin toISOString)
         const fechaStr = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
         let disponible = false;
 
@@ -170,7 +188,6 @@ export class AgendaPublicaService {
       });
       const timezoneCentro = centro?.timezone || 'America/Argentina/Buenos_Aires';
       
-      // Esto está bien porque necesitamos el día de la semana numérico
       const fechaObj = this.fechaStrToDate(fecha);
       const diaSemana = fechaObj.getDay();
 
@@ -192,6 +209,15 @@ export class AgendaPublicaService {
 
       if (profesionalesCentro.length === 0) {
         return [];
+      }
+
+      // ✅ Obtener horarios ocupados para todos los profesionales de una vez
+      const profesionalesIds = profesionalesCentro.map(pc => pc.id);
+      const horariosOcupadosPorProfesional: Map<number, string[]> = new Map();
+      
+      for (const pcId of profesionalesIds) {
+        const ocupados = await this.obtenerHorariosOcupados(pcId, fecha);
+        horariosOcupadosPorProfesional.set(pcId, ocupados);
       }
 
       const resultados: ProfesionalSlots[] = [];
@@ -235,14 +261,19 @@ export class AgendaPublicaService {
               const horaActual = this.obtenerHoraActual(tz);
               console.log(`[getProfesionalesSlots] ES HOY - Hora actual en ${tz}: ${horaActual}`);
               horariosDisponibles = horariosDisponibles.filter(hora => hora > horaActual);
-              console.log(`[getProfesionalesSlots] horariosDisponibles DESPUÉS del filtro:`, horariosDisponibles);
+              console.log(`[getProfesionalesSlots] horariosDisponibles DESPUÉS del filtro de hora actual:`, horariosDisponibles);
             } else {
               console.log(`[getProfesionalesSlots] NO ES HOY - Mostrando todos los slots`);
             }
 
-            console.log(`[getProfesionalesSlots] horariosDisponibles FINALES:`, horariosDisponibles);
+            // ✅ FILTRAR TURNOS OCUPADOS
+            const horariosOcupados = horariosOcupadosPorProfesional.get(pc.id) || [];
+            const horariosLibres = horariosDisponibles.filter(hora => !horariosOcupados.includes(hora));
+            
+            console.log(`[getProfesionalesSlots] Horarios ocupados (turnos activos):`, horariosOcupados);
+            console.log(`[getProfesionalesSlots] Horarios libres DESPUÉS de filtrar turnos:`, horariosLibres);
 
-            if (horariosDisponibles.length > 0) {
+            if (horariosLibres.length > 0) {
               resultados.push({
                 profesionalId: pc.profesional.id,
                 nombre: pc.profesional.nombre,
@@ -252,7 +283,7 @@ export class AgendaPublicaService {
                 centroId: centroId,
                 profesionalCentroId: pc.id,
                 descripcion: descripcion,
-                slots: horariosDisponibles,
+                slots: horariosLibres,
               });
             }
           }
