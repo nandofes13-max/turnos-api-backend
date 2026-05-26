@@ -110,11 +110,13 @@ export class TurnosController {
     @Query('horaFin') horaFin: string,
   ): Promise<{ disponible: boolean }> {
     try {
+      // ✅ Pasar null como usuarioId (este endpoint solo verifica disponibilidad del profesional)
       await this.turnosService.validarDisponibilidad(
         Number(profesionalCentroId),
         new Date(fechaTurno),
         horaInicio,
         horaFin,
+        null, // usuarioId (no aplica para esta verificación)
       );
       return { disponible: true };
     } catch (error) {
