@@ -254,31 +254,44 @@ export class TurnosService {
     }
   }
 
+  // ✅ VALIDACIÓN MEJORADA: Verifica tanto profesional como usuario
   async validarDisponibilidad(
     profesionalCentroId: number,
     fechaTurno: Date,
     horaInicio: string,
     horaFin: string,
+    usuarioId: number,
     excludeId?: number,
   ): Promise<void> {
-    const whereCondition: any = {
-      profesionalCentroId,
-      fecha_baja: IsNull(),
-      fechaTurno: fechaTurno,
-      horaInicio: horaInicio,
-    };
-    
-    if (excludeId) {
-      whereCondition.id = Not(excludeId);
-    }
-    
-    const turnosExistentes = await this.turnoRepository.find({
-      where: whereCondition,
+    // 1. Verificar si el profesional ya tiene un turno ACTIVO en ese horario
+    const turnoProfesionalActivo = await this.turnoRepository.findOne({
+      where: {
+        profesionalCentroId,
+        fechaTurno: fechaTurno,
+        horaInicio: horaInicio,
+        fecha_baja: IsNull(),
+      },
     });
 
-    if (turnosExistentes.length > 0) {
+    if (turnoProfesionalActivo) {
       throw new BadRequestException(
         `El horario seleccionado (${fechaTurno.toISOString().split('T')[0]} ${horaInicio}) ya está ocupado para este profesional.`
+      );
+    }
+
+    // 2. Verificar si el usuario ya tiene un turno ACTIVO en ese horario
+    const turnoUsuarioActivo = await this.turnoRepository.findOne({
+      where: {
+        usuarioId,
+        fechaTurno: fechaTurno,
+        horaInicio: horaInicio,
+        fecha_baja: IsNull(),
+      },
+    });
+
+    if (turnoUsuarioActivo) {
+      throw new BadRequestException(
+        `Ya tienes un turno activo para el día ${fechaTurno.toISOString().split('T')[0]} a las ${horaInicio}.`
       );
     }
   }
@@ -289,26 +302,25 @@ export class TurnosService {
     return `https://meet.jit.si/${roomId}#config.prejoinPageEnabled=false`;
   }
 
-  // ✅ Método para recargar turno con relaciones (corregido)
   private async recargarTurnoConRelaciones(id: number): Promise<Turno> {
-  const turno = await this.turnoRepository.findOne({
-    where: { id },
-    relations: [
-      'usuario',
-      'profesionalCentro',
-      'profesionalCentro.profesional',
-      'profesionalCentro.especialidad',  // ✅ Especialidad desde profesionalCentro
-      'centro',
-      'estadoTurno'
-    ],
-  });
-  
-  if (!turno) {
-    throw new NotFoundException(`Turno con ID ${id} no encontrado al recargar relaciones`);
+    const turno = await this.turnoRepository.findOne({
+      where: { id },
+      relations: [
+        'usuario',
+        'profesionalCentro',
+        'profesionalCentro.profesional',
+        'profesionalCentro.especialidad',
+        'centro',
+        'estadoTurno'
+      ],
+    });
+    
+    if (!turno) {
+      throw new NotFoundException(`Turno con ID ${id} no encontrado al recargar relaciones`);
+    }
+    
+    return turno;
   }
-  
-  return turno;
-}
 
   async create(createTurnoDto: CreateTurnoDto): Promise<Turno> {
     if (createTurnoDto.horaFin <= createTurnoDto.horaInicio) {
@@ -332,16 +344,18 @@ export class TurnosService {
     );
 
     await this.asignarRolPaciente(usuario.id, createTurnoDto.negocioId);
+    
+    // ✅ Pasar usuarioId a la validación
     await this.validarDisponibilidad(
       createTurnoDto.profesionalCentroId,
       createTurnoDto.fechaTurno,
       createTurnoDto.horaInicio,
       createTurnoDto.horaFin,
+      usuario.id, // 👈 Agregado
     );
 
     const estadoReservadoId = await this.obtenerEstadoReservadoId(createTurnoDto.negocioId);
 
-    // ✅ Obtener profesionalId para URL de videollamada
     const profesionalIdResult = await this.turnoRepository.query(
       `SELECT profesional_id FROM profesional_centro WHERE id = $1`,
       [createTurnoDto.profesionalCentroId]
@@ -369,16 +383,13 @@ export class TurnosService {
 
     const turnoGuardado = await this.turnoRepository.save(turno);
 
-    // ✅ Generar URL de videollamada (solo para centros virtuales)
     if (centro.es_virtual && profesionalId) {
       turnoGuardado.videollamadaUrl = this.generarUrlVideollamada(turnoGuardado.id, profesionalId);
       await this.turnoRepository.save(turnoGuardado);
     }
 
-    // ✅ Recargar turno con todas las relaciones para el email
     const turnoConRelaciones = await this.recargarTurnoConRelaciones(turnoGuardado.id);
 
-    // ✅ Enviar email de confirmación
     try {
       await this.notificationsService.enviarEmailConfirmacion(turnoConRelaciones, usuario, centro);
       turnoGuardado.emailEnviado = true;
@@ -454,7 +465,6 @@ export class TurnosService {
       if (estadoExistente.nombre === 'CANCELADO') {
         turno.fecha_baja = new Date();
         
-        // ✅ Recargar turno con relaciones para el email
         const turnoConRelaciones = await this.recargarTurnoConRelaciones(id);
         
         try {
@@ -515,7 +525,6 @@ export class TurnosService {
 
     const turnoGuardado = await this.turnoRepository.save(turno);
 
-    // ✅ Recargar turno con relaciones para el email
     const turnoConRelaciones = await this.recargarTurnoConRelaciones(id);
 
     try {
