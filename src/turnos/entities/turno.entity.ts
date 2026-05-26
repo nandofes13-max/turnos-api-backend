@@ -9,8 +9,9 @@ import { NegocioEstadoTurno } from '../../negocios-estados-turno/entities/negoci
 import { NegocioEstadoPago } from '../../negocios-estados-pago/entities/negocio-estado-pago.entity';
 
 @Entity('turnos')
-@Unique(['profesionalCentroId', 'fechaTurno', 'horaInicio'])
-@Unique(['usuarioId', 'fechaTurno', 'horaInicio'])
+// ✅ Cambiar nombres de las restricciones para que TypeORM no las borre
+@Unique('UQ_TURNO_PROFESIONAL_ACTIVO', ['profesionalCentroId', 'fechaTurno', 'horaInicio'])
+@Unique('UQ_TURNO_USUARIO_ACTIVO', ['usuarioId', 'fechaTurno', 'horaInicio'])
 @Index(['profesionalCentroId'])
 @Index(['fechaTurno'])
 @Index(['estadoTurnoId'])
@@ -97,16 +98,14 @@ export class Turno extends BaseEntityAuditable {
   @Column({ type: 'text', nullable: true })
   observaciones: string | null;
 
-  // ✅ NUEVO: Campo zona horaria del turno
   @Column({ name: 'timezone', length: 50, nullable: true, default: 'America/Argentina/Buenos_Aires' })
   timezone: string;
 
-  // Agregar después de la línea 'timezone'
-@Column({ name: 'videollamada_url', type: 'varchar', length: 255, nullable: true })
-videollamadaUrl: string;
+  @Column({ name: 'videollamada_url', type: 'varchar', length: 255, nullable: true })
+  videollamadaUrl: string;
 
-@Column({ name: 'email_enviado', type: 'boolean', default: false })
-emailEnviado: boolean;
+  @Column({ name: 'email_enviado', type: 'boolean', default: false })
+  emailEnviado: boolean;
 
   estado: string;
 
