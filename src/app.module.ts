@@ -20,6 +20,7 @@ import { AgendaPublicaModule } from './agenda-publica/agenda-publica.module';
 import { TurnosModule } from './turnos/turnos.module';
 import { NegociosEstadosTurnoModule } from './negocios-estados-turno/negocios-estados-turno.module';
 import { NegociosEstadosPagoModule } from './negocios-estados-pago/negocios-estados-pago.module';
+import { SolicitudesModule } from './solicitudes/solicitudes.module'; // ✅ AGREGAR
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { NegociosEstadosPagoModule } from './negocios-estados-pago/negocios-esta
     TurnosModule,
     NegociosEstadosTurnoModule,
     NegociosEstadosPagoModule,
+    SolicitudesModule, // ✅ AGREGAR
   ],
 })
 export class AppModule {}
