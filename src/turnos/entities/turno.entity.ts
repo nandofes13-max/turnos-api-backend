@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, JoinColumn, Index, Check, AfterLoad, Unique } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, Index, Check, AfterLoad } from 'typeorm';
 import { BaseEntityAuditable } from '../../entities/base.entity';
 import { Negocio } from '../../negocios/entities/negocio.entity';
 import { Centro } from '../../centro/entities/centro.entity';
@@ -9,9 +9,7 @@ import { NegocioEstadoTurno } from '../../negocios-estados-turno/entities/negoci
 import { NegocioEstadoPago } from '../../negocios-estados-pago/entities/negocio-estado-pago.entity';
 
 @Entity('turnos')
-// ✅ Cambiar nombres de las restricciones para que TypeORM no las borre
-@Unique('UQ_TURNO_PROFESIONAL_ACTIVO', ['profesionalCentroId', 'fechaTurno', 'horaInicio'])
-@Unique('UQ_TURNO_USUARIO_ACTIVO', ['usuarioId', 'fechaTurno', 'horaInicio'])
+// ✅ ÍNDICES DE BÚSQUEDA (no de unicidad)
 @Index(['profesionalCentroId'])
 @Index(['fechaTurno'])
 @Index(['estadoTurnoId'])
