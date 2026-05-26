@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Turno } from '../turnos/entities/turno.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Centro } from '../centro/entities/centro.entity';
+import { CreateSolicitudDto } from '../solicitudes/dto/create-solicitud.dto';
 
 @Injectable()
 export class EmailService {
@@ -35,6 +36,65 @@ export class EmailService {
       centro.country,
     ].filter(Boolean);
     return partes.join(', ') || 'Dirección no disponible';
+  }
+
+  // ✅ NUEVO: Enviar solicitud de nuevo servicio/actividad
+  async enviarEmailSolicitudServicio(solicitud: CreateSolicitudDto): Promise<void> {
+    if (!this.apiKey) {
+      console.warn('⚠️ No se envió email de solicitud: KEPLARS_API_KEY no configurada');
+      return;
+    }
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2196F3;">📋 Nueva solicitud de actividad/servicio</h2>
+        
+        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 8px; margin: 15px 0;">
+          <p><strong>👤 Nombre:</strong> ${solicitud.nombre} ${solicitud.apellido}</p>
+          <p><strong>📧 Email:</strong> ${solicitud.email}</p>
+          <p><strong>📱 WhatsApp:</strong> ${solicitud.whatsapp}</p>
+          <p><strong>📝 Mensaje:</strong></p>
+          <p style="background-color: white; padding: 10px; border-radius: 5px; margin-top: 5px;">
+            ${solicitud.mensaje.replace(/\n/g, '<br>')}
+          </p>
+        </div>
+        
+        <p style="color: #666; font-size: 12px; margin-top: 20px;">
+          Para gestionar esta solicitud, podés contactar al usuario directamente por email o WhatsApp.
+        </p>
+        <hr />
+        <p style="color: #999; font-size: 10px;">
+          Este es un mensaje automático enviado desde el formulario de solicitud de actividades/servicios.
+        </p>
+      </div>
+    `;
+
+    try {
+      const response = await fetch('https://api.keplars.com/api/v1/send-email/async', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          to: ['pwaturnos@gmail.com'],
+          subject: `📋 Nueva solicitud de actividad - ${solicitud.nombre} ${solicitud.apellido}`,
+          body: html,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error(`❌ Keplars API error (${response.status}):`, errorData);
+        throw new Error(`Keplars API error: ${JSON.stringify(errorData)}`);
+      }
+
+      const data = await response.json();
+      console.log(`📧 Email de solicitud enviado a pwaturnos@gmail.com`);
+    } catch (error) {
+      console.error(`❌ Error enviando email de solicitud:`, error);
+      throw error;
+    }
   }
 
   async enviarEmailConfirmacion(turno: Turno, usuario: Usuario, centro: Centro): Promise<void> {
@@ -86,7 +146,6 @@ export class EmailService {
     `;
 
     try {
-      // 🔥 URL Y FORMATO CORREGIDOS según la documentación que me pasaste
       const response = await fetch('https://api.keplars.com/api/v1/send-email/async', {
         method: 'POST',
         headers: {
@@ -94,9 +153,9 @@ export class EmailService {
           'Authorization': `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          to: [usuario.email], // ⚠️ Importante: Debe ser un array de strings
+          to: [usuario.email],
           subject: `[CONFIRMADO] Turno - ${fechaHoraFormateada}`,
-          body: html, // ⚠️ Cambia de 'htmlContent' o 'html' a solo 'body'
+          body: html,
         }),
       });
 
@@ -160,9 +219,9 @@ export class EmailService {
           'Authorization': `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          to: [usuario.email], // Array de strings
-         subject: `[CANCELADO] Turno - ${fechaHoraFormateada}`,
-          body: html, // 'body' en lugar de 'html'
+          to: [usuario.email],
+          subject: `[CANCELADO] Turno - ${fechaHoraFormateada}`,
+          body: html,
         }),
       });
 
