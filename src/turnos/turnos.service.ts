@@ -254,13 +254,13 @@ export class TurnosService {
     }
   }
 
-  // ✅ VALIDACIÓN MEJORADA: Verifica tanto profesional como usuario
+  // ✅ VALIDACIÓN MEJORADA: usuarioId es opcional
   async validarDisponibilidad(
     profesionalCentroId: number,
     fechaTurno: Date,
     horaInicio: string,
     horaFin: string,
-    usuarioId: number,
+    usuarioId?: number | null,
     excludeId?: number,
   ): Promise<void> {
     // 1. Verificar si el profesional ya tiene un turno ACTIVO en ese horario
@@ -279,20 +279,22 @@ export class TurnosService {
       );
     }
 
-    // 2. Verificar si el usuario ya tiene un turno ACTIVO en ese horario
-    const turnoUsuarioActivo = await this.turnoRepository.findOne({
-      where: {
-        usuarioId,
-        fechaTurno: fechaTurno,
-        horaInicio: horaInicio,
-        fecha_baja: IsNull(),
-      },
-    });
+    // 2. Verificar si el usuario ya tiene un turno ACTIVO en ese horario (solo si se proporciona usuarioId)
+    if (usuarioId) {
+      const turnoUsuarioActivo = await this.turnoRepository.findOne({
+        where: {
+          usuarioId,
+          fechaTurno: fechaTurno,
+          horaInicio: horaInicio,
+          fecha_baja: IsNull(),
+        },
+      });
 
-    if (turnoUsuarioActivo) {
-      throw new BadRequestException(
-        `Ya tienes un turno activo para el día ${fechaTurno.toISOString().split('T')[0]} a las ${horaInicio}.`
-      );
+      if (turnoUsuarioActivo) {
+        throw new BadRequestException(
+          `Ya tienes un turno activo para el día ${fechaTurno.toISOString().split('T')[0]} a las ${horaInicio}.`
+        );
+      }
     }
   }
 
@@ -345,13 +347,12 @@ export class TurnosService {
 
     await this.asignarRolPaciente(usuario.id, createTurnoDto.negocioId);
     
-    // ✅ Pasar usuarioId a la validación
     await this.validarDisponibilidad(
       createTurnoDto.profesionalCentroId,
       createTurnoDto.fechaTurno,
       createTurnoDto.horaInicio,
       createTurnoDto.horaFin,
-      usuario.id, // 👈 Agregado
+      usuario.id, // Pasamos el usuarioId
     );
 
     const estadoReservadoId = await this.obtenerEstadoReservadoId(createTurnoDto.negocioId);
