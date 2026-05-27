@@ -132,7 +132,8 @@ export class UsuariosService {
       // Si existe, actualizar datos
       usuarioExistente.apellido = createUsuarioDto.apellido.toUpperCase();
       usuarioExistente.nombre = createUsuarioDto.nombre.toUpperCase();
-      usuarioExistente.telefono = createUsuarioDto.telefono;
+      // ✅ CORREGIDO: manejar telefono undefined
+      usuarioExistente.telefono = createUsuarioDto.telefono ?? '';
       // Si estaba dado de baja, reactivar
       if (usuarioExistente.fecha_baja) {
         usuarioExistente.fecha_baja = null as any;
