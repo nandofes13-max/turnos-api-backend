@@ -254,7 +254,6 @@ export class TurnosService {
     }
   }
 
-  // ✅ VALIDACIÓN MEJORADA: usuarioId es opcional
   async validarDisponibilidad(
     profesionalCentroId: number,
     fechaTurno: Date,
@@ -263,7 +262,6 @@ export class TurnosService {
     usuarioId?: number | null,
     excludeId?: number,
   ): Promise<void> {
-    // 1. Verificar si el profesional ya tiene un turno ACTIVO en ese horario
     const turnoProfesionalActivo = await this.turnoRepository.findOne({
       where: {
         profesionalCentroId,
@@ -279,7 +277,6 @@ export class TurnosService {
       );
     }
 
-    // 2. Verificar si el usuario ya tiene un turno ACTIVO en ese horario (solo si se proporciona usuarioId)
     if (usuarioId) {
       const turnoUsuarioActivo = await this.turnoRepository.findOne({
         where: {
@@ -298,10 +295,11 @@ export class TurnosService {
     }
   }
 
+  // ✅ URL CORREGIDA: cámara y micrófono habilitados por defecto
   private generarUrlVideollamada(turnoId: number, profesionalId: number): string {
     const timestamp = Date.now();
     const roomId = `Turno_${turnoId}_Prof_${profesionalId}_${timestamp}`;
-    return `https://meet.jit.si/${roomId}#config.prejoinPageEnabled=false`;
+    return `https://meet.jit.si/${roomId}#config.startWithVideoMuted=false&config.startWithAudioMuted=false&config.prejoinPageEnabled=false`;
   }
 
   private async recargarTurnoConRelaciones(id: number): Promise<Turno> {
@@ -352,7 +350,7 @@ export class TurnosService {
       createTurnoDto.fechaTurno,
       createTurnoDto.horaInicio,
       createTurnoDto.horaFin,
-      usuario.id, // Pasamos el usuarioId
+      usuario.id,
     );
 
     const estadoReservadoId = await this.obtenerEstadoReservadoId(createTurnoDto.negocioId);
