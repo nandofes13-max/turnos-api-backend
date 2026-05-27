@@ -33,10 +33,16 @@ export class UsuariosController {
     return this.agregarUltimoMovimiento(usuario);
   }
 
+  // ✅ NUEVO: Crear o actualizar usuario (upsert)
+  @Post('upsert')
+  async upsert(@Body() createUsuarioDto: CreateUsuarioDto): Promise<any> {
+    const usuario = await this.usuariosService.upsert(createUsuarioDto, 'demo');
+    return this.agregarUltimoMovimiento(usuario);
+  }
+
   // Crear nuevo usuario
   @Post()
   async create(@Body() createUsuarioDto: CreateUsuarioDto): Promise<any> {
-    // Para demo, usuario por defecto "demo"
     const usuario = await this.usuariosService.create(createUsuarioDto, 'demo');
     return this.agregarUltimoMovimiento(usuario);
   }
