@@ -34,12 +34,10 @@ export class UsuariosService {
   private validarDominioConocido(email: string): { valido: boolean; sugerencia?: string } {
     const dominio = email.split('@')[1];
     
-    // Si el dominio está en la lista de conocidos, es válido
     if (DOMINIOS_VALIDOS.includes(dominio)) {
       return { valido: true };
     }
     
-    // Detectar errores comunes en Gmail
     if (dominio.startsWith('gmail.')) {
       return { 
         valido: false, 
@@ -47,7 +45,6 @@ export class UsuariosService {
       };
     }
     
-    // Detectar gnail → gmail
     if (dominio === 'gnail.com' || dominio === 'gmai.com' || dominio === 'gmal.com') {
       return { 
         valido: false, 
@@ -55,7 +52,6 @@ export class UsuariosService {
       };
     }
     
-    // Detectar hotmal / hotmil → hotmail
     if (dominio.includes('hotmail') && dominio !== 'hotmail.com' && !dominio.endsWith('.com')) {
       return { 
         valido: false, 
@@ -63,9 +59,8 @@ export class UsuariosService {
       };
     }
     
-    // Detectar yahoo errores comunes
     if (dominio === 'yahooo.com' || dominio === 'yahoo.com.ar' || dominio === 'yahoo.com') {
-      return { valido: true }; // estos sí son válidos
+      return { valido: true };
     }
     if (dominio.startsWith('yahoo.') && dominio !== 'yahoo.com') {
       return { 
@@ -74,7 +69,6 @@ export class UsuariosService {
       };
     }
     
-    // Detectar outlook errores
     if (dominio === 'outlook.com' || dominio === 'outlook.com.ar' || dominio === 'outlook.com.mx') {
       return { valido: true };
     }
@@ -85,7 +79,6 @@ export class UsuariosService {
       };
     }
     
-    // Si el dominio tiene MX pero no está en lista, lo aceptamos pero con advertencia
     return { 
       valido: true, 
       sugerencia: 'El dominio es válido pero poco común. Verificá que sea correcto.' 
@@ -113,15 +106,15 @@ export class UsuariosService {
     return this.usuariosRepository.findOneBy({ email: email.toLowerCase() });
   }
 
-  // Crear usuario con auditoría
-  async create(createUsuarioDto: CreateUsuarioDto, usuario?: string): Promise<Usuario> {
+  // ✅ NUEVO: Crear o actualizar usuario (upsert)
+  async upsert(createUsuarioDto: CreateUsuarioDto, usuario?: string): Promise<Usuario> {
     // Validar MX records del dominio
     const mxValido = await this.validarMX(createUsuarioDto.email);
     if (!mxValido) {
       throw new BadRequestException('El dominio del email no existe o no puede recibir correos');
     }
 
-    // Validar dominio conocido y obtener sugerencia
+    // Validar dominio conocido
     const dominioValido = this.validarDominioConocido(createUsuarioDto.email);
     if (!dominioValido.valido) {
       throw new BadRequestException(dominioValido.sugerencia || 'El dominio del email no es válido');
@@ -129,8 +122,52 @@ export class UsuariosService {
 
     // Convertir email a minúsculas
     const emailLower = createUsuarioDto.email.toLowerCase();
+
+    // Buscar si ya existe un usuario con ese email (activo o inactivo)
+    let usuarioExistente = await this.usuariosRepository.findOneBy({ 
+      email: emailLower,
+    });
+
+    if (usuarioExistente) {
+      // Si existe, actualizar datos
+      usuarioExistente.apellido = createUsuarioDto.apellido.toUpperCase();
+      usuarioExistente.nombre = createUsuarioDto.nombre.toUpperCase();
+      usuarioExistente.telefono = createUsuarioDto.telefono;
+      // Si estaba dado de baja, reactivar
+      if (usuarioExistente.fecha_baja) {
+        usuarioExistente.fecha_baja = null as any;
+        usuarioExistente.usuario_baja = null as any;
+      }
+      usuarioExistente.usuario_modificacion = usuario || 'demo';
+      return this.usuariosRepository.save(usuarioExistente);
+    }
+
+    // Si no existe, crear nuevo
+    const nuevoUsuario = this.usuariosRepository.create({
+      ...createUsuarioDto,
+      email: emailLower,
+      apellido: createUsuarioDto.apellido.toUpperCase(),
+      nombre: createUsuarioDto.nombre.toUpperCase(),
+      usuario_alta: usuario || 'demo',
+    });
+
+    return this.usuariosRepository.save(nuevoUsuario);
+  }
+
+  // Crear usuario con auditoría
+  async create(createUsuarioDto: CreateUsuarioDto, usuario?: string): Promise<Usuario> {
+    const mxValido = await this.validarMX(createUsuarioDto.email);
+    if (!mxValido) {
+      throw new BadRequestException('El dominio del email no existe o no puede recibir correos');
+    }
+
+    const dominioValido = this.validarDominioConocido(createUsuarioDto.email);
+    if (!dominioValido.valido) {
+      throw new BadRequestException(dominioValido.sugerencia || 'El dominio del email no es válido');
+    }
+
+    const emailLower = createUsuarioDto.email.toLowerCase();
     
-    // Verificar si ya existe un usuario activo con ese email
     const existente = await this.usuariosRepository.findOneBy({ 
       email: emailLower,
       fecha_baja: IsNull()
@@ -155,7 +192,6 @@ export class UsuariosService {
   async update(id: number, updateUsuarioDto: UpdateUsuarioDto, usuario?: string): Promise<Usuario> {
     const usuarioExistente = await this.findOne(id);
 
-    // Si se actualiza el email, validar MX y dominio
     if (updateUsuarioDto.email) {
       const mxValido = await this.validarMX(updateUsuarioDto.email);
       if (!mxValido) {
@@ -170,7 +206,6 @@ export class UsuariosService {
       updateUsuarioDto.email = updateUsuarioDto.email.toLowerCase();
     }
 
-    // Si se actualiza apellido o nombre, pasarlos a mayúsculas
     if (updateUsuarioDto.apellido) {
       updateUsuarioDto.apellido = updateUsuarioDto.apellido.toUpperCase();
     }
