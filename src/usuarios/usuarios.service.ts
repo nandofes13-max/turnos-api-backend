@@ -1,11 +1,13 @@
 // src/usuarios/usuarios.service.ts
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { Usuario } from './entities/usuario.entity';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { DOMINIOS_VALIDOS } from './constants/dominios-email';
+import { NegocioUsuarioRol } from '../negocios-usuarios-roles/entities/negocio-usuario-rol.entity';
+import { Rol } from '../roles/entities/rol.entity';
 import * as dns from 'dns';
 import { promisify } from 'util';
 
@@ -16,6 +18,10 @@ export class UsuariosService {
   constructor(
     @InjectRepository(Usuario)
     private readonly usuariosRepository: Repository<Usuario>,
+    @InjectRepository(NegocioUsuarioRol)
+    private readonly negocioUsuarioRolRepository: Repository<NegocioUsuarioRol>,
+    @InjectRepository(Rol)
+    private readonly rolRepository: Repository<Rol>,
   ) {}
 
   // ===== VALIDACIÓN MX =====
@@ -85,6 +91,38 @@ export class UsuariosService {
     };
   }
 
+  // ===== ASIGNAR ROL PACIENTE (negocio DEMO) =====
+  private async asignarRolPaciente(usuarioId: number): Promise<void> {
+    const negocioId = 6; // Negocio DEMO
+    
+    const rolPaciente = await this.rolRepository.findOne({
+      where: { nombre: 'PACIENTE', fecha_baja: IsNull() },
+    });
+
+    if (!rolPaciente) {
+      throw new BadRequestException('El rol PACIENTE no existe en el sistema');
+    }
+
+    const existeRelacion = await this.negocioUsuarioRolRepository.findOne({
+      where: {
+        usuarioId,
+        negocioId,
+        rolId: rolPaciente.id,
+        fecha_baja: IsNull(),
+      },
+    });
+
+    if (!existeRelacion) {
+      const nuevaRelacion = this.negocioUsuarioRolRepository.create({
+        usuarioId,
+        negocioId,
+        rolId: rolPaciente.id,
+        usuario_alta: 'sistema',
+      });
+      await this.negocioUsuarioRolRepository.save(nuevaRelacion);
+    }
+  }
+
   // Obtener todos los usuarios
   async findAll(): Promise<Usuario[]> {
     return this.usuariosRepository.find();
@@ -106,7 +144,7 @@ export class UsuariosService {
     return this.usuariosRepository.findOneBy({ email: email.toLowerCase() });
   }
 
-  // ✅ NUEVO: Crear o actualizar usuario (upsert)
+  // ✅ NUEVO: Crear o actualizar usuario (upsert) con asignación de rol PACIENTE
   async upsert(createUsuarioDto: CreateUsuarioDto, usuario?: string): Promise<Usuario> {
     // Validar MX records del dominio
     const mxValido = await this.validarMX(createUsuarioDto.email);
@@ -132,7 +170,6 @@ export class UsuariosService {
       // Si existe, actualizar datos
       usuarioExistente.apellido = createUsuarioDto.apellido.toUpperCase();
       usuarioExistente.nombre = createUsuarioDto.nombre.toUpperCase();
-      // ✅ CORREGIDO: manejar telefono undefined
       usuarioExistente.telefono = createUsuarioDto.telefono ?? '';
       // Si estaba dado de baja, reactivar
       if (usuarioExistente.fecha_baja) {
@@ -140,7 +177,12 @@ export class UsuariosService {
         usuarioExistente.usuario_baja = null as any;
       }
       usuarioExistente.usuario_modificacion = usuario || 'demo';
-      return this.usuariosRepository.save(usuarioExistente);
+      await this.usuariosRepository.save(usuarioExistente);
+      
+      // ✅ Asignar rol PACIENTE si no lo tiene
+      await this.asignarRolPaciente(usuarioExistente.id);
+      
+      return usuarioExistente;
     }
 
     // Si no existe, crear nuevo
@@ -152,7 +194,12 @@ export class UsuariosService {
       usuario_alta: usuario || 'demo',
     });
 
-    return this.usuariosRepository.save(nuevoUsuario);
+    const usuarioGuardado = await this.usuariosRepository.save(nuevoUsuario);
+    
+    // ✅ Asignar rol PACIENTE al nuevo usuario
+    await this.asignarRolPaciente(usuarioGuardado.id);
+    
+    return usuarioGuardado;
   }
 
   // Crear usuario con auditoría
@@ -186,7 +233,12 @@ export class UsuariosService {
       usuario_alta: usuario || 'demo',
     });
 
-    return this.usuariosRepository.save(usuarioEntity);
+    const usuarioGuardado = await this.usuariosRepository.save(usuarioEntity);
+    
+    // ✅ Asignar rol PACIENTE
+    await this.asignarRolPaciente(usuarioGuardado.id);
+    
+    return usuarioGuardado;
   }
 
   // Actualizar usuario con auditoría
