@@ -38,8 +38,8 @@ export class ActividadEspecialidadController {
   }
 
   // ============================================================
-  // NUEVO ENDPOINT: Obtener especialidades por negocio y actividad
-  // (Usa @Param como el endpoint que funciona)
+  // ENDPOINT MODIFICADO: Obtener especialidades por negocio y actividad
+  // Ahora usa el método optimizado que filtra por agenda_disponibilidad
   // ============================================================
   @Get('especialidades-por-negocio-actividad/:negocioId/:actividadId')
   async getEspecialidadesPorNegocioYActividad(
@@ -47,7 +47,8 @@ export class ActividadEspecialidadController {
     @Param('actividadId') actividadId: string,
   ): Promise<any[]> {
     console.log(`[Controller] especialidades-por-negocio-actividad - negocioId: ${negocioId}, actividadId: ${actividadId}`);
-    return this.service.findEspecialidadesPorNegocioYActividadSimple(
+    // ✅ Usar el método optimizado (con agenda_disponibilidad)
+    return this.service.findEspecialidadesPorNegocioYActividad(
       Number(negocioId),
       Number(actividadId),
     );
