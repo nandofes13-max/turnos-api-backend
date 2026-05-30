@@ -6,7 +6,7 @@ import { ProfesionalEspecialidad } from '../profesional-especialidad/entities/pr
 import { Centro } from '../centro/entities/centro.entity';
 import { AgendaDisponibilidadService } from '../agenda-disponibilidad/agenda-disponibilidad.service';
 import { ProfesionalCentroService } from '../profesional-centro/profesional-centro.service';
-import { Turno } from '../turnos/entities/turno.entity'; // ✅ Agregado
+import { Turno } from '../turnos/entities/turno.entity';
 
 export interface DiaDisponible {
   fecha: string;
@@ -35,16 +35,14 @@ export class AgendaPublicaService {
     private readonly profesionalEspecialidadRepository: Repository<ProfesionalEspecialidad>,
     @InjectRepository(Centro)
     private readonly centroRepository: Repository<Centro>,
-    @InjectRepository(Turno) // ✅ Inyectar repositorio de Turnos
+    @InjectRepository(Turno)
     private readonly turnoRepository: Repository<Turno>,
     private readonly agendaDisponibilidadService: AgendaDisponibilidadService,
     private readonly profesionalCentroService: ProfesionalCentroService,
   ) {}
 
-  // ===== FUNCIÓN AUXILIAR: Convertir string YYYY-MM-DD a Date sin zona horaria =====
   private fechaStrToDate(fechaStr: string): Date {
     const [year, month, day] = fechaStr.split('-').map(Number);
-    // Usar constructor local (año, mes, día) → evita UTC
     return new Date(year, month - 1, day);
   }
 
@@ -76,7 +74,6 @@ export class AgendaPublicaService {
     });
   }
 
-  // ✅ NUEVO: Obtener horarios ocupados de la tabla turnos
   private async obtenerHorariosOcupados(
     profesionalCentroId: number,
     fecha: string,
@@ -85,13 +82,34 @@ export class AgendaPublicaService {
       where: {
         profesionalCentroId: profesionalCentroId,
         fechaTurno: this.fechaStrToDate(fecha),
-        fecha_baja: IsNull(), // Solo turnos activos (no cancelados)
+        fecha_baja: IsNull(),
       },
       select: ['horaInicio'],
     });
     
-    // Retornar solo las horas en formato HH:MM
     return turnos.map(turno => turno.horaInicio.substring(0, 5));
+  }
+
+  // ✅ NUEVO MÉTODO: Obtener especialidades por negocio usando agenda_disponibilidad
+  async getEspecialidadesPorNegocio(negocioId: number): Promise<any[]> {
+    const sql = `
+      SELECT DISTINCT 
+        e.id, 
+        e.nombre
+      FROM agenda_disponibilidad ad
+      JOIN profesional_centro pc ON pc.id = ad.profesional_centro_id
+      JOIN centro c ON c.id = pc.centro_id
+      JOIN especialidad e ON e.id = pc.especialidad_id
+      WHERE c.negocio_id = $1
+        AND ad.fecha_baja IS NULL
+        AND pc.fecha_baja IS NULL
+        AND c.fecha_baja IS NULL
+      ORDER BY e.nombre
+    `;
+    
+    const result = await this.profesionalCentroRepository.query(sql, [negocioId]);
+    console.log(`[getEspecialidadesPorNegocio] Negocio ${negocioId}: ${result.length} especialidades encontradas`);
+    return result;
   }
 
   async getDiasDisponibles(
@@ -211,7 +229,6 @@ export class AgendaPublicaService {
         return [];
       }
 
-      // ✅ Obtener horarios ocupados para todos los profesionales de una vez
       const profesionalesIds = profesionalesCentro.map(pc => pc.id);
       const horariosOcupadosPorProfesional: Map<number, string[]> = new Map();
       
@@ -266,7 +283,6 @@ export class AgendaPublicaService {
               console.log(`[getProfesionalesSlots] NO ES HOY - Mostrando todos los slots`);
             }
 
-            // ✅ FILTRAR TURNOS OCUPADOS
             const horariosOcupados = horariosOcupadosPorProfesional.get(pc.id) || [];
             const horariosLibres = horariosDisponibles.filter(hora => !horariosOcupados.includes(hora));
             
