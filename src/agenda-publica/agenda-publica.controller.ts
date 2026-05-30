@@ -40,4 +40,15 @@ export class AgendaPublicaController {
       fecha,
     );
   }
+
+  // ============================================================
+  // ENDPOINT 3: Obtener especialidades por negocio (usando agenda_disponibilidad)
+  // ============================================================
+  @Get('especialidades-por-negocio')
+  async getEspecialidadesPorNegocio(
+    @Query('negocioId') negocioId: string,
+  ): Promise<any[]> {
+    console.log(`[AgendaPublica] especialidades-por-negocio - negocioId: ${negocioId}`);
+    return this.service.getEspecialidadesPorNegocio(Number(negocioId));
+  }
 }
