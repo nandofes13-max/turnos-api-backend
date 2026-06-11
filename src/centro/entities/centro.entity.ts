@@ -24,7 +24,7 @@ export class Centro extends BaseEntityAuditable {
   @Column({ length: 15, nullable: false })
   national_number: string;
 
-  @Column({ length: 16, unique: true, nullable: false })
+  @Column({ length: 16, nullable: false })
   whatsapp_e164: string;
 
   // Domicilio estructurado (nullable para centros virtuales)
