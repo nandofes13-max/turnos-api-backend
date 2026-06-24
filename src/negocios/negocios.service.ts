@@ -7,6 +7,7 @@ import { CreateNegocioDto } from './dto/create-negocio.dto';
 import { UpdateNegocioDto } from './dto/update-negocio.dto';
 import { parsePhoneNumber } from 'libphonenumber-js';
 import { CentroService } from '../centro/centro.service';
+import { randomBytes } from 'crypto';
 
 @Injectable()
 export class NegociosService {
@@ -19,7 +20,7 @@ export class NegociosService {
 
   // ===== OBTENER TIMEZONE DESDE COORDENADAS (TimezoneDB) =====
   private async obtenerTimezoneDesdeCoordenadas(lat: number, lng: number): Promise<string> {
-    const API_KEY = 'DAPTMA97YA6B';  // Tu API key de TimezoneDB
+    const API_KEY = 'DAPTMA97YA6B';
     
     try {
       const url = `https://api.timezonedb.com/v2.1/get-time-zone?key=${API_KEY}&format=json&by=position&lat=${lat}&lng=${lng}`;
@@ -92,7 +93,7 @@ export class NegociosService {
     return true;
   }
 
-  // ===== FUNCIÓN PARA GENERAR URL ÚNICA =====
+  // ===== FUNCIÓN PARA GENERAR URL ÚNICA (pública) =====
   private async generarUrlUnica(nombre: string): Promise<string> {
     let baseUrl = nombre
       .toLowerCase()
@@ -121,6 +122,15 @@ export class NegociosService {
     return url;
   }
 
+  // 👈 NUEVO: FUNCIÓN PARA GENERAR URL DE GESTIÓN ÚNICA
+  private async generarUrlGestionUnica(id: number): Promise<string> {
+    // Generar un hash aleatorio de 8 caracteres
+    const hash = randomBytes(4).toString('hex');
+    // La URL de gestión es fija: gestion-turnos-[hash]
+    // El hash hace que sea única e impredecible
+    return `gestion-turnos-${hash}`;
+  }
+
   async findAll(): Promise<Negocio[]> {
     return this.negociosRepository.find();
   }
@@ -142,6 +152,7 @@ export class NegociosService {
     });
   }
 
+  // 👈 MODIFICADO: Crear negocio con urlGestion
   async create(createNegocioDto: CreateNegocioDto, usuario?: string): Promise<Negocio> {
     const whatsappE164 = this.validarWhatsApp(
       createNegocioDto.country_code,
@@ -177,7 +188,14 @@ export class NegociosService {
       usuario_alta: usuario || 'demo',
     });
 
-    return this.negociosRepository.save(negocioEntity);
+    const negocioGuardado = await this.negociosRepository.save(negocioEntity);
+
+    // 👈 Generar la URL de gestión basada en el ID del negocio
+    const urlGestion = await this.generarUrlGestionUnica(negocioGuardado.id);
+    negocioGuardado.urlGestion = urlGestion;
+    await this.negociosRepository.save(negocioGuardado);
+
+    return negocioGuardado;
   }
 
   async update(id: number, updateNegocioDto: UpdateNegocioDto, usuario?: string): Promise<Negocio> {
@@ -240,18 +258,15 @@ export class NegociosService {
   async softDelete(id: number, usuario?: string): Promise<void> {
     const negocioExistente = await this.findOne(id);
     
-    // 🔹 1. Buscar todos los centros activos de este negocio
     const centros = await this.centroService.findByNegocio(id);
     console.log(`[Negocio.softDelete] Desactivando ${centros.length} centros del negocio ${negocioExistente.nombre}`);
     
-    // 🔹 2. Desactivar cada centro (esto activará su propia cascada)
     for (const centro of centros) {
       if (!centro.fecha_baja) {
         await this.centroService.softDelete(centro.id, usuario);
       }
     }
     
-    // 🔹 3. Desactivar el negocio
     negocioExistente.fecha_baja = new Date();
     negocioExistente.usuario_baja = usuario || 'demo';
     
