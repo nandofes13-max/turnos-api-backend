@@ -9,21 +9,18 @@ import { UpdateNegocioDto } from './dto/update-negocio.dto';
 export class NegociosController {
   constructor(private readonly negociosService: NegociosService) {}
 
-  // Listar todos los negocios con último movimiento calculado
   @Get()
   async findAll(): Promise<any[]> {
     const negocios = await this.negociosService.findAll();
     return negocios.map(negocio => this.agregarUltimoMovimiento(negocio));
   }
 
-  // Obtener un negocio por ID con último movimiento calculado
   @Get(':id')
   async findOne(@Param('id') id: string): Promise<any> {
     const negocio = await this.negociosService.findOne(Number(id));
     return this.agregarUltimoMovimiento(negocio);
   }
 
-  // Obtener un negocio por URL (para la agenda pública)
   @Get('url/:url')
   async findByUrl(@Param('url') url: string): Promise<any> {
     const negocio = await this.negociosService.findByUrl(url);
@@ -33,27 +30,23 @@ export class NegociosController {
     return this.agregarUltimoMovimiento(negocio);
   }
 
-  // Crear nuevo negocio (genera URL automáticamente)
   @Post()
   async create(@Body() createNegocioDto: CreateNegocioDto): Promise<any> {
     const negocio = await this.negociosService.create(createNegocioDto, 'demo');
     return this.agregarUltimoMovimiento(negocio);
   }
 
-  // Actualizar negocio existente (no modifica la URL)
   @Put(':id')
   async update(@Param('id') id: string, @Body() updateNegocioDto: UpdateNegocioDto): Promise<any> {
     const negocio = await this.negociosService.update(Number(id), updateNegocioDto, 'demo');
     return this.agregarUltimoMovimiento(negocio);
   }
 
-  // Soft delete de un negocio
   @Delete(':id')
   softDelete(@Param('id') id: string): Promise<void> {
     return this.negociosService.softDelete(Number(id), 'demo');
   }
 
-  // Debug: ver estructura de tabla
   @Get('debug/structure')
   debugStructure() {
     return this.negociosService.debugStructure();
