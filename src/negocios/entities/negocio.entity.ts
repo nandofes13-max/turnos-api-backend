@@ -11,6 +11,10 @@ export class Negocio extends BaseEntityAuditable {
   @Column({ length: 100, unique: true })
   url: string;
 
+  // 👈 NUEVO: URL de gestión de turnos (única e inmutable)
+  @Column({ length: 100, unique: true, nullable: true })
+  urlGestion: string;
+
   // WhatsApp
   @Column({ type: 'int', nullable: false })
   country_code: number;
@@ -53,7 +57,7 @@ export class Negocio extends BaseEntityAuditable {
   formatted_address: string;
 
   @Column({ length: 50, nullable: true, default: 'America/Argentina/Buenos_Aires' })
-timezone: string;
+  timezone: string;
 
   // Getter para último movimiento
   get ultimoMovimiento(): string {
