@@ -1,3 +1,4 @@
+// src/notifications/email.service.ts
 import { Injectable } from '@nestjs/common';
 import { Turno } from '../turnos/entities/turno.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
@@ -235,6 +236,99 @@ export class EmailService {
       console.log(`📧 Email de cancelación enviado a ${usuario.email} para turno ${turno.id}. Respuesta:`, data);
     } catch (error) {
       console.error(`❌ Error enviando email de cancelación a ${usuario.email}:`, error);
+      throw error;
+    }
+  }
+
+  // ✅ NUEVO: Enviar email de bienvenida al dueño del negocio
+  async enviarEmailBienvenidaNegocio(params: {
+    email: string;
+    nombreNegocio: string;
+    urlPublica: string;
+    urlGestion: string;
+  }): Promise<void> {
+    if (!this.apiKey) {
+      console.warn('⚠️ No se envió email de bienvenida: KEPLARS_API_KEY no configurada');
+      return;
+    }
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #4CAF50;">✅ ¡Tu negocio está configurado!</h2>
+        
+        <p>Hola,</p>
+        
+        <p>Felicitaciones, tu negocio <strong>${params.nombreNegocio}</strong> ya está configurado en nuestra plataforma.</p>
+        
+        <p>Compartí estos enlaces para empezar a recibir turnos:</p>
+        
+        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 8px; margin: 15px 0;">
+          <p><strong>📢 Link Público (para redes sociales):</strong></p>
+          <p><a href="${params.urlPublica}" style="color: #2196F3; word-break: break-all;">${params.urlPublica}</a></p>
+          
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 10px 0;" />
+          
+          <p><strong>⚙️ Link de Gestión (para administrar):</strong></p>
+          <p><a href="${params.urlGestion}" style="color: #2196F3; word-break: break-all;">${params.urlGestion}</a></p>
+        </div>
+        
+        <p style="color: #666; font-size: 14px;">
+          Guardá estos enlaces en un lugar seguro. El link de gestión te permite ver y administrar todos los turnos de tu negocio.
+        </p>
+        
+        <hr />
+        <p style="color: #999; font-size: 12px;">
+          Este es un mensaje automático enviado desde el sistema de gestión de turnos.
+          Por favor, no responder a este email.
+        </p>
+      </div>
+    `;
+
+    try {
+      // Enviar al dueño del negocio
+      const response1 = await fetch('https://api.keplars.com/api/v1/send-email/async', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          to: [params.email],
+          subject: `✅ Tu negocio "${params.nombreNegocio}" está configurado`,
+          body: html,
+        }),
+      });
+
+      if (!response1.ok) {
+        const errorData = await response1.json();
+        console.error(`❌ Keplars API error (dueño):`, errorData);
+      } else {
+        console.log(`📧 Email de bienvenida enviado a ${params.email}`);
+      }
+
+      // Enviar copia a pwaturnos@gmail.com
+      const response2 = await fetch('https://api.keplars.com/api/v1/send-email/async', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          to: ['pwaturnos@gmail.com'],
+          subject: `📋 Nuevo negocio registrado: "${params.nombreNegocio}"`,
+          body: html,
+        }),
+      });
+
+      if (!response2.ok) {
+        const errorData = await response2.json();
+        console.error(`❌ Keplars API error (copia):`, errorData);
+      } else {
+        console.log(`📧 Email de bienvenida enviado a pwaturnos@gmail.com (copia)`);
+      }
+
+    } catch (error) {
+      console.error(`❌ Error enviando email de bienvenida:`, error);
       throw error;
     }
   }
