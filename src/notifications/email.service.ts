@@ -1,15 +1,24 @@
 // src/notifications/email.service.ts
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { Turno } from '../turnos/entities/turno.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Centro } from '../centro/entities/centro.entity';
 import { CreateSolicitudDto } from '../solicitudes/dto/create-solicitud.dto';
+import { NegocioUsuarioRol } from '../negocios-usuarios-roles/entities/negocios-usuarios-rol.entity';
+import { Usuario as UsuarioEntity } from '../usuarios/entities/usuario.entity';
 
 @Injectable()
 export class EmailService {
   private apiKey: string | undefined;
 
-  constructor() {
+  constructor(
+    @InjectRepository(NegocioUsuarioRol)
+    private readonly negocioUsuarioRolRepository: Repository<NegocioUsuarioRol>,
+    @InjectRepository(UsuarioEntity)
+    private readonly usuarioRepository: Repository<UsuarioEntity>,
+  ) {
     this.apiKey = process.env.KEPLARS_API_KEY;
     if (!this.apiKey) {
       console.warn('⚠️ KEPLARS_API_KEY no configurada. Los emails no se enviarán.');
@@ -39,7 +48,32 @@ export class EmailService {
     return partes.join(', ') || 'Dirección no disponible';
   }
 
-  // ✅ NUEVO: Enviar solicitud de nuevo servicio/actividad
+  // 👈 NUEVO: Obtener el email del dueño del negocio (rolId = 7)
+  private async obtenerEmailDueno(negocioId: number): Promise<string | null> {
+    try {
+      // Buscar la relación negocio-usuario-rol con rolId = 7 (DUEÑO)
+      const relacion = await this.negocioUsuarioRolRepository.findOne({
+        where: {
+          negocioId: negocioId,
+          rolId: 7,
+          fecha_baja: null,
+        },
+        relations: ['usuario'],
+      });
+
+      if (relacion && relacion.usuario) {
+        return relacion.usuario.email;
+      }
+
+      console.warn(`⚠️ No se encontró dueño (rolId=7) para el negocio ${negocioId}`);
+      return null;
+    } catch (error) {
+      console.error(`❌ Error al obtener email del dueño:`, error);
+      return null;
+    }
+  }
+
+  // ✅ Enviar solicitud de nuevo servicio/actividad
   async enviarEmailSolicitudServicio(solicitud: CreateSolicitudDto): Promise<void> {
     if (!this.apiKey) {
       console.warn('⚠️ No se envió email de solicitud: KEPLARS_API_KEY no configurada');
@@ -98,6 +132,7 @@ export class EmailService {
     }
   }
 
+  // ✅ MODIFICADO: Enviar email de confirmación al cliente y al dueño del negocio
   async enviarEmailConfirmacion(turno: Turno, usuario: Usuario, centro: Centro): Promise<void> {
     if (!this.apiKey) {
       console.warn('⚠️ No se envió email de confirmación: KEPLARS_API_KEY no configurada');
@@ -146,6 +181,19 @@ export class EmailService {
       </div>
     `;
 
+    // 👈 Obtener el email del dueño del negocio
+    const negocioId = centro.negocioId;
+    const emailDueno = await this.obtenerEmailDueno(negocioId);
+
+    // 👈 Construir lista de destinatarios
+    const destinatarios = [usuario.email];
+    if (emailDueno) {
+      destinatarios.push(emailDueno);
+      console.log(`📧 Se enviará copia al dueño del negocio: ${emailDueno}`);
+    } else {
+      console.warn(`⚠️ No se encontró dueño para el negocio ${negocioId}, enviando solo al cliente`);
+    }
+
     try {
       const response = await fetch('https://api.keplars.com/api/v1/send-email/async', {
         method: 'POST',
@@ -154,7 +202,7 @@ export class EmailService {
           'Authorization': `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          to: [usuario.email],
+          to: destinatarios,
           subject: `[CONFIRMADO] Turno - ${fechaHoraFormateada}`,
           body: html,
         }),
@@ -167,7 +215,7 @@ export class EmailService {
       }
 
       const data = await response.json();
-      console.log(`📧 Email enviado a ${usuario.email} para turno ${turno.id}. Respuesta:`, data);
+      console.log(`📧 Email de confirmación enviado a: ${destinatarios.join(', ')} para turno ${turno.id}. Respuesta:`, data);
     } catch (error) {
       console.error(`❌ Error enviando email a ${usuario.email}:`, error);
       throw error;
@@ -212,6 +260,17 @@ export class EmailService {
       </div>
     `;
 
+    // 👈 Obtener el email del dueño del negocio
+    const negocioId = centro.negocioId;
+    const emailDueno = await this.obtenerEmailDueno(negocioId);
+
+    // 👈 Construir lista de destinatarios
+    const destinatarios = [usuario.email];
+    if (emailDueno) {
+      destinatarios.push(emailDueno);
+      console.log(`📧 Se enviará copia de cancelación al dueño del negocio: ${emailDueno}`);
+    }
+
     try {
       const response = await fetch('https://api.keplars.com/api/v1/send-email/async', {
         method: 'POST',
@@ -220,7 +279,7 @@ export class EmailService {
           'Authorization': `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          to: [usuario.email],
+          to: destinatarios,
           subject: `[CANCELADO] Turno - ${fechaHoraFormateada}`,
           body: html,
         }),
@@ -233,7 +292,7 @@ export class EmailService {
       }
 
       const data = await response.json();
-      console.log(`📧 Email de cancelación enviado a ${usuario.email} para turno ${turno.id}. Respuesta:`, data);
+      console.log(`📧 Email de cancelación enviado a: ${destinatarios.join(', ')} para turno ${turno.id}. Respuesta:`, data);
     } catch (error) {
       console.error(`❌ Error enviando email de cancelación a ${usuario.email}:`, error);
       throw error;
