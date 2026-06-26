@@ -6,7 +6,8 @@ import { Turno } from '../turnos/entities/turno.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Centro } from '../centro/entities/centro.entity';
 import { CreateSolicitudDto } from '../solicitudes/dto/create-solicitud.dto';
-import { NegocioUsuarioRol } from '../negocios-usuarios-roles/entities/negocios-usuarios-rol.entity';
+// 👈 CORREGIDO: ruta correcta al archivo
+import { NegocioUsuarioRol } from '../negocios-usuarios-roles/entities/negocio-usuario-rol.entity';
 import { Usuario as UsuarioEntity } from '../usuarios/entities/usuario.entity';
 
 @Injectable()
