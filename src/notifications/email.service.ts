@@ -1,12 +1,11 @@
 // src/notifications/email.service.ts
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { Turno } from '../turnos/entities/turno.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Centro } from '../centro/entities/centro.entity';
 import { CreateSolicitudDto } from '../solicitudes/dto/create-solicitud.dto';
-// 👈 CORREGIDO: ruta correcta al archivo
 import { NegocioUsuarioRol } from '../negocios-usuarios-roles/entities/negocio-usuario-rol.entity';
 import { Usuario as UsuarioEntity } from '../usuarios/entities/usuario.entity';
 
@@ -57,7 +56,7 @@ export class EmailService {
         where: {
           negocioId: negocioId,
           rolId: 7,
-          fecha_baja: null,
+          fecha_baja: IsNull(), // ✅ CORREGIDO: usa IsNull() en lugar de null
         },
         relations: ['usuario'],
       });
