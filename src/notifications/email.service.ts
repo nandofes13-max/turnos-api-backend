@@ -12,6 +12,8 @@ import { Usuario as UsuarioEntity } from '../usuarios/entities/usuario.entity';
 @Injectable()
 export class EmailService {
   private apiKey: string | undefined;
+  // 👈 NUEVO: Email remitente fijo
+  private readonly fromEmail: string = 'pwaturnos@gmail.com';
 
   constructor(
     @InjectRepository(NegocioUsuarioRol)
@@ -48,15 +50,14 @@ export class EmailService {
     return partes.join(', ') || 'Dirección no disponible';
   }
 
-  // 👈 NUEVO: Obtener el email del dueño del negocio (rolId = 7)
+  // 👈 Obtener el email del dueño del negocio (rolId = 7)
   private async obtenerEmailDueno(negocioId: number): Promise<string | null> {
     try {
-      // Buscar la relación negocio-usuario-rol con rolId = 7 (DUEÑO)
       const relacion = await this.negocioUsuarioRolRepository.findOne({
         where: {
           negocioId: negocioId,
           rolId: 7,
-          fecha_baja: IsNull(), // ✅ CORREGIDO: usa IsNull() en lugar de null
+          fecha_baja: IsNull(),
         },
         relations: ['usuario'],
       });
@@ -112,6 +113,7 @@ export class EmailService {
           'Authorization': `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
+          from: this.fromEmail, // 👈 AGREGADO
           to: ['pwaturnos@gmail.com'],
           subject: `📋 Nueva solicitud de actividad - ${solicitud.nombre} ${solicitud.apellido}`,
           body: html,
@@ -181,11 +183,9 @@ export class EmailService {
       </div>
     `;
 
-    // 👈 Obtener el email del dueño del negocio
     const negocioId = centro.negocioId;
     const emailDueno = await this.obtenerEmailDueno(negocioId);
 
-    // 👈 Construir lista de destinatarios
     const destinatarios = [usuario.email];
     if (emailDueno) {
       destinatarios.push(emailDueno);
@@ -202,6 +202,7 @@ export class EmailService {
           'Authorization': `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
+          from: this.fromEmail, // 👈 AGREGADO
           to: destinatarios,
           subject: `[CONFIRMADO] Turno - ${fechaHoraFormateada}`,
           body: html,
@@ -260,11 +261,9 @@ export class EmailService {
       </div>
     `;
 
-    // 👈 Obtener el email del dueño del negocio
     const negocioId = centro.negocioId;
     const emailDueno = await this.obtenerEmailDueno(negocioId);
 
-    // 👈 Construir lista de destinatarios
     const destinatarios = [usuario.email];
     if (emailDueno) {
       destinatarios.push(emailDueno);
@@ -279,6 +278,7 @@ export class EmailService {
           'Authorization': `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
+          from: this.fromEmail, // 👈 AGREGADO
           to: destinatarios,
           subject: `[CANCELADO] Turno - ${fechaHoraFormateada}`,
           body: html,
@@ -299,7 +299,7 @@ export class EmailService {
     }
   }
 
-  // ✅ NUEVO: Enviar email de bienvenida al dueño del negocio
+  // ✅ Enviar email de bienvenida al dueño del negocio
   async enviarEmailBienvenidaNegocio(params: {
     email: string;
     nombreNegocio: string;
@@ -352,6 +352,7 @@ export class EmailService {
           'Authorization': `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
+          from: this.fromEmail, // 👈 AGREGADO
           to: [params.email],
           subject: `✅ Tu negocio "${params.nombreNegocio}" está configurado`,
           body: html,
@@ -373,6 +374,7 @@ export class EmailService {
           'Authorization': `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
+          from: this.fromEmail, // 👈 AGREGADO
           to: ['pwaturnos@gmail.com'],
           subject: `📋 Nuevo negocio registrado: "${params.nombreNegocio}"`,
           body: html,
