@@ -10,7 +10,7 @@ export class DomicilioDto {
   street: string;
 
   @IsString({ message: 'El número debe ser texto' })
-  @IsNotEmpty({ message: 'El número es obligatorio' })
+  @IsOptional() // ✅ AHORA ES OPCIONAL
   @MaxLength(20, { message: 'El número no puede tener más de 20 caracteres' })
   street_number: string;
 
