@@ -60,11 +60,10 @@ export class NegociosService {
     }
   }
 
-  // ===== VALIDACIÓN DE DIRECCIÓN (MODIFICADA: street_number ya no es obligatorio) =====
+  // ===== VALIDACIÓN DE DIRECCIÓN =====
   private validarDireccion(domicilio: any) {
-    // 👈 street_number ya no es obligatorio
     const camposRequeridos = [
-      'street', 'postal_code', 'city', 
+      'street', 'street_number', 'postal_code', 'city', 
       'state', 'country', 'country_code', 'latitude', 
       'longitude', 'formatted_address'
     ];
@@ -176,7 +175,7 @@ export class NegociosService {
       whatsapp_e164: whatsappE164,
       url,
       street: createNegocioDto.domicilio.street,
-      street_number: createNegocioDto.domicilio.street_number || null, // 👈 Si viene vacío, guardar null
+      street_number: createNegocioDto.domicilio.street_number,
       postal_code: createNegocioDto.domicilio.postal_code,
       city: createNegocioDto.domicilio.city,
       state: createNegocioDto.domicilio.state,
@@ -220,7 +219,7 @@ export class NegociosService {
       negocioExistente.timezone = nuevoTimezone;
       
       negocioExistente.street = updateNegocioDto.domicilio.street;
-      negocioExistente.street_number = updateNegocioDto.domicilio.street_number || null; // 👈 Si viene vacío, guardar null
+      negocioExistente.street_number = updateNegocioDto.domicilio.street_number;
       negocioExistente.postal_code = updateNegocioDto.domicilio.postal_code;
       negocioExistente.city = updateNegocioDto.domicilio.city;
       negocioExistente.state = updateNegocioDto.domicilio.state;
