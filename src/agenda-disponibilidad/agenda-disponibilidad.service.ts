@@ -275,16 +275,17 @@ export class AgendaDisponibilidadService implements OnModuleInit {
   }
 
   // ============================================================
-  // MÉTODO generarSlots (corregido con normalizacion)
+  // MÉTODO generarSlots (MODIFICADO: ahora combina TODOS los bloques)
   // ============================================================
   async generarSlots(
     profesionalCentroId: number,
     diaSemana: number,
   ): Promise<{ slots: { disponible: boolean; hora: string; bloqueado: boolean }[]; timezone: string }> {
     
-    console.log(`[SLOTS] Buscando agenda - profesionalCentroId: ${profesionalCentroId}, diaSemana: ${diaSemana}`);
+    console.log(`[SLOTS] Buscando agendas - profesionalCentroId: ${profesionalCentroId}, diaSemana: ${diaSemana}`);
     
-    const agenda = await this.repository.findOne({
+    // 🔹 OBTENER TODOS los bloques activos para este día
+    const agendas = await this.repository.find({
       where: {
         profesionalCentroId,
         diaSemana,
@@ -292,35 +293,50 @@ export class AgendaDisponibilidadService implements OnModuleInit {
       },
     });
     
-    if (!agenda) {
-      console.log(`[SLOTS] No se encontró agenda para esos parámetros`);
+    if (!agendas || agendas.length === 0) {
+      console.log(`[SLOTS] No se encontraron agendas para esos parámetros`);
       return { slots: [], timezone: 'America/Argentina/Buenos_Aires' };
     }
     
-    console.log(`[SLOTS] Agenda encontrada - ID: ${agenda.id}, timezone: ${agenda.timezone}, duracionTurno: ${agenda.duracionTurno} min, horaDesde: ${agenda.horaDesde}, horaHasta: ${agenda.horaHasta}`);
+    console.log(`[SLOTS] Encontrados ${agendas.length} bloques para este día`);
     
-    const slots: { hora: string; bloqueado: boolean }[] = [];
-    let horaActual = this.normalizarHora(agenda.horaDesde);
-    const horaFin = this.normalizarHora(agenda.horaHasta);
-    let contador = 0;
-    const maxIteraciones = 100;
+    // 🔹 GENERAR SLOTS PARA CADA BLOQUE Y COMBINARLOS
+    const todosLosSlots: { hora: string; bloqueado: boolean }[] = [];
+    let timezoneFinal = 'America/Argentina/Buenos_Aires';
     
-    while (horaActual < horaFin && contador < maxIteraciones) {
-      slots.push({ hora: this.normalizarHora(horaActual), bloqueado: false });
-      contador++;
+    for (const agenda of agendas) {
+      console.log(`[SLOTS] Procesando bloque ID: ${agenda.id}, horario: ${agenda.horaDesde} a ${agenda.horaHasta}, duración: ${agenda.duracionTurno} min`);
       
-      const [h, m] = horaActual.split(':').map(Number);
-      let minutos = m + agenda.duracionTurno;
-      let horas = h;
-      if (minutos >= 60) {
-        horas += Math.floor(minutos / 60);
-        minutos = minutos % 60;
+      if (agenda.timezone) {
+        timezoneFinal = agenda.timezone;
       }
-      horaActual = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
+      
+      let horaActual = this.normalizarHora(agenda.horaDesde);
+      const horaFin = this.normalizarHora(agenda.horaHasta);
+      let contador = 0;
+      const maxIteraciones = 100;
+      
+      while (horaActual < horaFin && contador < maxIteraciones) {
+        todosLosSlots.push({ hora: this.normalizarHora(horaActual), bloqueado: false });
+        contador++;
+        
+        const [h, m] = horaActual.split(':').map(Number);
+        let minutos = m + agenda.duracionTurno;
+        let horas = h;
+        if (minutos >= 60) {
+          horas += Math.floor(minutos / 60);
+          minutos = minutos % 60;
+        }
+        horaActual = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
+      }
     }
     
-    console.log(`[SLOTS] Generados ${slots.length} slots. Primeros 3: ${slots.slice(0, 3).map(s => s.hora).join(', ')}`);
+    // 🔹 ORDENAR SLOTS POR HORA
+    todosLosSlots.sort((a, b) => a.hora.localeCompare(b.hora));
     
+    console.log(`[SLOTS] Generados ${todosLosSlots.length} slots combinados. Primeros 3: ${todosLosSlots.slice(0, 3).map(s => s.hora).join(', ')}`);
+    
+    // 🔹 APLICAR EXCEPCIONES A TODOS LOS SLOTS
     const excepcionesFechas = await this.excepcionesFechasRepository.find({
       where: {
         profesionalCentroId: profesionalCentroId,
@@ -330,27 +346,27 @@ export class AgendaDisponibilidadService implements OnModuleInit {
     
     for (const excepcion of excepcionesFechas) {
       if (!excepcion.horaDesde && !excepcion.horaHasta) {
-        for (let i = 0; i < slots.length; i++) {
-          slots[i].bloqueado = true;
+        for (let i = 0; i < todosLosSlots.length; i++) {
+          todosLosSlots[i].bloqueado = true;
         }
       } else if (excepcion.horaDesde && excepcion.horaHasta) {
-        for (let i = 0; i < slots.length; i++) {
-          const slotHora = slots[i].hora;
+        for (let i = 0; i < todosLosSlots.length; i++) {
+          const slotHora = todosLosSlots[i].hora;
           const exHoraDesde = this.normalizarHora(excepcion.horaDesde);
           const exHoraHasta = this.normalizarHora(excepcion.horaHasta);
           if (slotHora >= exHoraDesde && slotHora < exHoraHasta) {
-            slots[i].bloqueado = true;
+            todosLosSlots[i].bloqueado = true;
           }
         }
       }
     }
     
     return {
-      slots: slots.map(slot => ({
+      slots: todosLosSlots.map(slot => ({
         ...slot,
         disponible: !slot.bloqueado,
       })),
-      timezone: agenda.timezone || 'America/Argentina/Buenos_Aires'
+      timezone: timezoneFinal
     };
   }
 
