@@ -1,3 +1,4 @@
+// src/centro/centro.service.ts
 import { Injectable, NotFoundException, BadRequestException, forwardRef, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
@@ -78,7 +79,7 @@ export class CentroService {
 
   private validarDireccion(domicilio: DomicilioDto) {
     const camposRequeridos = [
-      'street', 'street_number', 'postal_code', 'city', 
+      'street', 'postal_code', 'city', 
       'state', 'country', 'country_code', 'latitude', 
       'longitude', 'formatted_address'
     ];
