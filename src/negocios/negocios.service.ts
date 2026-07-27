@@ -63,7 +63,7 @@ export class NegociosService {
   // ===== VALIDACIÓN DE DIRECCIÓN =====
   private validarDireccion(domicilio: any) {
     const camposRequeridos = [
-      'street', 'street_number', 'postal_code', 'city', 
+      'street', 'postal_code', 'city', 
       'state', 'country', 'country_code', 'latitude', 
       'longitude', 'formatted_address'
     ];
