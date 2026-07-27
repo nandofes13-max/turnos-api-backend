@@ -30,7 +30,7 @@ export class Negocio extends BaseEntityAuditable {
   street: string;
 
   @Column({ length: 20, nullable: true })
-  street_number: string | null; // 👈 PERMITE NULL
+  street_number: string;
 
   @Column({ length: 20, nullable: true })
   postal_code: string;
