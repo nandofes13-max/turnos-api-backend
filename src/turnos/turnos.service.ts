@@ -1,3 +1,4 @@
+// src/turnos/turnos.service.ts
 import { Injectable, BadRequestException, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, Not, In, ILike } from 'typeorm';
@@ -11,6 +12,9 @@ import { NegocioEstadoTurno } from '../negocios-estados-turno/entities/negocio-e
 import { NegocioActividad } from '../negocio-actividades/entities/negocio-actividad.entity';
 import { Centro } from '../centro/entities/centro.entity';
 import { NotificationsService } from '../notifications/notifications.service';
+// 👈 IMPORTAR WhatsAppService
+import { WhatsappService } from '../whatsapp/whatsapp.service';
+import { NuevoTurnoWhatsappPayload } from '../whatsapp/interfaces/whatsapp-provider.interface';
 
 @Injectable()
 export class TurnosService {
@@ -31,6 +35,8 @@ export class TurnosService {
     private readonly centroRepository: Repository<Centro>,
     @Inject(forwardRef(() => NotificationsService))
     private readonly notificationsService: NotificationsService,
+    // 👈 INYECTAR WhatsAppService
+    private readonly whatsappService: WhatsappService,
   ) {}
 
   async findAll(filtros: {
@@ -389,6 +395,7 @@ export class TurnosService {
 
     const turnoConRelaciones = await this.recargarTurnoConRelaciones(turnoGuardado.id);
 
+    // 📧 Enviar email de confirmación (YA EXISTE)
     try {
       await this.notificationsService.enviarEmailConfirmacion(turnoConRelaciones, usuario, centro);
       turnoGuardado.emailEnviado = true;
@@ -396,6 +403,21 @@ export class TurnosService {
       console.log(`[EMAIL ENVIADO] Turno ID: ${turnoGuardado.id} - Email: ${usuario.email}`);
     } catch (error) {
       console.error(`[ERROR EMAIL] No se pudo enviar email para turno ${turnoGuardado.id}:`, error.message);
+    }
+
+    // 🔔 Enviar WhatsApp al negocio (NUEVO)
+    try {
+      const payload: NuevoTurnoWhatsappPayload = {
+        cliente: `${usuario.apellido}, ${usuario.nombre}`,
+        fecha: turnoGuardado.fechaTurno.toISOString().split('T')[0],
+        hora: turnoGuardado.horaInicio.substring(0, 5),
+        telefono: usuario.telefono || undefined,
+      };
+      await this.whatsappService.enviarNuevoTurno(turnoGuardado.negocioId, payload);
+      console.log(`[WHATSAPP ENVIADO] Turno ID: ${turnoGuardado.id} - Negocio ID: ${turnoGuardado.negocioId}`);
+    } catch (error) {
+      // 👈 Si falla WhatsApp, solo registramos el error, NO afecta al turno
+      console.error(`[ERROR WHATSAPP] Turno ${turnoGuardado.id}:`, error.message);
     }
 
     console.log(`[TURNO CREADO] ID: ${turnoGuardado.id} - Usuario: ${usuario.email} - ${turnoGuardado.fechaTurno} ${turnoGuardado.horaInicio} - Timezone: ${turnoGuardado.timezone}`);
