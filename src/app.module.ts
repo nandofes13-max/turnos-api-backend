@@ -35,6 +35,10 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       autoLoadEntities: true,
       synchronize: true,
+      // 👈 AGREGAR CONFIGURACIÓN DE MIGRACIONES
+      migrations: [__dirname + '/migrations/*{.ts,.js}'],
+      migrationsRun: true,
+      migrationsTableName: 'migrations',
     }),
     FilialModule,
     ActividadModule,
