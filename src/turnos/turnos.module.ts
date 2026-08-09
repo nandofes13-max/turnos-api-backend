@@ -1,3 +1,4 @@
+// src/turnos/turnos.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TurnosService } from './turnos.service';
@@ -10,6 +11,8 @@ import { NegocioEstadoTurno } from '../negocios-estados-turno/entities/negocio-e
 import { NegocioActividad } from '../negocio-actividades/entities/negocio-actividad.entity';
 import { Centro } from '../centro/entities/centro.entity';
 import { NotificationsModule } from '../notifications/notifications.module';  // ✅ Importar el módulo
+// 👈 IMPORTAR WhatsAppModule
+import { WhatsappModule } from '../whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -23,6 +26,8 @@ import { NotificationsModule } from '../notifications/notifications.module';  //
       Centro,
     ]),
     NotificationsModule,  // ✅ Agregar a imports
+    // 👈 AGREGAR WhatsAppModule
+    WhatsappModule,
   ],
   controllers: [TurnosController],
   providers: [TurnosService],
