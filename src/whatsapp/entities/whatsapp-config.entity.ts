@@ -23,7 +23,7 @@ export class WhatsappConfig extends BaseEntityAuditable {
   apiToken: string;
 
   @Column({ name: 'phone_number', type: 'varchar', length: 20, nullable: true })
-  phoneNumber: string;
+  phoneNumber: string | null; // 👈 CAMBIADO: ahora acepta null
 
   // ===== FUTURO: META CLOUD API =====
   // @Column({ name: 'meta_waba_id', type: 'varchar', length: 100, nullable: true })
