@@ -1,3 +1,4 @@
+// src/app.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FilialModule } from './filial/filial.module';
@@ -20,7 +21,9 @@ import { AgendaPublicaModule } from './agenda-publica/agenda-publica.module';
 import { TurnosModule } from './turnos/turnos.module';
 import { NegociosEstadosTurnoModule } from './negocios-estados-turno/negocios-estados-turno.module';
 import { NegociosEstadosPagoModule } from './negocios-estados-pago/negocios-estados-pago.module';
-import { SolicitudesModule } from './solicitudes/solicitudes.module'; // ✅ AGREGAR
+import { SolicitudesModule } from './solicitudes/solicitudes.module';
+// 👈 IMPORTAR WhatsAppModule
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -53,7 +56,9 @@ import { SolicitudesModule } from './solicitudes/solicitudes.module'; // ✅ AGR
     TurnosModule,
     NegociosEstadosTurnoModule,
     NegociosEstadosPagoModule,
-    SolicitudesModule, // ✅ AGREGAR
+    SolicitudesModule,
+    // 👈 AGREGAR WhatsAppModule
+    WhatsappModule,
   ],
 })
 export class AppModule {}
