@@ -155,11 +155,14 @@ export class WhatsappService {
       where: { negocioId },
     });
 
-    // Si el número no fue proporcionado, obtenerlo del negocio
-    let phoneNumberFinal = phoneNumber;
-    if (!phoneNumberFinal) {
-      phoneNumberFinal = negocio.whatsapp_e164 || null;
+    // 👈 CORREGIDO: manejar null y undefined correctamente
+    let phoneNumberFinal: string | null = null;
+    if (phoneNumber) {
+      phoneNumberFinal = phoneNumber;
+    } else if (negocio.whatsapp_e164) {
+      phoneNumberFinal = negocio.whatsapp_e164;
     }
+    // Si no hay ninguno, queda null
 
     if (config) {
       // Actualizar existente
@@ -167,7 +170,7 @@ export class WhatsappService {
       config.provider = provider;
       config.activo = true;
       config.estado = 'pending';
-      config.instanciaId = instancia.id; // 👈 ASIGNAR INSTANCIA
+      config.instanciaId = instancia.id;
       config.usuario_modificacion = 'system';
       config.fecha_modificacion = new Date();
     } else {
@@ -178,7 +181,7 @@ export class WhatsappService {
         provider,
         activo: true,
         estado: 'pending',
-        instanciaId: instancia.id, // 👈 ASIGNAR INSTANCIA
+        instanciaId: instancia.id,
         usuario_alta: 'system',
         fecha_alta: new Date(),
       });
