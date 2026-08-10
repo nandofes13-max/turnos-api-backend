@@ -143,7 +143,7 @@ export class WhatsappService {
 
   /**
    * Guarda o actualiza la configuración de WhatsApp de un negocio
-   * 👈 AHORA GUARDA EL NÚMERO SIN EL SIGNO +
+   * 👈 AHORA COPIA LAS CREDENCIALES DE LA INSTANCIA
    */
   async guardarConfiguracion(
     negocioId: number,
@@ -168,7 +168,6 @@ export class WhatsappService {
       where: { negocioId },
     });
 
-    // 👈 ELIMINAR EL SIGNO + DEL NÚMERO ANTES DE GUARDARLO
     let phoneNumberFinal: string | null = null;
     if (phoneNumber) {
       phoneNumberFinal = phoneNumber.replace(/^\+/, '');
@@ -177,14 +176,18 @@ export class WhatsappService {
     }
 
     if (config) {
+      // 👈 ACTUALIZAR INCLUYENDO CREDENCIALES DE LA INSTANCIA
       config.phoneNumber = phoneNumberFinal;
       config.provider = provider;
       config.activo = true;
       config.estado = 'pending';
       config.instanciaId = instancia.id;
+      config.instanceId = instancia.instanceId; // 👈 COPIAR
+      config.apiToken = instancia.apiToken;     // 👈 COPIAR
       config.usuario_modificacion = 'system';
       config.fecha_modificacion = new Date();
     } else {
+      // 👈 CREAR INCLUYENDO CREDENCIALES DE LA INSTANCIA
       config = this.configRepository.create({
         negocioId,
         phoneNumber: phoneNumberFinal,
@@ -192,6 +195,8 @@ export class WhatsappService {
         activo: true,
         estado: 'pending',
         instanciaId: instancia.id,
+        instanceId: instancia.instanceId, // 👈 COPIAR
+        apiToken: instancia.apiToken,     // 👈 COPIAR
         usuario_alta: 'system',
         fecha_alta: new Date(),
       });
