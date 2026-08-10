@@ -85,8 +85,19 @@ export class GreenApiProvider implements WhatsappProvider {
     const config = await this.obtenerConfiguracion(negocioId);
     const phoneNumber = await this.obtenerNumeroTelefono(config);
 
-    const mensaje = this.construirMensajeTurno(payload);
+    // 👈 OBTENER EL NEGOCIO PARA EL ENLACE DE GESTIÓN
+    const negocio = await this.negocioRepository.findOne({
+      where: { id: negocioId },
+    });
 
+    if (!negocio) {
+      throw new NotFoundException(`Negocio con ID ${negocioId} no encontrado`);
+    }
+
+    // 📝 Construir mensaje con el enlace de gestión
+    const mensaje = this.construirMensajeTurno(payload, negocio.urlGestion);
+
+    // 📤 Enviar mensaje con sonido
     await this.enviarMensaje(config, phoneNumber, mensaje);
   }
 
@@ -138,6 +149,7 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
 
   /**
    * Envía un mensaje usando GREEN API
+   * 👈 AHORA CON SONIDO
    */
   private async enviarMensaje(
     config: WhatsappConfig,
@@ -150,6 +162,7 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
       const body = {
         chatId: `${phoneNumber}@c.us`,
         message: mensaje,
+        notification: { sound: "default" }, // 👈 SONIDO
       };
 
       const response = await axios.post(url, body);
@@ -167,10 +180,15 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
 
   /**
    * Construye el mensaje de notificación de turno
+   * 👈 SIN EMOJI Y CON ENLACE DE GESTIÓN
    */
-  private construirMensajeTurno(payload: NuevoTurnoWhatsappPayload): string {
+  private construirMensajeTurno(payload: NuevoTurnoWhatsappPayload, urlGestion: string): string {
+    // 📝 Construir el enlace completo de gestión
+    const frontendUrl = process.env.FRONTEND_URL || 'https://turnos-pwa-frontend.onrender.com';
+    const enlaceGestion = `${frontendUrl}/gestion/turnos/${urlGestion}`;
+
     let mensaje = `
-🐾 Nuevo turno reservado
+🔔 Nuevo turno reservado
 
 Cliente: ${payload.cliente}
 Fecha: ${payload.fecha}
@@ -180,6 +198,8 @@ Hora: ${payload.hora}
     if (payload.telefono) {
       mensaje += `\nTeléfono: ${payload.telefono}`;
     }
+
+    mensaje += `\n\n📊 Gestiona aquí: ${enlaceGestion}`;
 
     return mensaje;
   }
@@ -195,7 +215,6 @@ Hora: ${payload.hora}
 
   /**
    * Guarda o actualiza la configuración de WhatsApp de un negocio
-   * 👈 AHORA GUARDA EL NÚMERO DE TELÉFONO
    */
   async guardarConfiguracion(
     negocioId: number,
@@ -204,12 +223,10 @@ Hora: ${payload.hora}
     phoneNumber?: string,
     provider: string = 'greenapi',
   ): Promise<WhatsappConfig> {
-    // Buscar configuración existente
     let config = await this.configRepository.findOne({
       where: { negocioId },
     });
 
-    // 👈 OBTENER EL NÚMERO DE TELÉFONO DE GREEN API
     let phoneNumberFromApi: string | null = null;
     try {
       const url = `${this.API_BASE_URL}/waInstance${instanceId}/getWaSettings/${apiToken}`;
@@ -222,26 +239,23 @@ Hora: ${payload.hora}
       console.warn('[GreenApiProvider] No se pudo obtener el número de GREEN API:', error.message);
     }
 
-    // 👈 USAR EL NÚMERO DE LA API, O EL PROPORCIONADO POR EL USUARIO
     const phoneNumberFinal = phoneNumberFromApi || phoneNumber || null;
 
     if (config) {
-      // Actualizar existente
       config.instanceId = instanceId;
       config.apiToken = apiToken;
-      config.phoneNumber = phoneNumberFinal; // 👈 AHORA SE GUARDA
+      config.phoneNumber = phoneNumberFinal;
       config.provider = provider;
       config.activo = true;
       config.estado = 'pending';
       config.usuario_modificacion = 'system';
       config.fecha_modificacion = new Date();
     } else {
-      // Crear nueva
       config = this.configRepository.create({
         negocioId,
         instanceId,
         apiToken,
-        phoneNumber: phoneNumberFinal, // 👈 AHORA SE GUARDA
+        phoneNumber: phoneNumberFinal,
         provider,
         activo: true,
         estado: 'pending',
