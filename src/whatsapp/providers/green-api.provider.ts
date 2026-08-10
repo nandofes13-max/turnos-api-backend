@@ -97,7 +97,7 @@ export class GreenApiProvider implements WhatsappProvider {
     // 📝 Construir mensaje con el enlace de gestión
     const mensaje = this.construirMensajeTurno(payload, negocio.urlGestion);
 
-    // 📤 Enviar mensaje con sonido
+    // 📤 Enviar mensaje (sin notification)
     await this.enviarMensaje(config, phoneNumber, mensaje);
   }
 
@@ -149,7 +149,7 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
 
   /**
    * Envía un mensaje usando GREEN API
-   * 👈 AHORA CON SONIDO
+   * 👈 SIN NOTIFICATION (GREEN API no lo soporta)
    */
   private async enviarMensaje(
     config: WhatsappConfig,
@@ -162,7 +162,6 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
       const body = {
         chatId: `${phoneNumber}@c.us`,
         message: mensaje,
-        notification: { sound: "default" }, // 👈 SONIDO
       };
 
       const response = await axios.post(url, body);
