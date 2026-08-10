@@ -155,7 +155,7 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
 
   /**
    * Envía un mensaje usando GREEN API
-   * 👈 CORREGIDO: elimina el signo + del chatId
+   * 👈 CORREGIDO: usa el número sin +
    */
   private async enviarMensaje(
     instanceId: string,
