@@ -97,11 +97,9 @@ export class WhatsappService {
 
   /**
    * Valida la conexión con el proveedor configurado para el negocio
-   * 👈 AHORA USA LAS CREDENCIALES DE LA INSTANCIA ASIGNADA
    */
   async validarConexion(negocioId: number): Promise<boolean> {
     try {
-      // 1. Obtener la configuración del negocio
       const config = await this.configRepository.findOne({
         where: { negocioId, activo: true },
       });
@@ -111,7 +109,6 @@ export class WhatsappService {
         return false;
       }
       
-      // 2. Obtener la instancia con sus credenciales
       const instancia = await this.instanciasService.findOne(config.instanciaId);
       
       if (!instancia) {
@@ -119,13 +116,11 @@ export class WhatsappService {
         return false;
       }
       
-      // 3. Validar la conexión usando las credenciales de la instancia
       const esValido = await this.greenApiProvider.validarConexionConCredenciales(
         instancia.instanceId,
         instancia.apiToken
       );
       
-      // 4. Actualizar el estado de la configuración del negocio
       config.estado = esValido ? 'authorized' : 'error';
       config.ultimaPrueba = new Date();
       await this.configRepository.save(config);
@@ -148,6 +143,7 @@ export class WhatsappService {
 
   /**
    * Guarda o actualiza la configuración de WhatsApp de un negocio
+   * 👈 AHORA GUARDA EL NÚMERO SIN EL SIGNO +
    */
   async guardarConfiguracion(
     negocioId: number,
@@ -172,11 +168,12 @@ export class WhatsappService {
       where: { negocioId },
     });
 
+    // 👈 ELIMINAR EL SIGNO + DEL NÚMERO ANTES DE GUARDARLO
     let phoneNumberFinal: string | null = null;
     if (phoneNumber) {
-      phoneNumberFinal = phoneNumber;
+      phoneNumberFinal = phoneNumber.replace(/^\+/, '');
     } else if (negocio.whatsapp_e164) {
-      phoneNumberFinal = negocio.whatsapp_e164;
+      phoneNumberFinal = negocio.whatsapp_e164.replace(/^\+/, '');
     }
 
     if (config) {
