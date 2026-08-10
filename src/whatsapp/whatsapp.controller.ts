@@ -18,6 +18,17 @@ export class WhatsappController {
   constructor(private readonly whatsappService: WhatsappService) {}
 
   /**
+   * GET /whatsapp/:negocioId/phone
+   * Obtiene el número de WhatsApp del negocio (desde negocio o configuración)
+   */
+  @Get(':negocioId/phone')
+  async obtenerNumeroWhatsApp(@Param('negocioId') negocioId: string) {
+    const id = Number(negocioId);
+    const phoneNumber = await this.whatsappService.obtenerNumeroWhatsAppNegocio(id);
+    return { phoneNumber };
+  }
+
+  /**
    * GET /whatsapp/:negocioId/config
    * Obtiene la configuración de WhatsApp de un negocio
    */
@@ -36,6 +47,7 @@ export class WhatsappController {
   /**
    * POST /whatsapp/:negocioId/config
    * Guarda o actualiza la configuración de WhatsApp de un negocio
+   * 👈 AHORA SOLO RECIBE phoneNumber (y provider opcional)
    */
   @Post(':negocioId/config')
   async guardarConfiguracion(
@@ -43,18 +55,22 @@ export class WhatsappController {
     @Body() createDto: CreateWhatsappConfigDto,
   ) {
     const id = Number(negocioId);
-    const config = await this.whatsappService.guardarConfiguracion(
-      id,
-      createDto.instanceId,
-      createDto.apiToken,
-      createDto.phoneNumber,
-      createDto.provider || 'greenapi',
-    );
-    return {
-      success: true,
-      message: 'Configuración de WhatsApp guardada correctamente',
-      config,
-    };
+    try {
+      const config = await this.whatsappService.guardarConfiguracion(
+        id,
+        createDto.phoneNumber,
+        createDto.provider || 'greenapi',
+      );
+      return {
+        success: true,
+        message: 'Configuración de WhatsApp guardada correctamente',
+        config,
+      };
+    } catch (error) {
+      throw new BadRequestException(
+        `Error al guardar la configuración: ${error.message}`
+      );
+    }
   }
 
   /**
