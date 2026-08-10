@@ -49,20 +49,17 @@ export class GreenApiProvider implements WhatsappProvider {
    */
   private async obtenerNumeroTelefono(config: WhatsappConfig): Promise<string> {
     try {
-      // 👈 USAR getWaSettings (NO getSettings)
       const url = `${this.API_BASE_URL}/waInstance${config.instanceId}/getWaSettings/${config.apiToken}`;
       console.log(`[GreenApiProvider] Consultando getWaSettings para instancia ${config.instanceId}`);
       
       const response = await axios.get(url);
       console.log(`[GreenApiProvider] Respuesta de getWaSettings:`, JSON.stringify(response.data, null, 2));
       
-      // 👈 El campo correcto es "phone"
       if (response.data && response.data.phone) {
         console.log(`[GreenApiProvider] Número obtenido: ${response.data.phone}`);
         return response.data.phone;
       }
       
-      // Fallback: usar el número guardado en la configuración
       if (config.phoneNumber) {
         console.log(`[GreenApiProvider] Usando phoneNumber de la configuración: ${config.phoneNumber}`);
         return config.phoneNumber;
@@ -88,10 +85,8 @@ export class GreenApiProvider implements WhatsappProvider {
     const config = await this.obtenerConfiguracion(negocioId);
     const phoneNumber = await this.obtenerNumeroTelefono(config);
 
-    // 📝 Construir mensaje amigable
     const mensaje = this.construirMensajeTurno(payload);
 
-    // 📤 Enviar mensaje
     await this.enviarMensaje(config, phoneNumber, mensaje);
   }
 
@@ -130,7 +125,6 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
       const stateInstance = response.data?.stateInstance;
       const esAutorizado = stateInstance === 'authorized' || stateInstance === 'online';
       
-      // Actualizar estado en la base de datos
       config.estado = esAutorizado ? 'authorized' : 'error';
       config.ultimaPrueba = new Date();
       await this.configRepository.save(config);
@@ -201,6 +195,7 @@ Hora: ${payload.hora}
 
   /**
    * Guarda o actualiza la configuración de WhatsApp de un negocio
+   * 👈 AHORA GUARDA EL NÚMERO DE TELÉFONO
    */
   async guardarConfiguracion(
     negocioId: number,
@@ -214,13 +209,27 @@ Hora: ${payload.hora}
       where: { negocioId },
     });
 
+    // 👈 OBTENER EL NÚMERO DE TELÉFONO DE GREEN API
+    let phoneNumberFromApi: string | null = null;
+    try {
+      const url = `${this.API_BASE_URL}/waInstance${instanceId}/getWaSettings/${apiToken}`;
+      const response = await axios.get(url);
+      if (response.data && response.data.phone) {
+        phoneNumberFromApi = response.data.phone;
+        console.log(`[GreenApiProvider] Número obtenido de GREEN API: ${phoneNumberFromApi}`);
+      }
+    } catch (error) {
+      console.warn('[GreenApiProvider] No se pudo obtener el número de GREEN API:', error.message);
+    }
+
+    // 👈 USAR EL NÚMERO DE LA API, O EL PROPORCIONADO POR EL USUARIO
+    const phoneNumberFinal = phoneNumberFromApi || phoneNumber || null;
+
     if (config) {
       // Actualizar existente
       config.instanceId = instanceId;
       config.apiToken = apiToken;
-      if (phoneNumber) {
-        config.phoneNumber = phoneNumber;
-      }
+      config.phoneNumber = phoneNumberFinal; // 👈 AHORA SE GUARDA
       config.provider = provider;
       config.activo = true;
       config.estado = 'pending';
@@ -232,7 +241,7 @@ Hora: ${payload.hora}
         negocioId,
         instanceId,
         apiToken,
-        phoneNumber: phoneNumber || null,
+        phoneNumber: phoneNumberFinal, // 👈 AHORA SE GUARDA
         provider,
         activo: true,
         estado: 'pending',
