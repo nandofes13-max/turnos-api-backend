@@ -23,8 +23,6 @@ export class GreenApiProvider implements WhatsappProvider {
 
   /**
    * Obtiene la configuración de WhatsApp de un negocio
-   * 👈 AHORA OBTIENE LAS CREDENCIALES DE LA INSTANCIA ASIGNADA
-   * @throws NotFoundException si el negocio no tiene configuración
    */
   private async obtenerConfiguracion(negocioId: number): Promise<{ config: WhatsappConfig; instanceId: string; apiToken: string }> {
     const config = await this.configRepository.findOne({
@@ -43,7 +41,6 @@ export class GreenApiProvider implements WhatsappProvider {
       );
     }
 
-    // 👈 OBTENER LA INSTANCIA CON SUS CREDENCIALES
     const instancia = await this.instanciaRepository.findOne({
       where: { id: config.instanciaId },
     });
@@ -69,7 +66,6 @@ export class GreenApiProvider implements WhatsappProvider {
 
   /**
    * Envía una notificación de nuevo turno usando GREEN API
-   * 👈 AHORA USA EL NÚMERO DEL NEGOCIO (config.phoneNumber)
    */
   async enviarNuevoTurno(
     negocioId: number,
@@ -77,7 +73,6 @@ export class GreenApiProvider implements WhatsappProvider {
   ): Promise<void> {
     const { config, instanceId, apiToken } = await this.obtenerConfiguracion(negocioId);
 
-    // 👈 USAR EL NÚMERO DEL NEGOCIO (no el de la instancia)
     if (!config.phoneNumber) {
       throw new BadRequestException(
         `El negocio ID ${negocioId} no tiene un número de WhatsApp configurado.`
@@ -98,12 +93,10 @@ export class GreenApiProvider implements WhatsappProvider {
 
   /**
    * Envía un mensaje de prueba usando GREEN API
-   * 👈 AHORA USA EL NÚMERO DEL NEGOCIO (config.phoneNumber)
    */
   async enviarMensajePrueba(negocioId: number): Promise<void> {
     const { config, instanceId, apiToken } = await this.obtenerConfiguracion(negocioId);
 
-    // 👈 USAR EL NÚMERO DEL NEGOCIO (no el de la instancia)
     if (!config.phoneNumber) {
       throw new BadRequestException(
         `El negocio ID ${negocioId} no tiene un número de WhatsApp configurado.`
@@ -162,6 +155,7 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
 
   /**
    * Envía un mensaje usando GREEN API
+   * 👈 CON LOGS MEJORADOS
    */
   private async enviarMensaje(
     instanceId: string,
@@ -177,6 +171,13 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
         message: mensaje,
       };
 
+      // 👈 LOG DETALLADO ANTES DE ENVIAR
+      console.log('📤 Enviando mensaje a GREEN API:');
+      console.log('  URL:', url);
+      console.log('  phoneNumber:', phoneNumber);
+      console.log('  chatId:', body.chatId);
+      console.log('  message:', body.message.substring(0, 100) + '...');
+
       const response = await axios.post(url, body);
       
       if (!response.data?.idMessage) {
@@ -185,8 +186,13 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
 
       console.log(`✅ Mensaje WhatsApp enviado a ${phoneNumber}: ID ${response.data.idMessage}`);
     } catch (error) {
-      console.error('❌ Error enviando mensaje WhatsApp:', error.message);
-      throw new Error(`Error al enviar mensaje: ${error.message}`);
+      // 👈 LOG MEJORADO DEL ERROR
+      console.error('❌ Error enviando mensaje WhatsApp:');
+      console.error('  Status:', error.response?.status);
+      console.error('  Data:', error.response?.data);
+      console.error('  Message:', error.message);
+      console.error('  Body enviado:', JSON.stringify(error.config?.data || {}, null, 2));
+      throw new Error(`Error al enviar mensaje: ${error.response?.data?.message || error.message}`);
     }
   }
 
