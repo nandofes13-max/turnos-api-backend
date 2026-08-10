@@ -155,7 +155,7 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
 
   /**
    * Envía un mensaje usando GREEN API
-   * 👈 CON LOGS MEJORADOS
+   * 👈 CORREGIDO: elimina el signo + del chatId
    */
   private async enviarMensaje(
     instanceId: string,
@@ -166,12 +166,14 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
     try {
       const url = `${this.API_BASE_URL}/waInstance${instanceId}/sendMessage/${apiToken}`;
       
+      // 👈 ELIMINAR EL SIGNO + DEL CHATID
+      const chatId = phoneNumber.replace(/^\+/, '');
+      
       const body = {
-        chatId: `${phoneNumber}@c.us`,
+        chatId: `${chatId}@c.us`,
         message: mensaje,
       };
 
-      // 👈 LOG DETALLADO ANTES DE ENVIAR
       console.log('📤 Enviando mensaje a GREEN API:');
       console.log('  URL:', url);
       console.log('  phoneNumber:', phoneNumber);
@@ -186,7 +188,6 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
 
       console.log(`✅ Mensaje WhatsApp enviado a ${phoneNumber}: ID ${response.data.idMessage}`);
     } catch (error) {
-      // 👈 LOG MEJORADO DEL ERROR
       console.error('❌ Error enviando mensaje WhatsApp:');
       console.error('  Status:', error.response?.status);
       console.error('  Data:', error.response?.data);
