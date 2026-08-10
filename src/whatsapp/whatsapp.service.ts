@@ -26,7 +26,6 @@ export class WhatsappService {
    * @returns string | null
    */
   async obtenerNumeroWhatsAppNegocio(negocioId: number): Promise<string | null> {
-    // 1. Buscar en la configuración de WhatsApp
     const config = await this.configRepository.findOne({
       where: { negocioId, activo: true },
     });
@@ -35,7 +34,6 @@ export class WhatsappService {
       return config.phoneNumber;
     }
 
-    // 2. Si no hay configuración activa, buscar en la tabla negocio
     const negocio = await this.negocioRepository.findOne({
       where: { id: negocioId },
     });
@@ -63,15 +61,9 @@ export class WhatsappService {
       );
     }
 
-    // Determinar proveedor según la configuración
     switch (config.provider) {
       case 'greenapi':
         return this.greenApiProvider;
-
-      // FUTURO: caso para Meta Cloud API
-      // case 'meta':
-      //   return this.metaCloudProvider;
-
       default:
         throw new BadRequestException(
           `Proveedor de WhatsApp no soportado: ${config.provider}`
@@ -105,11 +97,40 @@ export class WhatsappService {
 
   /**
    * Valida la conexión con el proveedor configurado para el negocio
+   * 👈 AHORA USA LAS CREDENCIALES DE LA INSTANCIA ASIGNADA
    */
   async validarConexion(negocioId: number): Promise<boolean> {
     try {
-      const provider = await this.obtenerProveedor(negocioId);
-      return await provider.validarConexion(negocioId);
+      // 1. Obtener la configuración del negocio
+      const config = await this.configRepository.findOne({
+        where: { negocioId, activo: true },
+      });
+      
+      if (!config || !config.instanciaId) {
+        console.error(`❌ El negocio ${negocioId} no tiene instancia asignada`);
+        return false;
+      }
+      
+      // 2. Obtener la instancia con sus credenciales
+      const instancia = await this.instanciasService.findOne(config.instanciaId);
+      
+      if (!instancia) {
+        console.error(`❌ Instancia ${config.instanciaId} no encontrada`);
+        return false;
+      }
+      
+      // 3. Validar la conexión usando las credenciales de la instancia
+      const esValido = await this.greenApiProvider.validarConexionConCredenciales(
+        instancia.instanceId,
+        instancia.apiToken
+      );
+      
+      // 4. Actualizar el estado de la configuración del negocio
+      config.estado = esValido ? 'authorized' : 'error';
+      config.ultimaPrueba = new Date();
+      await this.configRepository.save(config);
+      
+      return esValido;
     } catch (error) {
       console.error(`❌ Error validando conexión WhatsApp del negocio ${negocioId}:`, error.message);
       return false;
@@ -127,14 +148,12 @@ export class WhatsappService {
 
   /**
    * Guarda o actualiza la configuración de WhatsApp de un negocio
-   * 👈 AHORA ASIGNA UNA INSTANCIA AUTOMÁTICAMENTE
    */
   async guardarConfiguracion(
     negocioId: number,
     phoneNumber?: string,
     provider: string = 'greenapi',
   ): Promise<WhatsappConfig> {
-    // Verificar que el negocio existe
     const negocio = await this.negocioRepository.findOne({
       where: { id: negocioId },
     });
@@ -142,7 +161,6 @@ export class WhatsappService {
       throw new NotFoundException(`Negocio con ID ${negocioId} no encontrado`);
     }
 
-    // 👈 BUSCAR UNA INSTANCIA DISPONIBLE
     const instancia = await this.instanciasService.findDisponible();
     if (!instancia) {
       throw new BadRequestException(
@@ -150,22 +168,18 @@ export class WhatsappService {
       );
     }
 
-    // Buscar configuración existente
     let config = await this.configRepository.findOne({
       where: { negocioId },
     });
 
-    // 👈 CORREGIDO: manejar null y undefined correctamente
     let phoneNumberFinal: string | null = null;
     if (phoneNumber) {
       phoneNumberFinal = phoneNumber;
     } else if (negocio.whatsapp_e164) {
       phoneNumberFinal = negocio.whatsapp_e164;
     }
-    // Si no hay ninguno, queda null
 
     if (config) {
-      // Actualizar existente
       config.phoneNumber = phoneNumberFinal;
       config.provider = provider;
       config.activo = true;
@@ -174,7 +188,6 @@ export class WhatsappService {
       config.usuario_modificacion = 'system';
       config.fecha_modificacion = new Date();
     } else {
-      // Crear nueva
       config = this.configRepository.create({
         negocioId,
         phoneNumber: phoneNumberFinal,
@@ -188,8 +201,6 @@ export class WhatsappService {
     }
 
     await this.configRepository.save(config);
-
-    // 👈 ACTUALIZAR CONTADOR DE LA INSTANCIA
     await this.instanciasService.actualizarContador(instancia.id);
 
     return config;
@@ -213,7 +224,6 @@ export class WhatsappService {
       config.fecha_modificacion = new Date();
       await this.configRepository.save(config);
 
-      // 👈 ACTUALIZAR CONTADOR DE LA INSTANCIA
       if (instanciaId) {
         await this.instanciasService.actualizarContador(instanciaId);
       }
