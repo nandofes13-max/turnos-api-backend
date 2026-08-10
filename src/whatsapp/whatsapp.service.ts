@@ -6,6 +6,7 @@ import { WhatsappProvider, NuevoTurnoWhatsappPayload } from './interfaces/whatsa
 import { GreenApiProvider } from './providers/green-api.provider';
 import { WhatsappConfig } from './entities/whatsapp-config.entity';
 import { Negocio } from '../negocios/entities/negocio.entity';
+import { InstanciasWhatsappService } from './instancias-whatsapp.service';
 
 @Injectable()
 export class WhatsappService {
@@ -15,7 +16,36 @@ export class WhatsappService {
     private readonly configRepository: Repository<WhatsappConfig>,
     @InjectRepository(Negocio)
     private readonly negocioRepository: Repository<Negocio>,
+    private readonly instanciasService: InstanciasWhatsappService,
   ) {}
+
+  /**
+   * Obtiene el número de WhatsApp de un negocio
+   * - Primero busca en negocio_whatsapp_config (si está activo)
+   * - Si no, busca en la tabla negocio
+   * @returns string | null
+   */
+  async obtenerNumeroWhatsAppNegocio(negocioId: number): Promise<string | null> {
+    // 1. Buscar en la configuración de WhatsApp
+    const config = await this.configRepository.findOne({
+      where: { negocioId, activo: true },
+    });
+
+    if (config && config.phoneNumber) {
+      return config.phoneNumber;
+    }
+
+    // 2. Si no hay configuración activa, buscar en la tabla negocio
+    const negocio = await this.negocioRepository.findOne({
+      where: { id: negocioId },
+    });
+
+    if (negocio && negocio.whatsapp_e164) {
+      return negocio.whatsapp_e164;
+    }
+
+    return null;
+  }
 
   /**
    * Obtiene el proveedor de WhatsApp configurado para un negocio
@@ -37,7 +67,7 @@ export class WhatsappService {
     switch (config.provider) {
       case 'greenapi':
         return this.greenApiProvider;
-      
+
       // FUTURO: caso para Meta Cloud API
       // case 'meta':
       //   return this.metaCloudProvider;
@@ -60,9 +90,7 @@ export class WhatsappService {
       const provider = await this.obtenerProveedor(negocioId);
       await provider.enviarNuevoTurno(negocioId, payload);
     } catch (error) {
-      // 👈 LOG pero NO lanzamos error para no romper el flujo de creación de turnos
       console.error(`❌ Error enviando notificación WhatsApp al negocio ${negocioId}:`, error.message);
-      // No re-lanzamos el error para que el turno se guarde igual
     }
   }
 
@@ -99,11 +127,10 @@ export class WhatsappService {
 
   /**
    * Guarda o actualiza la configuración de WhatsApp de un negocio
+   * 👈 AHORA ASIGNA UNA INSTANCIA AUTOMÁTICAMENTE
    */
   async guardarConfiguracion(
     negocioId: number,
-    instanceId: string,
-    apiToken: string,
     phoneNumber?: string,
     provider: string = 'greenapi',
   ): Promise<WhatsappConfig> {
@@ -115,27 +142,52 @@ export class WhatsappService {
       throw new NotFoundException(`Negocio con ID ${negocioId} no encontrado`);
     }
 
-    // Guardar configuración usando GREEN API provider (por ahora)
-    // En el futuro, cuando haya más providers, se podría delegar en un factory
-    const config = await this.greenApiProvider.guardarConfiguracion(
-      negocioId,
-      instanceId,
-      apiToken,
-      phoneNumber,
-      provider,
-    );
-
-    // Después de guardar, validar la conexión automáticamente
-    const esValido = await this.validarConexion(negocioId);
-    if (esValido) {
-      // Enviar mensaje de prueba automático
-      try {
-        await this.enviarMensajePrueba(negocioId);
-      } catch (error) {
-        console.error('⚠️ No se pudo enviar mensaje de prueba:', error.message);
-        // No fallamos la configuración si el mensaje de prueba falla
-      }
+    // 👈 BUSCAR UNA INSTANCIA DISPONIBLE
+    const instancia = await this.instanciasService.findDisponible();
+    if (!instancia) {
+      throw new BadRequestException(
+        'No hay instancias de WhatsApp disponibles. Contactá al administrador.'
+      );
     }
+
+    // Buscar configuración existente
+    let config = await this.configRepository.findOne({
+      where: { negocioId },
+    });
+
+    // Si el número no fue proporcionado, obtenerlo del negocio
+    let phoneNumberFinal = phoneNumber;
+    if (!phoneNumberFinal) {
+      phoneNumberFinal = negocio.whatsapp_e164 || null;
+    }
+
+    if (config) {
+      // Actualizar existente
+      config.phoneNumber = phoneNumberFinal;
+      config.provider = provider;
+      config.activo = true;
+      config.estado = 'pending';
+      config.instanciaId = instancia.id; // 👈 ASIGNAR INSTANCIA
+      config.usuario_modificacion = 'system';
+      config.fecha_modificacion = new Date();
+    } else {
+      // Crear nueva
+      config = this.configRepository.create({
+        negocioId,
+        phoneNumber: phoneNumberFinal,
+        provider,
+        activo: true,
+        estado: 'pending',
+        instanciaId: instancia.id, // 👈 ASIGNAR INSTANCIA
+        usuario_alta: 'system',
+        fecha_alta: new Date(),
+      });
+    }
+
+    await this.configRepository.save(config);
+
+    // 👈 ACTUALIZAR CONTADOR DE LA INSTANCIA
+    await this.instanciasService.actualizarContador(instancia.id);
 
     return config;
   }
@@ -149,11 +201,19 @@ export class WhatsappService {
     });
 
     if (config) {
+      const instanciaId = config.instanciaId;
       config.activo = false;
       config.estado = 'disabled';
+      config.fecha_baja = new Date();
+      config.usuario_baja = 'system';
       config.usuario_modificacion = 'system';
       config.fecha_modificacion = new Date();
       await this.configRepository.save(config);
+
+      // 👈 ACTUALIZAR CONTADOR DE LA INSTANCIA
+      if (instanciaId) {
+        await this.instanciasService.actualizarContador(instanciaId);
+      }
     }
   }
 }
