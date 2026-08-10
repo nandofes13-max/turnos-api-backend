@@ -1,9 +1,12 @@
 // src/whatsapp/entities/instancia-whatsapp.entity.ts
-import { Entity, Column, OneToMany } from 'typeorm';
+import { Entity, Column, OneToMany, Index } from 'typeorm';
 import { BaseEntityAuditable } from '../../entities/base.entity';
 import { WhatsappConfig } from './whatsapp-config.entity';
 
 @Entity('instancias_whatsapp')
+// 👈 ÍNDICES PARA MEJORAR EL RENDIMIENTO
+@Index(['estado'])
+@Index(['negociosActivos'])
 export class InstanciaWhatsapp extends BaseEntityAuditable {
   @Column({ name: 'instance_id', type: 'varchar', length: 50, nullable: false })
   instanceId: string;
