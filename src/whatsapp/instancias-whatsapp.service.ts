@@ -186,7 +186,7 @@ export class InstanciasWhatsappService {
   async actualizarContador(instanciaId: number): Promise<InstanciaWhatsapp> {
     const instancia = await this.findOne(instanciaId);
     
-    // Contar negocios activos asignados a esta instancia
+    // 👈 CORREGIDO: usar instanciaId (el nombre del campo en la entidad)
     const count = await this.configRepository.count({
       where: {
         instanciaId: instanciaId,
