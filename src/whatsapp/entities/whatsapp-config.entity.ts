@@ -2,6 +2,8 @@
 import { Entity, Column, ManyToOne, JoinColumn, Unique, Index } from 'typeorm';
 import { BaseEntityAuditable } from '../../entities/base.entity';
 import { Negocio } from '../../negocios/entities/negocio.entity';
+// 👈 IMPORTAR InstanciaWhatsapp
+import { InstanciaWhatsapp } from './instancia-whatsapp.entity';
 
 @Entity('negocio_whatsapp_config')
 @Unique(['negocioId']) // Solo una configuración por negocio
@@ -11,6 +13,10 @@ import { Negocio } from '../../negocios/entities/negocio.entity';
 export class WhatsappConfig extends BaseEntityAuditable {
   @Column({ name: 'negocio_id' })
   negocioId: number;
+
+  // 👈 NUEVO CAMPO: referencia a la instancia
+  @Column({ name: 'instancia_id', nullable: true })
+  instanciaId: number;
 
   @Column({ name: 'provider', type: 'varchar', length: 20, default: 'greenapi' })
   provider: string; // 'greenapi' | 'meta' (para futuro)
@@ -23,7 +29,7 @@ export class WhatsappConfig extends BaseEntityAuditable {
   apiToken: string;
 
   @Column({ name: 'phone_number', type: 'varchar', length: 20, nullable: true })
-  phoneNumber: string | null; // 👈 CAMBIADO: ahora acepta null
+  phoneNumber: string | null;
 
   // ===== FUTURO: META CLOUD API =====
   // @Column({ name: 'meta_waba_id', type: 'varchar', length: 100, nullable: true })
@@ -46,4 +52,9 @@ export class WhatsappConfig extends BaseEntityAuditable {
   @ManyToOne(() => Negocio)
   @JoinColumn({ name: 'negocio_id' })
   negocio: Negocio;
+
+  // 👈 NUEVA RELACIÓN: ManyToOne con InstanciaWhatsapp
+  @ManyToOne(() => InstanciaWhatsapp)
+  @JoinColumn({ name: 'instancia_id' })
+  instancia: InstanciaWhatsapp;
 }
