@@ -44,25 +44,33 @@ export class GreenApiProvider implements WhatsappProvider {
 
   /**
    * Obtiene el número de teléfono del negocio (desde GREEN API)
+   * Usa getWaSettings que devuelve el campo "phone"
    * @throws Error si no se puede obtener el número
    */
   private async obtenerNumeroTelefono(config: WhatsappConfig): Promise<string> {
     try {
-      const url = `${this.API_BASE_URL}/waInstance${config.instanceId}/getSettings/${config.apiToken}`;
-      const response = await axios.get(url);
+      // 👈 USAR getWaSettings (NO getSettings)
+      const url = `${this.API_BASE_URL}/waInstance${config.instanceId}/getWaSettings/${config.apiToken}`;
+      console.log(`[GreenApiProvider] Consultando getWaSettings para instancia ${config.instanceId}`);
       
+      const response = await axios.get(url);
+      console.log(`[GreenApiProvider] Respuesta de getWaSettings:`, JSON.stringify(response.data, null, 2));
+      
+      // 👈 El campo correcto es "phone"
       if (response.data && response.data.phone) {
+        console.log(`[GreenApiProvider] Número obtenido: ${response.data.phone}`);
         return response.data.phone;
       }
       
       // Fallback: usar el número guardado en la configuración
       if (config.phoneNumber) {
+        console.log(`[GreenApiProvider] Usando phoneNumber de la configuración: ${config.phoneNumber}`);
         return config.phoneNumber;
       }
       
       throw new Error('No se pudo obtener el número de teléfono de GREEN API');
     } catch (error) {
-      console.error('Error obteniendo número de GREEN API:', error.message);
+      console.error('[GreenApiProvider] Error obteniendo número de GREEN API:', error.message);
       if (config.phoneNumber) {
         return config.phoneNumber;
       }
