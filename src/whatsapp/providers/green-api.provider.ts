@@ -6,6 +6,7 @@ import axios from 'axios';
 import { WhatsappProvider, NuevoTurnoWhatsappPayload } from '../interfaces/whatsapp-provider.interface';
 import { WhatsappConfig } from '../entities/whatsapp-config.entity';
 import { Negocio } from '../../negocios/entities/negocio.entity';
+import { InstanciaWhatsapp } from '../entities/instancia-whatsapp.entity'; // 👈 AGREGAR
 
 @Injectable()
 export class GreenApiProvider implements WhatsappProvider {
@@ -16,13 +17,16 @@ export class GreenApiProvider implements WhatsappProvider {
     private readonly configRepository: Repository<WhatsappConfig>,
     @InjectRepository(Negocio)
     private readonly negocioRepository: Repository<Negocio>,
+    @InjectRepository(InstanciaWhatsapp) // 👈 AGREGAR
+    private readonly instanciaRepository: Repository<InstanciaWhatsapp>,
   ) {}
 
   /**
    * Obtiene la configuración de WhatsApp de un negocio
+   * 👈 AHORA OBTIENE LAS CREDENCIALES DE LA INSTANCIA ASIGNADA
    * @throws NotFoundException si el negocio no tiene configuración
    */
-  private async obtenerConfiguracion(negocioId: number): Promise<WhatsappConfig> {
+  private async obtenerConfiguracion(negocioId: number): Promise<{ config: WhatsappConfig; instanceId: string; apiToken: string }> {
     const config = await this.configRepository.findOne({
       where: { negocioId, activo: true },
     });
@@ -33,13 +37,34 @@ export class GreenApiProvider implements WhatsappProvider {
       );
     }
 
-    if (!config.instanceId || !config.apiToken) {
+    if (!config.instanciaId) {
       throw new BadRequestException(
-        `La configuración de WhatsApp del negocio ID ${negocioId} está incompleta.`
+        `La configuración de WhatsApp del negocio ID ${negocioId} no tiene una instancia asignada.`
       );
     }
 
-    return config;
+    // 👈 OBTENER LA INSTANCIA CON SUS CREDENCIALES
+    const instancia = await this.instanciaRepository.findOne({
+      where: { id: config.instanciaId },
+    });
+
+    if (!instancia) {
+      throw new NotFoundException(
+        `Instancia ID ${config.instanciaId} no encontrada.`
+      );
+    }
+
+    if (!instancia.instanceId || !instancia.apiToken) {
+      throw new BadRequestException(
+        `La instancia ID ${config.instanciaId} tiene credenciales incompletas.`
+      );
+    }
+
+    return {
+      config,
+      instanceId: instancia.instanceId,
+      apiToken: instancia.apiToken,
+    };
   }
 
   /**
@@ -47,10 +72,10 @@ export class GreenApiProvider implements WhatsappProvider {
    * Usa getWaSettings que devuelve el campo "phone"
    * @throws Error si no se puede obtener el número
    */
-  private async obtenerNumeroTelefono(config: WhatsappConfig): Promise<string> {
+  private async obtenerNumeroTelefono(instanceId: string, apiToken: string, config: WhatsappConfig): Promise<string> {
     try {
-      const url = `${this.API_BASE_URL}/waInstance${config.instanceId}/getWaSettings/${config.apiToken}`;
-      console.log(`[GreenApiProvider] Consultando getWaSettings para instancia ${config.instanceId}`);
+      const url = `${this.API_BASE_URL}/waInstance${instanceId}/getWaSettings/${apiToken}`;
+      console.log(`[GreenApiProvider] Consultando getWaSettings para instancia ${instanceId}`);
       
       const response = await axios.get(url);
       console.log(`[GreenApiProvider] Respuesta de getWaSettings:`, JSON.stringify(response.data, null, 2));
@@ -82,10 +107,9 @@ export class GreenApiProvider implements WhatsappProvider {
     negocioId: number,
     payload: NuevoTurnoWhatsappPayload,
   ): Promise<void> {
-    const config = await this.obtenerConfiguracion(negocioId);
-    const phoneNumber = await this.obtenerNumeroTelefono(config);
+    const { config, instanceId, apiToken } = await this.obtenerConfiguracion(negocioId);
+    const phoneNumber = await this.obtenerNumeroTelefono(instanceId, apiToken, config);
 
-    // 👈 OBTENER EL NEGOCIO PARA EL ENLACE DE GESTIÓN
     const negocio = await this.negocioRepository.findOne({
       where: { id: negocioId },
     });
@@ -94,19 +118,16 @@ export class GreenApiProvider implements WhatsappProvider {
       throw new NotFoundException(`Negocio con ID ${negocioId} no encontrado`);
     }
 
-    // 📝 Construir mensaje con el enlace de gestión
     const mensaje = this.construirMensajeTurno(payload, negocio.urlGestion);
-
-    // 📤 Enviar mensaje (sin notification)
-    await this.enviarMensaje(config, phoneNumber, mensaje);
+    await this.enviarMensaje(instanceId, apiToken, phoneNumber, mensaje);
   }
 
   /**
    * Envía un mensaje de prueba usando GREEN API
    */
   async enviarMensajePrueba(negocioId: number): Promise<void> {
-    const config = await this.obtenerConfiguracion(negocioId);
-    const phoneNumber = await this.obtenerNumeroTelefono(config);
+    const { config, instanceId, apiToken } = await this.obtenerConfiguracion(negocioId);
+    const phoneNumber = await this.obtenerNumeroTelefono(instanceId, apiToken, config);
 
     const mensajePrueba = `
 ✅ PWA-Turnos: alertas de turnos activadas correctamente
@@ -116,31 +137,23 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
 📌 Para más información, ingresa a tu panel de gestión.
     `.trim();
 
-    await this.enviarMensaje(config, phoneNumber, mensajePrueba);
+    await this.enviarMensaje(instanceId, apiToken, phoneNumber, mensajePrueba);
   }
 
   /**
-   * Valida la conexión con GREEN API
+   * Valida la conexión con GREEN API usando la configuración del negocio
+   * 👈 AHORA USA LAS CREDENCIALES DE LA INSTANCIA
    */
   async validarConexion(negocioId: number): Promise<boolean> {
     try {
-      const config = await this.obtenerConfiguracion(negocioId);
+      const { config, instanceId, apiToken } = await this.obtenerConfiguracion(negocioId);
+      const esValido = await this.validarConexionConCredenciales(instanceId, apiToken);
       
-      if (!config.instanceId || !config.apiToken) {
-        return false;
-      }
-
-      const url = `${this.API_BASE_URL}/waInstance${config.instanceId}/getStateInstance/${config.apiToken}`;
-      const response = await axios.get(url);
-      
-      const stateInstance = response.data?.stateInstance;
-      const esAutorizado = stateInstance === 'authorized' || stateInstance === 'online';
-      
-      config.estado = esAutorizado ? 'authorized' : 'error';
+      config.estado = esValido ? 'authorized' : 'error';
       config.ultimaPrueba = new Date();
       await this.configRepository.save(config);
       
-      return esAutorizado;
+      return esValido;
     } catch (error) {
       console.error('Error validando conexión GREEN API:', error.message);
       return false;
@@ -148,16 +161,37 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
   }
 
   /**
+   * Valida la conexión con GREEN API usando credenciales específicas
+   * 👈 NUEVO MÉTODO
+   */
+  async validarConexionConCredenciales(instanceId: string, apiToken: string): Promise<boolean> {
+    try {
+      const url = `${this.API_BASE_URL}/waInstance${instanceId}/getStateInstance/${apiToken}`;
+      const response = await axios.get(url);
+      
+      const stateInstance = response.data?.stateInstance;
+      const esValido = stateInstance === 'authorized' || stateInstance === 'online';
+      
+      console.log(`[GreenApiProvider] Validando instancia ${instanceId}: estado=${stateInstance}, válido=${esValido}`);
+      
+      return esValido;
+    } catch (error) {
+      console.error('[GreenApiProvider] Error validando credenciales:', error.message);
+      return false;
+    }
+  }
+
+  /**
    * Envía un mensaje usando GREEN API
-   * 👈 SIN NOTIFICATION (GREEN API no lo soporta)
    */
   private async enviarMensaje(
-    config: WhatsappConfig,
+    instanceId: string,
+    apiToken: string,
     phoneNumber: string,
     mensaje: string,
   ): Promise<void> {
     try {
-      const url = `${this.API_BASE_URL}/waInstance${config.instanceId}/sendMessage/${config.apiToken}`;
+      const url = `${this.API_BASE_URL}/waInstance${instanceId}/sendMessage/${apiToken}`;
       
       const body = {
         chatId: `${phoneNumber}@c.us`,
@@ -179,10 +213,8 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
 
   /**
    * Construye el mensaje de notificación de turno
-   * 👈 SIN EMOJI Y CON ENLACE DE GESTIÓN
    */
   private construirMensajeTurno(payload: NuevoTurnoWhatsappPayload, urlGestion: string): string {
-    // 📝 Construir el enlace completo de gestión
     const frontendUrl = process.env.FRONTEND_URL || 'https://turnos-pwa-frontend.onrender.com';
     const enlaceGestion = `${frontendUrl}/gestion/turnos/${urlGestion}`;
 
@@ -214,6 +246,7 @@ Hora: ${payload.hora}
 
   /**
    * Guarda o actualiza la configuración de WhatsApp de un negocio
+   * @deprecated Este método ya no se usa. Usar WhatsappService.guardarConfiguracion()
    */
   async guardarConfiguracion(
     negocioId: number,
