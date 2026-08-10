@@ -6,7 +6,7 @@ import axios from 'axios';
 import { WhatsappProvider, NuevoTurnoWhatsappPayload } from '../interfaces/whatsapp-provider.interface';
 import { WhatsappConfig } from '../entities/whatsapp-config.entity';
 import { Negocio } from '../../negocios/entities/negocio.entity';
-import { InstanciaWhatsapp } from '../entities/instancia-whatsapp.entity'; // 👈 AGREGAR
+import { InstanciaWhatsapp } from '../entities/instancia-whatsapp.entity';
 
 @Injectable()
 export class GreenApiProvider implements WhatsappProvider {
@@ -17,7 +17,7 @@ export class GreenApiProvider implements WhatsappProvider {
     private readonly configRepository: Repository<WhatsappConfig>,
     @InjectRepository(Negocio)
     private readonly negocioRepository: Repository<Negocio>,
-    @InjectRepository(InstanciaWhatsapp) // 👈 AGREGAR
+    @InjectRepository(InstanciaWhatsapp)
     private readonly instanciaRepository: Repository<InstanciaWhatsapp>,
   ) {}
 
@@ -68,47 +68,21 @@ export class GreenApiProvider implements WhatsappProvider {
   }
 
   /**
-   * Obtiene el número de teléfono del negocio (desde GREEN API)
-   * Usa getWaSettings que devuelve el campo "phone"
-   * @throws Error si no se puede obtener el número
-   */
-  private async obtenerNumeroTelefono(instanceId: string, apiToken: string, config: WhatsappConfig): Promise<string> {
-    try {
-      const url = `${this.API_BASE_URL}/waInstance${instanceId}/getWaSettings/${apiToken}`;
-      console.log(`[GreenApiProvider] Consultando getWaSettings para instancia ${instanceId}`);
-      
-      const response = await axios.get(url);
-      console.log(`[GreenApiProvider] Respuesta de getWaSettings:`, JSON.stringify(response.data, null, 2));
-      
-      if (response.data && response.data.phone) {
-        console.log(`[GreenApiProvider] Número obtenido: ${response.data.phone}`);
-        return response.data.phone;
-      }
-      
-      if (config.phoneNumber) {
-        console.log(`[GreenApiProvider] Usando phoneNumber de la configuración: ${config.phoneNumber}`);
-        return config.phoneNumber;
-      }
-      
-      throw new Error('No se pudo obtener el número de teléfono de GREEN API');
-    } catch (error) {
-      console.error('[GreenApiProvider] Error obteniendo número de GREEN API:', error.message);
-      if (config.phoneNumber) {
-        return config.phoneNumber;
-      }
-      throw new Error('No se pudo obtener el número de teléfono del negocio');
-    }
-  }
-
-  /**
    * Envía una notificación de nuevo turno usando GREEN API
+   * 👈 AHORA USA EL NÚMERO DEL NEGOCIO (config.phoneNumber)
    */
   async enviarNuevoTurno(
     negocioId: number,
     payload: NuevoTurnoWhatsappPayload,
   ): Promise<void> {
     const { config, instanceId, apiToken } = await this.obtenerConfiguracion(negocioId);
-    const phoneNumber = await this.obtenerNumeroTelefono(instanceId, apiToken, config);
+
+    // 👈 USAR EL NÚMERO DEL NEGOCIO (no el de la instancia)
+    if (!config.phoneNumber) {
+      throw new BadRequestException(
+        `El negocio ID ${negocioId} no tiene un número de WhatsApp configurado.`
+      );
+    }
 
     const negocio = await this.negocioRepository.findOne({
       where: { id: negocioId },
@@ -119,15 +93,22 @@ export class GreenApiProvider implements WhatsappProvider {
     }
 
     const mensaje = this.construirMensajeTurno(payload, negocio.urlGestion);
-    await this.enviarMensaje(instanceId, apiToken, phoneNumber, mensaje);
+    await this.enviarMensaje(instanceId, apiToken, config.phoneNumber, mensaje);
   }
 
   /**
    * Envía un mensaje de prueba usando GREEN API
+   * 👈 AHORA USA EL NÚMERO DEL NEGOCIO (config.phoneNumber)
    */
   async enviarMensajePrueba(negocioId: number): Promise<void> {
     const { config, instanceId, apiToken } = await this.obtenerConfiguracion(negocioId);
-    const phoneNumber = await this.obtenerNumeroTelefono(instanceId, apiToken, config);
+
+    // 👈 USAR EL NÚMERO DEL NEGOCIO (no el de la instancia)
+    if (!config.phoneNumber) {
+      throw new BadRequestException(
+        `El negocio ID ${negocioId} no tiene un número de WhatsApp configurado.`
+      );
+    }
 
     const mensajePrueba = `
 ✅ PWA-Turnos: alertas de turnos activadas correctamente
@@ -137,12 +118,11 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
 📌 Para más información, ingresa a tu panel de gestión.
     `.trim();
 
-    await this.enviarMensaje(instanceId, apiToken, phoneNumber, mensajePrueba);
+    await this.enviarMensaje(instanceId, apiToken, config.phoneNumber, mensajePrueba);
   }
 
   /**
    * Valida la conexión con GREEN API usando la configuración del negocio
-   * 👈 AHORA USA LAS CREDENCIALES DE LA INSTANCIA
    */
   async validarConexion(negocioId: number): Promise<boolean> {
     try {
@@ -162,7 +142,6 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
 
   /**
    * Valida la conexión con GREEN API usando credenciales específicas
-   * 👈 NUEVO MÉTODO
    */
   async validarConexionConCredenciales(instanceId: string, apiToken: string): Promise<boolean> {
     try {
