@@ -143,19 +143,22 @@ export class WhatsappService {
 
   /**
    * Guarda o actualiza la configuración de WhatsApp de un negocio
-   * 👈 AHORA COPIA LAS CREDENCIALES DE LA INSTANCIA
+   * 👈 CON LOGS PARA DEPURAR
    */
   async guardarConfiguracion(
     negocioId: number,
     phoneNumber?: string,
     provider: string = 'greenapi',
   ): Promise<WhatsappConfig> {
+    console.log(`📦 [guardarConfiguracion] Iniciando para negocio ID ${negocioId}`);
+    
     const negocio = await this.negocioRepository.findOne({
       where: { id: negocioId },
     });
     if (!negocio) {
       throw new NotFoundException(`Negocio con ID ${negocioId} no encontrado`);
     }
+    console.log(`📦 [guardarConfiguracion] Negocio encontrado: ${negocio.nombre}`);
 
     const instancia = await this.instanciasService.findDisponible();
     if (!instancia) {
@@ -163,6 +166,12 @@ export class WhatsappService {
         'No hay instancias de WhatsApp disponibles. Contactá al administrador.'
       );
     }
+    console.log(`📦 [guardarConfiguracion] Instancia encontrada: ID ${instancia.id}`);
+    console.log(`📦 [guardarConfiguracion] Instancia - instanceId: ${instancia.instanceId}`);
+    console.log(`📦 [guardarConfiguracion] Instancia - apiToken: ${instancia.apiToken ? '***' : 'null'}`);
+    console.log(`📦 [guardarConfiguracion] Instancia - numeroWhatsapp: ${instancia.numeroWhatsapp}`);
+    console.log(`📦 [guardarConfiguracion] Instancia - negociosActivos: ${instancia.negociosActivos}`);
+    console.log(`📦 [guardarConfiguracion] Instancia - estado: ${instancia.estado}`);
 
     let config = await this.configRepository.findOne({
       where: { negocioId },
@@ -174,20 +183,21 @@ export class WhatsappService {
     } else if (negocio.whatsapp_e164) {
       phoneNumberFinal = negocio.whatsapp_e164.replace(/^\+/, '');
     }
+    console.log(`📦 [guardarConfiguracion] phoneNumberFinal: ${phoneNumberFinal}`);
 
     if (config) {
-      // 👈 ACTUALIZAR INCLUYENDO CREDENCIALES DE LA INSTANCIA
+      console.log(`📦 [guardarConfiguracion] Actualizando configuración existente ID ${config.id}`);
       config.phoneNumber = phoneNumberFinal;
       config.provider = provider;
       config.activo = true;
       config.estado = 'pending';
       config.instanciaId = instancia.id;
-      config.instanceId = instancia.instanceId; // 👈 COPIAR
-      config.apiToken = instancia.apiToken;     // 👈 COPIAR
+      config.instanceId = instancia.instanceId;
+      config.apiToken = instancia.apiToken;
       config.usuario_modificacion = 'system';
       config.fecha_modificacion = new Date();
     } else {
-      // 👈 CREAR INCLUYENDO CREDENCIALES DE LA INSTANCIA
+      console.log(`📦 [guardarConfiguracion] Creando nueva configuración`);
       config = this.configRepository.create({
         negocioId,
         phoneNumber: phoneNumberFinal,
@@ -195,17 +205,26 @@ export class WhatsappService {
         activo: true,
         estado: 'pending',
         instanciaId: instancia.id,
-        instanceId: instancia.instanceId, // 👈 COPIAR
-        apiToken: instancia.apiToken,     // 👈 COPIAR
+        instanceId: instancia.instanceId,
+        apiToken: instancia.apiToken,
         usuario_alta: 'system',
         fecha_alta: new Date(),
       });
     }
 
-    await this.configRepository.save(config);
-    await this.instanciasService.actualizarContador(instancia.id);
+    console.log(`📦 [guardarConfiguracion] Configuración a guardar:`);
+    console.log(`  - instanceId: ${config.instanceId}`);
+    console.log(`  - apiToken: ${config.apiToken ? '***' : 'null'}`);
+    console.log(`  - instanciaId: ${config.instanciaId}`);
+    console.log(`  - phoneNumber: ${config.phoneNumber}`);
 
-    return config;
+    const configGuardada = await this.configRepository.save(config);
+    console.log(`📦 [guardarConfiguracion] Configuración guardada con ID ${configGuardada.id}`);
+
+    await this.instanciasService.actualizarContador(instancia.id);
+    console.log(`📦 [guardarConfiguracion] Contador de instancia actualizado`);
+
+    return configGuardada;
   }
 
   /**
