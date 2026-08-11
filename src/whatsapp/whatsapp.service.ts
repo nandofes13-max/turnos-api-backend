@@ -7,6 +7,8 @@ import { GreenApiProvider } from './providers/green-api.provider';
 import { WhatsappConfig } from './entities/whatsapp-config.entity';
 import { Negocio } from '../negocios/entities/negocio.entity';
 import { InstanciasWhatsappService } from './instancias-whatsapp.service';
+// 👈 IMPORTAR FUNCIÓN DE NORMALIZACIÓN
+import { normalizePhoneNumber } from '../common/utils/phone-utils';
 
 @Injectable()
 export class WhatsappService {
@@ -143,7 +145,7 @@ export class WhatsappService {
 
   /**
    * Guarda o actualiza la configuración de WhatsApp de un negocio
-   * 👈 CON LOGS PARA DEPURAR
+   * 👈 AHORA NORMALIZA EL NÚMERO DE TELÉFONO
    */
   async guardarConfiguracion(
     negocioId: number,
@@ -177,11 +179,17 @@ export class WhatsappService {
       where: { negocioId },
     });
 
+    // 👈 NORMALIZAR EL NÚMERO DE TELÉFONO
     let phoneNumberFinal: string | null = null;
-    if (phoneNumber) {
-      phoneNumberFinal = phoneNumber.replace(/^\+/, '');
-    } else if (negocio.whatsapp_e164) {
-      phoneNumberFinal = negocio.whatsapp_e164.replace(/^\+/, '');
+    try {
+      if (phoneNumber) {
+        phoneNumberFinal = normalizePhoneNumber(phoneNumber);
+      } else if (negocio.whatsapp_e164) {
+        phoneNumberFinal = normalizePhoneNumber(negocio.whatsapp_e164);
+      }
+    } catch (error) {
+      console.error('❌ Error normalizando número:', error.message);
+      throw new BadRequestException(`Número de teléfono inválido: ${error.message}`);
     }
     console.log(`📦 [guardarConfiguracion] phoneNumberFinal: ${phoneNumberFinal}`);
 
