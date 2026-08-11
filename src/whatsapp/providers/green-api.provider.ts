@@ -7,6 +7,8 @@ import { WhatsappProvider, NuevoTurnoWhatsappPayload } from '../interfaces/whats
 import { WhatsappConfig } from '../entities/whatsapp-config.entity';
 import { Negocio } from '../../negocios/entities/negocio.entity';
 import { InstanciaWhatsapp } from '../entities/instancia-whatsapp.entity';
+// 👈 IMPORTAR FUNCIÓN DE NORMALIZACIÓN
+import { normalizePhoneNumber } from '../../common/utils/phone-utils';
 
 @Injectable()
 export class GreenApiProvider implements WhatsappProvider {
@@ -155,7 +157,7 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
 
   /**
    * Envía un mensaje usando GREEN API
-   * 👈 CORREGIDO: usa el número sin +
+   * 👈 AHORA NORMALIZA EL NÚMERO DE TELÉFONO
    */
   private async enviarMensaje(
     instanceId: string,
@@ -164,19 +166,21 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
     mensaje: string,
   ): Promise<void> {
     try {
+      // 👈 NORMALIZAR EL NÚMERO DE TELÉFONO
+      const normalizedNumber = normalizePhoneNumber(phoneNumber);
+      const chatId = `${normalizedNumber}@c.us`;
+      
       const url = `${this.API_BASE_URL}/waInstance${instanceId}/sendMessage/${apiToken}`;
       
-      // 👈 ELIMINAR EL SIGNO + DEL CHATID
-      const chatId = phoneNumber.replace(/^\+/, '');
-      
       const body = {
-        chatId: `${chatId}@c.us`,
+        chatId: chatId,
         message: mensaje,
       };
 
       console.log('📤 Enviando mensaje a GREEN API:');
       console.log('  URL:', url);
-      console.log('  phoneNumber:', phoneNumber);
+      console.log('  phoneNumber (original):', phoneNumber);
+      console.log('  phoneNumber (normalizado):', normalizedNumber);
       console.log('  chatId:', body.chatId);
       console.log('  message:', body.message.substring(0, 100) + '...');
 
@@ -186,7 +190,7 @@ Recibirás un mensaje como este cada vez que un cliente reserve un turno en tu n
         throw new Error('GREEN API no devolvió idMessage');
       }
 
-      console.log(`✅ Mensaje WhatsApp enviado a ${phoneNumber}: ID ${response.data.idMessage}`);
+      console.log(`✅ Mensaje WhatsApp enviado a ${normalizedNumber}: ID ${response.data.idMessage}`);
     } catch (error) {
       console.error('❌ Error enviando mensaje WhatsApp:');
       console.error('  Status:', error.response?.status);
