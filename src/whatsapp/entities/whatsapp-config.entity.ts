@@ -2,11 +2,10 @@
 import { Entity, Column, ManyToOne, JoinColumn, Unique, Index } from 'typeorm';
 import { BaseEntityAuditable } from '../../entities/base.entity';
 import { Negocio } from '../../negocios/entities/negocio.entity';
-// 👈 IMPORTAR InstanciaWhatsapp
 import { InstanciaWhatsapp } from './instancia-whatsapp.entity';
 
 @Entity('negocio_whatsapp_config')
-@Unique(['negocioId']) // Solo una configuración por negocio
+@Unique(['negocioId'])
 @Index(['negocioId'])
 @Index(['provider'])
 @Index(['activo'])
@@ -14,14 +13,12 @@ export class WhatsappConfig extends BaseEntityAuditable {
   @Column({ name: 'negocio_id' })
   negocioId: number;
 
-  // 👈 NUEVO CAMPO: referencia a la instancia
   @Column({ name: 'instancia_id', nullable: true })
   instanciaId: number;
 
   @Column({ name: 'provider', type: 'varchar', length: 20, default: 'greenapi' })
-  provider: string; // 'greenapi' | 'meta' (para futuro)
+  provider: string;
 
-  // ===== GREEN API =====
   @Column({ name: 'instance_id', type: 'varchar', length: 50, nullable: true })
   instanceId: string;
 
@@ -31,33 +28,29 @@ export class WhatsappConfig extends BaseEntityAuditable {
   @Column({ name: 'phone_number', type: 'varchar', length: 20, nullable: true })
   phoneNumber: string | null;
 
-  // 👈 NUEVO CAMPO: acceso a la funcionalidad (controlado por administrador)
   @Column({ name: 'acceso_whatsapp', type: 'boolean', default: false })
   accesoWhatsapp: boolean;
 
-  // ===== FUTURO: META CLOUD API =====
-  // @Column({ name: 'meta_waba_id', type: 'varchar', length: 100, nullable: true })
-  // metaWabaId: string;
-  //
-  // @Column({ name: 'meta_phone_number_id', type: 'varchar', length: 100, nullable: true })
-  // metaPhoneNumberId: string;
-
-  // ===== ESTADO GENERAL =====
   @Column({ name: 'activo', type: 'boolean', default: false })
   activo: boolean;
 
   @Column({ name: 'estado', type: 'varchar', length: 20, nullable: true })
-  estado: string; // 'pending' | 'authorized' | 'error' | 'disabled'
+  estado: string;
 
   @Column({ name: 'ultima_prueba', type: 'timestamp', nullable: true })
   ultimaPrueba: Date | null;
 
-  // ===== RELACIONES =====
+  // 👈 CAMBIAR TIPOS PARA ACEPTAR NULL
+  @Column({ name: 'fecha_baja', type: 'timestamp', nullable: true })
+  fecha_baja: Date | null;
+
+  @Column({ name: 'usuario_baja', type: 'varchar', length: 50, nullable: true })
+  usuario_baja: string | null;
+
   @ManyToOne(() => Negocio)
   @JoinColumn({ name: 'negocio_id' })
   negocio: Negocio;
 
-  // 👈 NUEVA RELACIÓN: ManyToOne con InstanciaWhatsapp
   @ManyToOne(() => InstanciaWhatsapp)
   @JoinColumn({ name: 'instancia_id' })
   instancia: InstanciaWhatsapp;
