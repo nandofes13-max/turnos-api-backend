@@ -129,4 +129,39 @@ export class WhatsappController {
       message: 'Configuración de WhatsApp desactivada correctamente',
     };
   }
+
+  // ============================================================
+  // 👈 NUEVOS ENDPOINTS PARA GESTIONAR EL ACCESO A WHATSAPP
+  // ============================================================
+
+  /**
+   * GET /whatsapp/:negocioId/acceso
+   * Obtiene el estado de acceso a WhatsApp de un negocio
+   */
+  @Get(':negocioId/acceso')
+  async obtenerAcceso(@Param('negocioId') negocioId: string) {
+    const id = Number(negocioId);
+    const acceso = await this.whatsappService.obtenerAcceso(id);
+    return { acceso };
+  }
+
+  /**
+   * PUT /whatsapp/:negocioId/acceso
+   * Actualiza el estado de acceso a WhatsApp de un negocio
+   */
+  @Put(':negocioId/acceso')
+  async actualizarAcceso(
+    @Param('negocioId') negocioId: string,
+    @Body('acceso') acceso: boolean,
+  ) {
+    const id = Number(negocioId);
+    if (typeof acceso !== 'boolean') {
+      throw new BadRequestException('El campo "acceso" debe ser booleano');
+    }
+    await this.whatsappService.actualizarAcceso(id, acceso);
+    return {
+      success: true,
+      message: `Acceso a WhatsApp actualizado correctamente a: ${acceso ? 'HABILITADO' : 'DESHABILITADO'}`,
+    };
+  }
 }
