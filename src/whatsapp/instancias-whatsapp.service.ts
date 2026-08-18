@@ -181,15 +181,16 @@ export class InstanciasWhatsappService {
 
   /**
    * Actualiza el contador de negocios activos y el estado de una instancia
-   * Se llama automáticamente cuando se activa o desactiva un negocio
+   * 👈 AHORA CUENTA SOLO NEGOCIOS CON WHATSAPP ACTIVO
    */
   async actualizarContador(instanciaId: number): Promise<InstanciaWhatsapp> {
     const instancia = await this.findOne(instanciaId);
     
-    // 👈 CORREGIDO: usar instanciaId (el nombre del campo en la entidad)
+    // 👈 CONTAR SOLO NEGOCIOS CON WHATSAPP ACTIVO
     const count = await this.configRepository.count({
       where: {
         instanciaId: instanciaId,
+        activo: true,        // 👈 SOLO NEGOCIOS CON WHATSAPP ACTIVO
         fecha_baja: IsNull(),
       },
     });
