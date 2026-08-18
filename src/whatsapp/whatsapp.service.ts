@@ -1,71 +1,296 @@
-// src/whatsapp/entities/whatsapp-config.entity.ts
-import { Entity, Column, ManyToOne, JoinColumn, Unique, Index } from 'typeorm';
-import { BaseEntityAuditable } from '../../entities/base.entity';
-import { Negocio } from '../../negocios/entities/negocio.entity';
-// 👈 IMPORTAR InstanciaWhatsapp
-import { InstanciaWhatsapp } from './instancia-whatsapp.entity';
+// src/whatsapp/whatsapp.service.ts
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { WhatsappProvider, NuevoTurnoWhatsappPayload } from './interfaces/whatsapp-provider.interface';
+import { GreenApiProvider } from './providers/green-api.provider';
+import { WhatsappConfig } from './entities/whatsapp-config.entity';
+import { InstanciaWhatsapp } from './entities/instancia-whatsapp.entity'; // 👈 RUTA CORREGIDA
+import { Negocio } from '../negocios/entities/negocio.entity'; // 👈 RUTA CORREGIDA
+import { BaseEntityAuditable } from '../entities/base.entity'; // 👈 RUTA CORREGIDA
+import { InstanciasWhatsappService } from './instancias-whatsapp.service';
+import { normalizePhoneNumber } from '../common/utils/phone-utils';
 
-@Entity('negocio_whatsapp_config')
-@Unique(['negocioId']) // Solo una configuración por negocio
-@Index(['negocioId'])
-@Index(['provider'])
-@Index(['activo'])
-export class WhatsappConfig extends BaseEntityAuditable {
-  @Column({ name: 'negocio_id' })
-  negocioId: number;
+@Injectable()
+export class WhatsappService {
+  constructor(
+    private readonly greenApiProvider: GreenApiProvider,
+    @InjectRepository(WhatsappConfig)
+    private readonly configRepository: Repository<WhatsappConfig>,
+    @InjectRepository(Negocio)
+    private readonly negocioRepository: Repository<Negocio>,
+    private readonly instanciasService: InstanciasWhatsappService,
+  ) {}
 
-  // 👈 NUEVO CAMPO: referencia a la instancia
-  @Column({ name: 'instancia_id', nullable: true })
-  instanciaId: number;
+  /**
+   * Obtiene el número de WhatsApp de un negocio
+   * - Primero busca en negocio_whatsapp_config (si está activo)
+   * - Si no, busca en la tabla negocio
+   * @returns string | null
+   */
+  async obtenerNumeroWhatsAppNegocio(negocioId: number): Promise<string | null> {
+    const config = await this.configRepository.findOne({
+      where: { negocioId, activo: true },
+    });
 
-  @Column({ name: 'provider', type: 'varchar', length: 20, default: 'greenapi' })
-  provider: string; // 'greenapi' | 'meta' (para futuro)
+    if (config && config.phoneNumber) {
+      return config.phoneNumber;
+    }
 
-  // ===== GREEN API =====
-  @Column({ name: 'instance_id', type: 'varchar', length: 50, nullable: true })
-  instanceId: string;
+    const negocio = await this.negocioRepository.findOne({
+      where: { id: negocioId },
+    });
 
-  @Column({ name: 'api_token', type: 'varchar', length: 200, nullable: true })
-  apiToken: string;
+    if (negocio && negocio.whatsapp_e164) {
+      return negocio.whatsapp_e164;
+    }
 
-  @Column({ name: 'phone_number', type: 'varchar', length: 20, nullable: true })
-  phoneNumber: string | null;
+    return null;
+  }
 
-  // 👈 NUEVO CAMPO: acceso a la funcionalidad (controlado por administrador)
-  @Column({ name: 'acceso_whatsapp', type: 'boolean', default: false })
-  accesoWhatsapp: boolean;
+  /**
+   * Obtiene el proveedor de WhatsApp configurado para un negocio
+   * @throws NotFoundException si el negocio no tiene configuración
+   * @throws BadRequestException si el proveedor no está soportado
+   */
+  private async obtenerProveedor(negocioId: number): Promise<WhatsappProvider> {
+    const config = await this.configRepository.findOne({
+      where: { negocioId, activo: true },
+    });
 
-  // ===== FUTURO: META CLOUD API =====
-  // @Column({ name: 'meta_waba_id', type: 'varchar', length: 100, nullable: true })
-  // metaWabaId: string;
-  //
-  // @Column({ name: 'meta_phone_number_id', type: 'varchar', length: 100, nullable: true })
-  // metaPhoneNumberId: string;
+    if (!config) {
+      throw new NotFoundException(
+        `El negocio ID ${negocioId} no tiene configuración de WhatsApp activa.`
+      );
+    }
 
-  // ===== ESTADO GENERAL =====
-  @Column({ name: 'activo', type: 'boolean', default: false })
-  activo: boolean;
+    switch (config.provider) {
+      case 'greenapi':
+        return this.greenApiProvider;
+      default:
+        throw new BadRequestException(
+          `Proveedor de WhatsApp no soportado: ${config.provider}`
+        );
+    }
+  }
 
-  @Column({ name: 'estado', type: 'varchar', length: 20, nullable: true })
-  estado: string; // 'pending' | 'authorized' | 'error' | 'disabled'
+  /**
+   * Envía una notificación de nuevo turno usando el proveedor configurado para el negocio
+   */
+  async enviarNuevoTurno(
+    negocioId: number,
+    payload: NuevoTurnoWhatsappPayload,
+  ): Promise<void> {
+    try {
+      const provider = await this.obtenerProveedor(negocioId);
+      await provider.enviarNuevoTurno(negocioId, payload);
 
-  @Column({ name: 'ultima_prueba', type: 'timestamp', nullable: true })
-  ultimaPrueba: Date | null;
+      // 👈 ACTUALIZAR CONTADOR DESPUÉS DE ENVIAR EL MENSAJE
+      const config = await this.configRepository.findOne({
+        where: { negocioId, activo: true },
+      });
+      if (config && config.instanciaId) {
+        await this.instanciasService.actualizarContador(config.instanciaId);
+        console.log(`📦 [enviarNuevoTurno] Contador de instancia ${config.instanciaId} actualizado`);
+      }
+    } catch (error) {
+      console.error(`❌ Error enviando notificación WhatsApp al negocio ${negocioId}:`, error.message);
+    }
+  }
 
-  // 👈 CAMBIAR TIPOS PARA ACEPTAR NULL
-  @Column({ name: 'fecha_baja', type: 'timestamp', nullable: true })
-  fecha_baja: Date | null;
+  /**
+   * Envía un mensaje de prueba usando el proveedor configurado para el negocio
+   * @throws Error si el proveedor falla
+   */
+  async enviarMensajePrueba(negocioId: number): Promise<void> {
+    const provider = await this.obtenerProveedor(negocioId);
+    await provider.enviarMensajePrueba(negocioId);
+  }
 
-  @Column({ name: 'usuario_baja', type: 'varchar', length: 50, nullable: true })
-  usuario_baja: string | null;
+  /**
+   * Valida la conexión con el proveedor configurado para el negocio
+   */
+  async validarConexion(negocioId: number): Promise<boolean> {
+    try {
+      const config = await this.configRepository.findOne({
+        where: { negocioId, activo: true },
+      });
+      
+      if (!config || !config.instanciaId) {
+        console.error(`❌ El negocio ${negocioId} no tiene instancia asignada`);
+        return false;
+      }
+      
+      const instancia = await this.instanciasService.findOne(config.instanciaId);
+      
+      if (!instancia) {
+        console.error(`❌ Instancia ${config.instanciaId} no encontrada`);
+        return false;
+      }
+      
+      const esValido = await this.greenApiProvider.validarConexionConCredenciales(
+        instancia.instanceId,
+        instancia.apiToken
+      );
+      
+      config.estado = esValido ? 'authorized' : 'error';
+      config.ultimaPrueba = new Date();
+      await this.configRepository.save(config);
+      
+      return esValido;
+    } catch (error) {
+      console.error(`❌ Error validando conexión WhatsApp del negocio ${negocioId}:`, error.message);
+      return false;
+    }
+  }
 
-  // ===== RELACIONES =====
-  @ManyToOne(() => Negocio)
-  @JoinColumn({ name: 'negocio_id' })
-  negocio: Negocio;
+  /**
+   * Obtiene la configuración de WhatsApp de un negocio
+   */
+  async obtenerConfiguracion(negocioId: number): Promise<WhatsappConfig | null> {
+    return this.configRepository.findOne({
+      where: { negocioId },
+    });
+  }
 
-  // 👈 NUEVA RELACIÓN: ManyToOne con InstanciaWhatsapp
-  @ManyToOne(() => InstanciaWhatsapp)
-  @JoinColumn({ name: 'instancia_id' })
-  instancia: InstanciaWhatsapp;
+  /**
+   * Guarda o actualiza la configuración de WhatsApp de un negocio
+   */
+  async guardarConfiguracion(
+    negocioId: number,
+    phoneNumber?: string,
+    provider: string = 'greenapi',
+  ): Promise<WhatsappConfig> {
+    console.log(`📦 [guardarConfiguracion] Iniciando para negocio ID ${negocioId}`);
+    
+    const negocio = await this.negocioRepository.findOne({
+      where: { id: negocioId },
+    });
+    if (!negocio) {
+      throw new NotFoundException(`Negocio con ID ${negocioId} no encontrado`);
+    }
+    console.log(`📦 [guardarConfiguracion] Negocio encontrado: ${negocio.nombre}`);
+
+    const instancia = await this.instanciasService.findDisponible();
+    if (!instancia) {
+      throw new BadRequestException(
+        'No hay instancias de WhatsApp disponibles. Contactá al administrador.'
+      );
+    }
+    console.log(`📦 [guardarConfiguracion] Instancia encontrada: ID ${instancia.id}`);
+    console.log(`📦 [guardarConfiguracion] Instancia - instanceId: ${instancia.instanceId}`);
+    console.log(`📦 [guardarConfiguracion] Instancia - apiToken: ${instancia.apiToken ? '***' : 'null'}`);
+    console.log(`📦 [guardarConfiguracion] Instancia - numeroWhatsapp: ${instancia.numeroWhatsapp}`);
+    console.log(`📦 [guardarConfiguracion] Instancia - negociosActivos: ${instancia.negociosActivos}`);
+    console.log(`📦 [guardarConfiguracion] Instancia - estado: ${instancia.estado}`);
+
+    let config = await this.configRepository.findOne({
+      where: { negocioId },
+    });
+
+    let phoneNumberFinal: string | null = null;
+    try {
+      if (phoneNumber) {
+        phoneNumberFinal = normalizePhoneNumber(phoneNumber);
+      } else if (negocio.whatsapp_e164) {
+        phoneNumberFinal = normalizePhoneNumber(negocio.whatsapp_e164);
+      }
+    } catch (error) {
+      console.error('❌ Error normalizando número:', error.message);
+      throw new BadRequestException(`Número de teléfono inválido: ${error.message}`);
+    }
+    console.log(`📦 [guardarConfiguracion] phoneNumberFinal: ${phoneNumberFinal}`);
+
+    if (config) {
+      console.log(`📦 [guardarConfiguracion] Actualizando configuración existente ID ${config.id}`);
+      config.phoneNumber = phoneNumberFinal;
+      config.provider = provider;
+      config.activo = true;
+      config.estado = 'pending';
+      config.instanciaId = instancia.id;
+      config.instanceId = instancia.instanceId;
+      config.apiToken = instancia.apiToken;
+      config.fecha_baja = null; // 👈 LIMPIAR
+      config.usuario_baja = null; // 👈 LIMPIAR
+      config.usuario_modificacion = 'system';
+      config.fecha_modificacion = new Date();
+    } else {
+      console.log(`📦 [guardarConfiguracion] Creando nueva configuración`);
+      config = this.configRepository.create({
+        negocioId,
+        phoneNumber: phoneNumberFinal,
+        provider,
+        activo: true,
+        estado: 'pending',
+        instanciaId: instancia.id,
+        instanceId: instancia.instanceId,
+        apiToken: instancia.apiToken,
+        usuario_alta: 'system',
+        fecha_alta: new Date(),
+      });
+    }
+
+    console.log(`📦 [guardarConfiguracion] Configuración a guardar:`);
+    console.log(`  - instanceId: ${config.instanceId}`);
+    console.log(`  - apiToken: ${config.apiToken ? '***' : 'null'}`);
+    console.log(`  - instanciaId: ${config.instanciaId}`);
+    console.log(`  - phoneNumber: ${config.phoneNumber}`);
+
+    const configGuardada = await this.configRepository.save(config);
+    console.log(`📦 [guardarConfiguracion] Configuración guardada con ID ${configGuardada.id}`);
+
+    await this.instanciasService.actualizarContador(instancia.id);
+    console.log(`📦 [guardarConfiguracion] Contador de instancia actualizado`);
+
+    return configGuardada;
+  }
+
+  /**
+   * Desactiva la configuración de WhatsApp de un negocio
+   */
+  async desactivarConfiguracion(negocioId: number): Promise<void> {
+    const config = await this.configRepository.findOne({
+      where: { negocioId },
+    });
+
+    if (config) {
+      const instanciaId = config.instanciaId;
+      config.activo = false;
+      config.estado = 'disabled';
+      config.fecha_baja = new Date();
+      config.usuario_baja = 'system';
+      config.usuario_modificacion = 'system';
+      config.fecha_modificacion = new Date();
+      await this.configRepository.save(config);
+
+      if (instanciaId) {
+        await this.instanciasService.actualizarContador(instanciaId);
+      }
+    }
+  }
+
+  // ============================================================
+  // 👈 MÉTODOS PARA GESTIONAR EL ACCESO A WHATSAPP
+  // ============================================================
+
+  async obtenerAcceso(negocioId: number): Promise<boolean> {
+    const config = await this.configRepository.findOne({
+      where: { negocioId },
+    });
+    return config?.accesoWhatsapp || false;
+  }
+
+  async actualizarAcceso(negocioId: number, acceso: boolean): Promise<void> {
+    const config = await this.configRepository.findOne({
+      where: { negocioId },
+    });
+    if (!config) {
+      throw new NotFoundException(
+        `Configuración de WhatsApp para negocio ID ${negocioId} no encontrada.`
+      );
+    }
+    config.accesoWhatsapp = acceso;
+    await this.configRepository.save(config);
+    console.log(`📦 [actualizarAcceso] Negocio ID ${negocioId}: acceso = ${acceso}`);
+  }
 }
