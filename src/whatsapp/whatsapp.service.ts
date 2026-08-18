@@ -155,7 +155,7 @@ export class WhatsappService {
 
   /**
    * Guarda o actualiza la configuración de WhatsApp de un negocio
-   * 👈 AHORA NORMALIZA EL NÚMERO DE TELÉFONO
+   * 👈 AHORA LIMPIA FECHA_BAJA AL REACTIVAR
    */
   async guardarConfiguracion(
     negocioId: number,
@@ -212,6 +212,8 @@ export class WhatsappService {
       config.instanciaId = instancia.id;
       config.instanceId = instancia.instanceId;
       config.apiToken = instancia.apiToken;
+      config.fecha_baja = null; // 👈 LIMPIAR FECHA BAJA
+      config.usuario_baja = null; // 👈 LIMPIAR USUARIO BAJA
       config.usuario_modificacion = 'system';
       config.fecha_modificacion = new Date();
     } else {
