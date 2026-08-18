@@ -3,7 +3,7 @@ import { IsString, IsNotEmpty, IsOptional, Length, IsBoolean } from 'class-valid
 
 /**
  * DTO para crear/actualizar la configuración de WhatsApp de un negocio
- * 👈 AHORA SOLO RECIBE phoneNumber (y provider opcional)
+ * 👈 AHORA INCLUYE accesoWhatsapp (opcional)
  * La instancia se asigna automáticamente desde el backend
  */
 export class CreateWhatsappConfigDto {
@@ -19,4 +19,9 @@ export class CreateWhatsappConfigDto {
   @IsOptional()
   @IsBoolean({ message: 'Activo debe ser verdadero o falso' })
   activo?: boolean;
+
+  // 👈 NUEVO CAMPO: acceso a la funcionalidad (controlado por administrador)
+  @IsOptional()
+  @IsBoolean({ message: 'Acceso debe ser verdadero o falso' })
+  accesoWhatsapp?: boolean;
 }
