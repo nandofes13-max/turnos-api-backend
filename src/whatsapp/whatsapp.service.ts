@@ -75,6 +75,7 @@ export class WhatsappService {
 
   /**
    * Envía una notificación de nuevo turno usando el proveedor configurado para el negocio
+   * 👈 AHORA ACTUALIZA EL CONTADOR DE LA INSTANCIA
    */
   async enviarNuevoTurno(
     negocioId: number,
@@ -83,6 +84,15 @@ export class WhatsappService {
     try {
       const provider = await this.obtenerProveedor(negocioId);
       await provider.enviarNuevoTurno(negocioId, payload);
+
+      // 👈 ACTUALIZAR CONTADOR DESPUÉS DE ENVIAR EL MENSAJE
+      const config = await this.configRepository.findOne({
+        where: { negocioId, activo: true },
+      });
+      if (config && config.instanciaId) {
+        await this.instanciasService.actualizarContador(config.instanciaId);
+        console.log(`📦 [enviarNuevoTurno] Contador de instancia ${config.instanciaId} actualizado`);
+      }
     } catch (error) {
       console.error(`❌ Error enviando notificación WhatsApp al negocio ${negocioId}:`, error.message);
     }
