@@ -5,10 +5,9 @@ import { Repository } from 'typeorm';
 import { WhatsappProvider, NuevoTurnoWhatsappPayload } from './interfaces/whatsapp-provider.interface';
 import { GreenApiProvider } from './providers/green-api.provider';
 import { WhatsappConfig } from './entities/whatsapp-config.entity';
-import { InstanciaWhatsapp } from './entities/instancia-whatsapp.entity'; // 👈 RUTA CORREGIDA
-import { Negocio } from '../negocios/entities/negocio.entity'; // 👈 RUTA CORREGIDA
-import { BaseEntityAuditable } from '../entities/base.entity'; // 👈 RUTA CORREGIDA
+import { Negocio } from '../negocios/entities/negocio.entity';
 import { InstanciasWhatsappService } from './instancias-whatsapp.service';
+// 👈 IMPORTAR FUNCIÓN DE NORMALIZACIÓN
 import { normalizePhoneNumber } from '../common/utils/phone-utils';
 
 @Injectable()
@@ -76,6 +75,7 @@ export class WhatsappService {
 
   /**
    * Envía una notificación de nuevo turno usando el proveedor configurado para el negocio
+   * 👈 AHORA ACTUALIZA EL CONTADOR DE LA INSTANCIA
    */
   async enviarNuevoTurno(
     negocioId: number,
@@ -155,6 +155,7 @@ export class WhatsappService {
 
   /**
    * Guarda o actualiza la configuración de WhatsApp de un negocio
+   * 👈 AHORA LIMPIA FECHA_BAJA AL REACTIVAR
    */
   async guardarConfiguracion(
     negocioId: number,
@@ -188,6 +189,7 @@ export class WhatsappService {
       where: { negocioId },
     });
 
+    // 👈 NORMALIZAR EL NÚMERO DE TELÉFONO
     let phoneNumberFinal: string | null = null;
     try {
       if (phoneNumber) {
@@ -210,8 +212,8 @@ export class WhatsappService {
       config.instanciaId = instancia.id;
       config.instanceId = instancia.instanceId;
       config.apiToken = instancia.apiToken;
-      config.fecha_baja = null; // 👈 LIMPIAR
-      config.usuario_baja = null; // 👈 LIMPIAR
+      config.fecha_baja = null; // 👈 LIMPIAR FECHA BAJA
+      config.usuario_baja = null; // 👈 LIMPIAR USUARIO BAJA
       config.usuario_modificacion = 'system';
       config.fecha_modificacion = new Date();
     } else {
@@ -270,16 +272,28 @@ export class WhatsappService {
   }
 
   // ============================================================
-  // 👈 MÉTODOS PARA GESTIONAR EL ACCESO A WHATSAPP
+  // 👈 NUEVOS MÉTODOS PARA GESTIONAR EL ACCESO A WHATSAPP
   // ============================================================
 
+  /**
+   * Obtiene el estado de acceso a WhatsApp de un negocio
+   * @param negocioId - ID del negocio
+   * @returns true si tiene acceso, false en caso contrario
+   */
   async obtenerAcceso(negocioId: number): Promise<boolean> {
     const config = await this.configRepository.findOne({
       where: { negocioId },
     });
+    // Si no existe configuración, devolvemos false (acceso denegado)
     return config?.accesoWhatsapp || false;
   }
 
+  /**
+   * Actualiza el estado de acceso a WhatsApp de un negocio
+   * @param negocioId - ID del negocio
+   * @param acceso - true para habilitar, false para deshabilitar
+   * @throws NotFoundException si la configuración no existe
+   */
   async actualizarAcceso(negocioId: number, acceso: boolean): Promise<void> {
     const config = await this.configRepository.findOne({
       where: { negocioId },
