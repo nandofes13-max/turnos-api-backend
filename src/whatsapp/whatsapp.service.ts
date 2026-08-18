@@ -7,7 +7,6 @@ import { GreenApiProvider } from './providers/green-api.provider';
 import { WhatsappConfig } from './entities/whatsapp-config.entity';
 import { Negocio } from '../negocios/entities/negocio.entity';
 import { InstanciasWhatsappService } from './instancias-whatsapp.service';
-// 👈 IMPORTAR FUNCIÓN DE NORMALIZACIÓN
 import { normalizePhoneNumber } from '../common/utils/phone-utils';
 
 @Injectable()
@@ -23,9 +22,6 @@ export class WhatsappService {
 
   /**
    * Obtiene el número de WhatsApp de un negocio
-   * - Primero busca en negocio_whatsapp_config (si está activo)
-   * - Si no, busca en la tabla negocio
-   * @returns string | null
    */
   async obtenerNumeroWhatsAppNegocio(negocioId: number): Promise<string | null> {
     const config = await this.configRepository.findOne({
@@ -49,8 +45,6 @@ export class WhatsappService {
 
   /**
    * Obtiene el proveedor de WhatsApp configurado para un negocio
-   * @throws NotFoundException si el negocio no tiene configuración
-   * @throws BadRequestException si el proveedor no está soportado
    */
   private async obtenerProveedor(negocioId: number): Promise<WhatsappProvider> {
     const config = await this.configRepository.findOne({
@@ -74,8 +68,7 @@ export class WhatsappService {
   }
 
   /**
-   * Envía una notificación de nuevo turno usando el proveedor configurado para el negocio
-   * 👈 AHORA ACTUALIZA EL CONTADOR DE LA INSTANCIA
+   * Envía una notificación de nuevo turno y actualiza el contador
    */
   async enviarNuevoTurno(
     negocioId: number,
@@ -85,7 +78,6 @@ export class WhatsappService {
       const provider = await this.obtenerProveedor(negocioId);
       await provider.enviarNuevoTurno(negocioId, payload);
 
-      // 👈 ACTUALIZAR CONTADOR DESPUÉS DE ENVIAR EL MENSAJE
       const config = await this.configRepository.findOne({
         where: { negocioId, activo: true },
       });
@@ -99,8 +91,7 @@ export class WhatsappService {
   }
 
   /**
-   * Envía un mensaje de prueba usando el proveedor configurado para el negocio
-   * @throws Error si el proveedor falla
+   * Envía un mensaje de prueba
    */
   async enviarMensajePrueba(negocioId: number): Promise<void> {
     const provider = await this.obtenerProveedor(negocioId);
@@ -108,7 +99,7 @@ export class WhatsappService {
   }
 
   /**
-   * Valida la conexión con el proveedor configurado para el negocio
+   * Valida la conexión con el proveedor configurado
    */
   async validarConexion(negocioId: number): Promise<boolean> {
     try {
@@ -155,7 +146,7 @@ export class WhatsappService {
 
   /**
    * Guarda o actualiza la configuración de WhatsApp de un negocio
-   * 👈 AHORA NORMALIZA EL NÚMERO DE TELÉFONO Y ACTUALIZA EL CONTADOR
+   * 👈 AHORA LIMPIA FECHA_BAJA AL REACTIVAR (como en NegociosService)
    */
   async guardarConfiguracion(
     negocioId: number,
@@ -189,7 +180,6 @@ export class WhatsappService {
       where: { negocioId },
     });
 
-    // 👈 NORMALIZAR EL NÚMERO DE TELÉFONO
     let phoneNumberFinal: string | null = null;
     try {
       if (phoneNumber) {
@@ -212,7 +202,11 @@ export class WhatsappService {
       config.instanciaId = instancia.id;
       config.instanceId = instancia.instanceId;
       config.apiToken = instancia.apiToken;
-      // 👈 NO TOCAMOS fecha_baja ni usuario_baja
+      
+      // 👈 LIMPIAR FECHA_BAJA AL REACTIVAR (como en NegociosService)
+      config.fecha_baja = null;
+      config.usuario_baja = null;
+      
       config.usuario_modificacion = 'system';
       config.fecha_modificacion = new Date();
     } else {
@@ -271,28 +265,16 @@ export class WhatsappService {
   }
 
   // ============================================================
-  // 👈 NUEVOS MÉTODOS PARA GESTIONAR EL ACCESO A WHATSAPP
+  // 👈 MÉTODOS PARA GESTIONAR EL ACCESO A WHATSAPP
   // ============================================================
 
-  /**
-   * Obtiene el estado de acceso a WhatsApp de un negocio
-   * @param negocioId - ID del negocio
-   * @returns true si tiene acceso, false en caso contrario
-   */
   async obtenerAcceso(negocioId: number): Promise<boolean> {
     const config = await this.configRepository.findOne({
       where: { negocioId },
     });
-    // Si no existe configuración, devolvemos false (acceso denegado)
     return config?.accesoWhatsapp || false;
   }
 
-  /**
-   * Actualiza el estado de acceso a WhatsApp de un negocio
-   * @param negocioId - ID del negocio
-   * @param acceso - true para habilitar, false para deshabilitar
-   * @throws NotFoundException si la configuración no existe
-   */
   async actualizarAcceso(negocioId: number, acceso: boolean): Promise<void> {
     const config = await this.configRepository.findOne({
       where: { negocioId },
