@@ -31,6 +31,10 @@ export class WhatsappConfig extends BaseEntityAuditable {
   @Column({ name: 'phone_number', type: 'varchar', length: 20, nullable: true })
   phoneNumber: string | null;
 
+  // 👈 NUEVO CAMPO: acceso a la funcionalidad (controlado por administrador)
+  @Column({ name: 'acceso_whatsapp', type: 'boolean', default: false })
+  accesoWhatsapp: boolean;
+
   // ===== FUTURO: META CLOUD API =====
   // @Column({ name: 'meta_waba_id', type: 'varchar', length: 100, nullable: true })
   // metaWabaId: string;
