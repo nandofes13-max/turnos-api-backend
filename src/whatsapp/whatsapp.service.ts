@@ -258,4 +258,41 @@ export class WhatsappService {
       }
     }
   }
+
+  // ============================================================
+  // 👈 NUEVOS MÉTODOS PARA GESTIONAR EL ACCESO A WHATSAPP
+  // ============================================================
+
+  /**
+   * Obtiene el estado de acceso a WhatsApp de un negocio
+   * @param negocioId - ID del negocio
+   * @returns true si tiene acceso, false en caso contrario
+   */
+  async obtenerAcceso(negocioId: number): Promise<boolean> {
+    const config = await this.configRepository.findOne({
+      where: { negocioId },
+    });
+    // Si no existe configuración, devolvemos false (acceso denegado)
+    return config?.accesoWhatsapp || false;
+  }
+
+  /**
+   * Actualiza el estado de acceso a WhatsApp de un negocio
+   * @param negocioId - ID del negocio
+   * @param acceso - true para habilitar, false para deshabilitar
+   * @throws NotFoundException si la configuración no existe
+   */
+  async actualizarAcceso(negocioId: number, acceso: boolean): Promise<void> {
+    const config = await this.configRepository.findOne({
+      where: { negocioId },
+    });
+    if (!config) {
+      throw new NotFoundException(
+        `Configuración de WhatsApp para negocio ID ${negocioId} no encontrada.`
+      );
+    }
+    config.accesoWhatsapp = acceso;
+    await this.configRepository.save(config);
+    console.log(`📦 [actualizarAcceso] Negocio ID ${negocioId}: acceso = ${acceso}`);
+  }
 }
