@@ -40,12 +40,7 @@ export class WhatsappConfig extends BaseEntityAuditable {
   @Column({ name: 'ultima_prueba', type: 'timestamp', nullable: true })
   ultimaPrueba: Date | null;
 
-  // 👈 AGREGAR CAMPOS DE AUDITORÍA (como en Negocio)
-  @Column({ name: 'fecha_baja', type: 'timestamp', nullable: true })
-  fecha_baja: Date | null;
-
-  @Column({ name: 'usuario_baja', type: 'varchar', length: 50, nullable: true })
-  usuario_baja: string | null;
+  // 👈 ELIMINAR fecha_baja y usuario_baja (ya existen en BaseEntityAuditable)
 
   @ManyToOne(() => Negocio)
   @JoinColumn({ name: 'negocio_id' })
