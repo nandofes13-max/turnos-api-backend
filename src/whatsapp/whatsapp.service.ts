@@ -146,7 +146,7 @@ export class WhatsappService {
 
   /**
    * Guarda o actualiza la configuración de WhatsApp de un negocio
-   * 👈 AHORA LIMPIA FECHA_BAJA AL REACTIVAR (como en NegociosService)
+   * 👈 AHORA LIMPIA FECHA_BAJA USANDO "as any" (como en NegociosService)
    */
   async guardarConfiguracion(
     negocioId: number,
@@ -203,9 +203,9 @@ export class WhatsappService {
       config.instanceId = instancia.instanceId;
       config.apiToken = instancia.apiToken;
       
-      // 👈 LIMPIAR FECHA_BAJA AL REACTIVAR (como en NegociosService)
-      config.fecha_baja = null;
-      config.usuario_baja = null;
+      // 👈 LIMPIAR FECHA_BAJA USANDO "as any" (como en NegociosService)
+      (config as any).fecha_baja = null;
+      (config as any).usuario_baja = null;
       
       config.usuario_modificacion = 'system';
       config.fecha_modificacion = new Date();
