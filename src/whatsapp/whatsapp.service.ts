@@ -146,7 +146,6 @@ export class WhatsappService {
 
   /**
    * Guarda o actualiza la configuración de WhatsApp de un negocio
-   * 👈 AHORA LIMPIA FECHA_BAJA USANDO "as any" (como en NegociosService)
    */
   async guardarConfiguracion(
     negocioId: number,
@@ -203,7 +202,6 @@ export class WhatsappService {
       config.instanceId = instancia.instanceId;
       config.apiToken = instancia.apiToken;
       
-      // 👈 LIMPIAR FECHA_BAJA USANDO "as any" (como en NegociosService)
       (config as any).fecha_baja = null;
       (config as any).usuario_baja = null;
       
@@ -287,5 +285,41 @@ export class WhatsappService {
     config.accesoWhatsapp = acceso;
     await this.configRepository.save(config);
     console.log(`📦 [actualizarAcceso] Negocio ID ${negocioId}: acceso = ${acceso}`);
+  }
+
+  // ============================================================
+  // 👈 NUEVO MÉTODO: OBTENER ESTADO COMPLETO
+  // ============================================================
+
+  /**
+   * Obtiene el estado completo de WhatsApp de un negocio
+   * @param negocioId - ID del negocio
+   * @returns Objeto con activo, estado, accesoWhatsapp y phoneNumber
+   */
+  async obtenerEstado(negocioId: number): Promise<{
+    activo: boolean;
+    estado: string | null;
+    accesoWhatsapp: boolean;
+    phoneNumber: string | null;
+  }> {
+    const config = await this.configRepository.findOne({
+      where: { negocioId },
+    });
+
+    if (!config) {
+      return {
+        activo: false,
+        estado: null,
+        accesoWhatsapp: false,
+        phoneNumber: null,
+      };
+    }
+
+    return {
+      activo: config.activo,
+      estado: config.estado,
+      accesoWhatsapp: config.accesoWhatsapp,
+      phoneNumber: config.phoneNumber,
+    };
   }
 }
