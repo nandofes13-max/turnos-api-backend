@@ -47,7 +47,6 @@ export class WhatsappController {
   /**
    * POST /whatsapp/:negocioId/config
    * Guarda o actualiza la configuración de WhatsApp de un negocio
-   * 👈 AHORA SOLO RECIBE phoneNumber (y provider opcional)
    */
   @Post(':negocioId/config')
   async guardarConfiguracion(
@@ -131,7 +130,7 @@ export class WhatsappController {
   }
 
   // ============================================================
-  // 👈 NUEVOS ENDPOINTS PARA GESTIONAR EL ACCESO A WHATSAPP
+  // 👈 ENDPOINTS PARA GESTIONAR EL ACCESO A WHATSAPP
   // ============================================================
 
   /**
@@ -163,5 +162,20 @@ export class WhatsappController {
       success: true,
       message: `Acceso a WhatsApp actualizado correctamente a: ${acceso ? 'HABILITADO' : 'DESHABILITADO'}`,
     };
+  }
+
+  // ============================================================
+  // 👈 NUEVO ENDPOINT: OBTENER ESTADO COMPLETO DE WHATSAPP
+  // ============================================================
+
+  /**
+   * GET /whatsapp/:negocioId/estado
+   * Obtiene el estado completo de WhatsApp de un negocio
+   */
+  @Get(':negocioId/estado')
+  async obtenerEstado(@Param('negocioId') negocioId: string) {
+    const id = Number(negocioId);
+    const estado = await this.whatsappService.obtenerEstado(id);
+    return estado;
   }
 }
